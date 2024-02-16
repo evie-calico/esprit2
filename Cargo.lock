@@ -42,10 +42,20 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 name = "esprit2"
 version = "0.1.0"
 dependencies = [
+ "grid",
  "lazy_static",
  "sdl2",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "grid"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d196ffc1627db18a531359249b2bf8416178d84b729f3cebeb278f285fb9b58c"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

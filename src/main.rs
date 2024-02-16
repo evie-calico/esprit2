@@ -1,5 +1,5 @@
-use esprit2::character;
 use esprit2::options::{Options, Shortcut, RESOURCE_DIRECTORY, USER_DIRECTORY};
+use esprit2::{character, world};
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Scancode;
@@ -22,6 +22,7 @@ pub fn main() {
     let texture_creator = canvas.texture_creator();
 
     let options = Options::default();
+    let mut floor = world::Floor::default();
     let mut player = character::Piece::default();
     let sleep_texture = texture_creator
         .load_texture(RESOURCE_DIRECTORY.join("luvui_sleep.png"))
@@ -71,6 +72,16 @@ pub fn main() {
             }
         }
         // The rest of the game loop goes here...
+        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        for (x, col) in floor.map.iter_cols().enumerate() {
+            for (y, tile) in col.enumerate() {
+                if *tile == world::Tile::Wall {
+                    canvas
+                        .fill_rect(Rect::new((x as i32) * 64, (y as i32) * 64, 64, 64))
+                        .unwrap();
+                }
+            }
+        }
 
         canvas
             .copy(
