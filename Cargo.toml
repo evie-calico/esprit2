@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 grid = { version = "0.13.0", features = ["serde"] }
 lazy_static = "1.4.0"
-sdl2 = { version = "0.36.0", features = ["bundled", "image"] }
+sdl2 = { version = "0.36.0", features = ["image", "ttf"] }
 serde = { version = "1.0.196", features = ["derive"] }
 toml = "0.8.10"
