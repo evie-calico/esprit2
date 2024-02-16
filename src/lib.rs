@@ -1,6 +1,9 @@
 pub mod character;
+pub mod console;
+pub mod gui;
 pub mod item;
 pub mod options;
+pub mod spell;
 pub mod world;
 
 /// Arbitrary Unit of Time.

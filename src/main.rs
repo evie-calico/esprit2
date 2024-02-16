@@ -1,5 +1,5 @@
 use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
-use esprit2::{character, world};
+use esprit2::{character, console::Console, gui, world};
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Scancode;
@@ -24,6 +24,16 @@ pub fn main() {
     let texture_creator = canvas.texture_creator();
 
     let options = Options::default();
+    let mut console = Console::default();
+    console.println("Hello, world!");
+    console.println("Luvui scratches the cat.");
+    console.println("The cat ran away.");
+    console.println("Luvui casts Magic Missile.");
+    console.println("Her magic missile strikes the cat!");
+    console.println("The cat scratches Aris");
+    console.println("Aris bites the cat");
+    console.println("The cat scampered off.");
+    console.println("Luvui's level increased to 2!");
     let floor = world::Floor::default();
     let mut player = character::Piece::default();
     let sleep_texture = texture_creator
@@ -32,7 +42,7 @@ pub fn main() {
     let font = ttf_context
         .load_font(
             RESOURCE_DIRECTORY.join("FantasqueSansMNerdFontPropo-Regular.ttf"),
-            100,
+            24,
         )
         .unwrap();
 
@@ -123,23 +133,35 @@ pub fn main() {
         // Configure pamphlet viewport
         canvas.set_viewport(None);
 
-        canvas.set_draw_color(Color::WHITE);
-
-        canvas.copy(
-            &font
-                .render("Hello, world!")
-                .shaded(Color::WHITE, Color::BLACK)
-                .unwrap()
-                .as_texture(&texture_creator)
-                .unwrap(),
-            None,
+        console.draw(
+            &mut canvas,
             Rect::new(
-                (window_size.0 - PAMPHLET_WIDTH + 50) as i32,
-                50,
-                PAMPHLET_WIDTH - 100,
-                50,
+                0,
+                (window_size.1 - CONSOLE_HEIGHT) as i32,
+                window_size.0 - PAMPHLET_WIDTH,
+                CONSOLE_HEIGHT,
             ),
+            &font,
         );
+
+        for i in 0..2 {
+            let mut player_window = gui::Context::new(
+                &mut canvas,
+                Rect::new(
+                    (window_size.0 - PAMPHLET_WIDTH + PAMPHLET_WIDTH / 2 * i) as i32,
+                    0,
+                    PAMPHLET_WIDTH / 2,
+                    // TODO: Make this a constant/pick a size for these
+                    500,
+                ),
+            );
+
+            player_window.label("Luvui (Cj)", &font);
+            player_window.label("HP: 10/10", &font);
+            player_window.label("SP: 10/10", &font);
+            player_window.label("Meow", &font);
+        }
+
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
