@@ -1,4 +1,4 @@
-use esprit2::options::{Options, Shortcut, RESOURCE_DIRECTORY, USER_DIRECTORY};
+use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::{character, world};
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
@@ -22,7 +22,7 @@ pub fn main() {
     let texture_creator = canvas.texture_creator();
 
     let options = Options::default();
-    let mut floor = world::Floor::default();
+    let floor = world::Floor::default();
     let mut player = character::Piece::default();
     let sleep_texture = texture_creator
         .load_texture(RESOURCE_DIRECTORY.join("luvui_sleep.png"))
