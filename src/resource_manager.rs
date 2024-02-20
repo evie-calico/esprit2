@@ -17,6 +17,7 @@ pub enum ResourceManagerError {
 }
 
 pub struct ResourceManager<'texture> {
+    missing_texture: Texture<'texture>,
     sheets: HashMap<PathBuf, character::Sheet>,
     textures: HashMap<PathBuf, Texture<'texture>>,
 }
@@ -63,14 +64,25 @@ impl<'texture> ResourceManager<'texture> {
                 .join(path.file_prefix().unwrap());
             textures.insert(reference, texture);
         }
-        Ok(Self { sheets, textures })
+
+        let missing_texture = texture_creator
+            .load_texture_bytes(include_bytes!("res/missing_texture.png"))
+            .unwrap();
+
+        Ok(Self {
+            sheets,
+            textures,
+            missing_texture,
+        })
     }
 
     pub fn get_sheet(&self, path: impl AsRef<Path>) -> Option<&character::Sheet> {
         self.sheets.get(path.as_ref())
     }
 
-    pub fn get_texture(&self, path: impl AsRef<Path>) -> Option<&Texture> {
-        self.textures.get(path.as_ref())
+    pub fn get_texture(&self, path: impl AsRef<Path>) -> &Texture {
+        self.textures
+            .get(path.as_ref())
+            .unwrap_or(&self.missing_texture)
     }
 }

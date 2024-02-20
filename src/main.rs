@@ -6,8 +6,9 @@ use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::rwops::RWops;
-use std::fs;
+use std::process::exit;
 use std::time::Duration;
+use tracing::error;
 
 pub fn main() {
     // SDL initialization.
@@ -22,10 +23,20 @@ pub fn main() {
         .unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+
+    // Logging initialization.
+    tracing_subscriber::fmt::init();
 
     // Game initialization.
-    let resources = ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator).unwrap();
-    let mut options = Options::default();
+    let resources = match ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator) {
+        Ok(resources) => resources,
+        Err(msg) => {
+            error!("Failed to open resource directory: {msg}");
+            exit(1);
+        }
+    };
+    let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
     let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
     let player = character::Piece {
@@ -51,7 +62,7 @@ pub fn main() {
     };
     world_manager.get_floor_mut().characters.push(player);
     world_manager.get_floor_mut().characters.push(ally);
-    let sleep_texture = resources.get_texture("luvui_sleep").unwrap();
+    let sleep_texture = resources.get_texture("luvui_sleep");
     let font = ttf_context
         .load_font_from_rwops(
             RWops::from_bytes(include_bytes!(
@@ -73,14 +84,6 @@ pub fn main() {
     console.print_defeat("The cat scampered off.");
     console.print_special("Luvui's level increased to 2!");
 
-    // This is mostly just to see what the toml looks like: very pretty of course.
-    fs::write(
-        USER_DIRECTORY.join("options.toml"),
-        toml::to_string(&options).unwrap(),
-    )
-    .unwrap();
-
-    let mut event_pump = sdl_context.event_pump().unwrap();
     let mut i = 0;
     'running: loop {
         // Input processing
@@ -99,26 +102,28 @@ pub fn main() {
                     let next_character = world_manager.next_character();
                     if next_character.player_controlled {
                         if options.controls.left.contains(&(keycode as i32)) {
-                            options.ui.pamphlet_width += 50;
-                            next_character.x -= 1;
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::Left));
                         }
                         if options.controls.right.contains(&(keycode as i32)) {
-                            options.ui.pamphlet_width -= 50;
-                            next_character.x += 1;
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::Right));
                         }
                         if options.controls.up.contains(&(keycode as i32)) {
-                            options.ui.console_height += 50;
-                            next_character.y -= 1;
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::Up));
                         }
                         if options.controls.down.contains(&(keycode as i32)) {
-                            options.ui.console_height -= 50;
-                            next_character.y += 1;
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::Down));
                         }
                     }
                 }
                 _ => {}
             }
         }
+
+        world_manager.next_character().act();
 
         // Rendering
         // Clear the screen.

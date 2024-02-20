@@ -1,5 +1,6 @@
 use sdl2::keyboard::Keycode;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 /// SDL2 Keycodes do not implement serde traits,
 /// but they can be converted to and from i32s.
@@ -26,6 +27,20 @@ fn get_resource_directory() -> PathBuf {
 pub struct Options {
     pub ui: UserInterface,
     pub controls: Controls,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum OpenOptionsError {
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("{0}")]
+    Toml(#[from] toml::de::Error),
+}
+
+impl Options {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, OpenOptionsError> {
+        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

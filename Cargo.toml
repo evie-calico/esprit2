@@ -13,4 +13,6 @@ sdl2 = { version = "0.36.0", features = ["image", "ttf"] }
 serde = { version = "1.0.196", features = ["derive"] }
 thiserror = "1.0.57"
 toml = "0.8.10"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
 uuid = { version = "1.7.0", features = ["v4", "fast-rng", "serde"] }

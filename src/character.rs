@@ -9,6 +9,7 @@ pub struct Piece {
 
     pub x: i32,
     pub y: i32,
+    pub next_action: Option<Action>,
 
     pub player_controlled: bool,
     pub alliance: Alliance,
@@ -21,15 +22,62 @@ impl Piece {
             sheet,
             x: 0,
             y: 0,
+            next_action: None,
             player_controlled: false,
             alliance: Alliance::default(),
         }
+    }
+
+    pub fn act(&mut self) {
+        let Some(action) = self.next_action.take() else {
+            return;
+        };
+        match action {
+            Action::Move(dir) => {
+                self.move_by(dir);
+            }
+        }
+    }
+
+    pub fn move_by(&mut self, dir: OrdDir) {
+        let (x, y) = match dir {
+            OrdDir::Up => (0, -1),
+            OrdDir::UpRight => (1, -1),
+            OrdDir::Right => (1, 0),
+            OrdDir::DownRight => (1, 1),
+            OrdDir::Down => (0, 1),
+            OrdDir::DownLeft => (-1, 1),
+            OrdDir::Left => (-1, 0),
+            OrdDir::UpLeft => (-1, -1),
+        };
+        self.x += x;
+        self.y += y;
     }
 }
 impl Default for Piece {
     fn default() -> Self {
         Self::new(Sheet::default())
     }
+}
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum OrdDir {
+    Up,
+    UpRight,
+    Right,
+    DownRight,
+    Down,
+    DownLeft,
+    Left,
+    UpLeft,
+}
+
+/// Anything a character piece can "do".
+///
+/// This is the only way that character logic or player input should communicate with pieces.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum Action {
+    Move(OrdDir),
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
