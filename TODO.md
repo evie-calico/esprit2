@@ -2,14 +2,14 @@
 
 ## Engine
 
-- [ ] resource loader.
+- [x] resource loader.
 - [ ] Actor system
 	- [ ] Pass around actions. inputs|ai -> actions
-	- [ ] party
+	- [x] party
 	- [ ] non-party allies
 - [ ] Spells
 - [ ] various attacks
-- [ ] cool UI :)
+- [x] cool UI :)
 - [ ] tilemap
 - [ ] level generation
 	- [ ] dcss-style vaults
