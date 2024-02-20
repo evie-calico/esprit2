@@ -29,40 +29,19 @@ pub fn main() {
     let player = character::Piece {
         player_controlled: true,
         alliance: character::Alliance::Friendly,
-        sheet: character::Sheet {
-            nouns: character::Nouns {
-                name: "Luvui".into(),
-                proper_name: true,
-                pronouns: character::Pronouns::Female,
-            },
-            ..Default::default()
-        },
+        sheet: toml::from_str(
+            &fs::read_to_string(RESOURCE_DIRECTORY.join("party/luvui.toml")).unwrap(),
+        )
+        .unwrap(),
         ..Default::default()
     };
     let ally = character::Piece {
         player_controlled: false,
         alliance: character::Alliance::Friendly,
-        sheet: character::Sheet {
-            nouns: character::Nouns {
-                name: "Aris".into(),
-                proper_name: true,
-                pronouns: character::Pronouns::Male,
-            },
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let ally2 = character::Piece {
-        player_controlled: false,
-        alliance: character::Alliance::Friendly,
-        sheet: character::Sheet {
-            nouns: character::Nouns {
-                name: "Aris".into(),
-                proper_name: true,
-                pronouns: character::Pronouns::Male,
-            },
-            ..Default::default()
-        },
+        sheet: toml::from_str(
+            &fs::read_to_string(RESOURCE_DIRECTORY.join("party/aris.toml")).unwrap(),
+        )
+        .unwrap(),
         ..Default::default()
     };
     let mut world_manager = world::Manager {
@@ -70,12 +49,12 @@ pub fn main() {
             level: String::from("New Level"),
             floor: 0,
         },
+
         current_level: world::Level::default(),
-        party: vec![player.id, ally.id, ally2.id],
+        party: vec![player.id, ally.id],
     };
     world_manager.get_floor_mut().characters.push(player);
     world_manager.get_floor_mut().characters.push(ally);
-    world_manager.get_floor_mut().characters.push(ally2);
     let sleep_texture = texture_creator
         .load_texture(RESOURCE_DIRECTORY.join("luvui_sleep.png"))
         .unwrap();
@@ -245,16 +224,8 @@ pub fn main() {
                         );
                         player_window.progress_bar(1.0, Color::BLUE, Color::RED, 10, 10);
                         let stats = &piece.sheet.stats;
-                        player_window.label_color(
-                            &format!("Pwr: {}/15", stats.power),
-                            Color::RED,
-                            &font,
-                        );
-                        player_window.label_color(
-                            &format!("Def: 5/{}", stats.defense),
-                            Color::BLUE,
-                            &font,
-                        );
+                        player_window.label(&format!("Pwr: {}", stats.power), &font);
+                        player_window.label(&format!("Def: {}", stats.defense), &font);
                         player_window.label(&format!("Mag: {}", stats.magic), &font);
                         player_window.label(&format!("Res: {}", stats.resistance), &font);
                     } else {

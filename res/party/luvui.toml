@@ -1,0 +1,16 @@
+level = 1
+spells = []
+speed = 12
+
+[nouns]
+name = "Luvui"
+proper_name = true
+pronouns = "Female"
+
+[stats]
+heart = 10
+soul = 10
+power = 1
+defense = 1
+magic = 1
+resistance = 1

@@ -24,8 +24,8 @@ fn get_resource_directory() -> PathBuf {
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Options {
-    pub controls: Controls,
     pub ui: UserInterface,
+    pub controls: Controls,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
