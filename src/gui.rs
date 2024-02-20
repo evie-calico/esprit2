@@ -60,10 +60,67 @@ impl<'canvas> Context<'canvas> {
         }
     }
 
+    pub fn hsplit(&mut self, views: &mut [Option<impl FnMut(&mut Context)>]) {
+        // We need to keep track of the tallest child so that we can advance our own pointer by the end of this.
+        let mut lowest_child = 0;
+        let view_count = views.len();
+        for (i, view) in views
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(i, view)| view.as_mut().map(|view| (i, view)))
+        {
+            let mut child = Context::new(
+                self.canvas,
+                Rect::new(
+                    self.x + (self.rect.width() as i32) / (view_count as i32) * i as i32,
+                    self.y,
+                    self.rect.width() / (view_count as u32),
+                    self.rect.height(),
+                ),
+            );
+            view(&mut child);
+            child.vertical();
+            lowest_child = lowest_child.max(child.y);
+        }
+        self.advance(0, (lowest_child - self.y) as u32);
+    }
+
+    pub fn progress_bar(
+        &mut self,
+        progress: f32,
+        fill: Color,
+        empty: Color,
+        margin: u32,
+        height: u32,
+    ) {
+        self.canvas.set_draw_color(empty);
+        self.canvas
+            .fill_rect(Rect::new(
+                self.x + margin as i32,
+                self.y,
+                self.rect.width() - margin * 2,
+                height,
+            ))
+            .unwrap();
+        self.canvas.set_draw_color(fill);
+        self.canvas
+            .fill_rect(Rect::new(
+                self.x + margin as i32,
+                self.y,
+                (((self.rect.width() - margin * 2) as f32) * progress) as u32,
+                height,
+            ))
+            .unwrap();
+        self.advance(self.rect.width(), height);
+    }
+
     pub fn label(&mut self, s: &str, font: &Font) {
+        self.label_color(s, Color::WHITE, font)
+    }
+    pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {
         let font_texture = font
             .render(s)
-            .shaded(Color::WHITE, Color::BLACK)
+            .shaded(color, Color::BLACK)
             .unwrap()
             .as_texture(&self.font_texture_creator)
             .unwrap();

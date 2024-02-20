@@ -7,3 +7,7 @@ up_left = [121, 1073741919]
 up_right = [117, 1073741921]
 down_left = [98, 1073741913]
 down_right = [110, 1073741915]
+
+[ui]
+pamphlet_width = 400
+console_height = 200

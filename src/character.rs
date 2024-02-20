@@ -1,17 +1,49 @@
 use crate::{spell::Spell, Aut};
+use uuid::Uuid;
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Piece {
+    // These are nice and serializable :)
+    pub id: Uuid,
     pub sheet: Sheet,
 
     pub x: i32,
     pub y: i32,
+
+    pub player_controlled: bool,
+    pub alliance: Alliance,
+}
+
+impl Piece {
+    pub fn new(sheet: Sheet) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            sheet,
+            x: 0,
+            y: 0,
+            player_controlled: false,
+            alliance: Alliance::default(),
+        }
+    }
+}
+impl Default for Piece {
+    fn default() -> Self {
+        Self::new(Sheet::default())
+    }
+}
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub enum Alliance {
+    Friendly,
+    #[default]
+    Enemy,
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Sheet {
     /// Note that this includes the character's name.
     pub nouns: Nouns,
+    pub level: u32,
     pub stats: Stats,
     pub spells: Vec<Spell>,
     pub speed: Aut,

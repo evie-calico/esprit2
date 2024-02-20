@@ -25,6 +25,22 @@ fn get_resource_directory() -> PathBuf {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Options {
     pub controls: Controls,
+    pub ui: UserInterface,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UserInterface {
+    pub pamphlet_width: u32,
+    pub console_height: u32,
+}
+
+impl Default for UserInterface {
+    fn default() -> Self {
+        Self {
+            pamphlet_width: 400,
+            console_height: 200,
+        }
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
