@@ -1,4 +1,5 @@
 use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
+use esprit2::res::ResourceManager;
 use esprit2::{character, console::Console, gui, world};
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
@@ -23,25 +24,20 @@ pub fn main() {
     let texture_creator = canvas.texture_creator();
 
     // Game initialization.
+    let resources = ResourceManager::open("res/", &texture_creator).unwrap();
     let mut options = Options::default();
     let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
     let player = character::Piece {
         player_controlled: true,
         alliance: character::Alliance::Friendly,
-        sheet: toml::from_str(
-            &fs::read_to_string(RESOURCE_DIRECTORY.join("party/luvui.toml")).unwrap(),
-        )
-        .unwrap(),
+        sheet: resources.get_sheet("luvui").unwrap().clone(),
         ..Default::default()
     };
     let ally = character::Piece {
         player_controlled: false,
         alliance: character::Alliance::Friendly,
-        sheet: toml::from_str(
-            &fs::read_to_string(RESOURCE_DIRECTORY.join("party/aris.toml")).unwrap(),
-        )
-        .unwrap(),
+        sheet: resources.get_sheet("aris").unwrap().clone(),
         ..Default::default()
     };
     let mut world_manager = world::Manager {
@@ -55,9 +51,7 @@ pub fn main() {
     };
     world_manager.get_floor_mut().characters.push(player);
     world_manager.get_floor_mut().characters.push(ally);
-    let sleep_texture = texture_creator
-        .load_texture(RESOURCE_DIRECTORY.join("luvui_sleep.png"))
-        .unwrap();
+    let sleep_texture = resources.get_texture("luvui_sleep").unwrap();
     let font = ttf_context
         .load_font(
             RESOURCE_DIRECTORY.join("FantasqueSansMNerdFontPropo-Regular.ttf"),
