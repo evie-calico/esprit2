@@ -5,7 +5,7 @@ pub mod console;
 pub mod gui;
 pub mod item;
 pub mod options;
-pub mod res;
+pub mod resource_manager;
 pub mod spell;
 pub mod world;
 

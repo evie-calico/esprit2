@@ -1,10 +1,11 @@
 use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
-use esprit2::res::ResourceManager;
+use esprit2::resource_manager::ResourceManager;
 use esprit2::{character, console::Console, gui, world};
 use sdl2::event::Event;
 use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::rwops::RWops;
 use std::fs;
 use std::time::Duration;
 
@@ -52,8 +53,11 @@ pub fn main() {
     world_manager.get_floor_mut().characters.push(ally);
     let sleep_texture = resources.get_texture("luvui_sleep").unwrap();
     let font = ttf_context
-        .load_font(
-            RESOURCE_DIRECTORY.join("FantasqueSansMNerdFontPropo-Regular.ttf"),
+        .load_font_from_rwops(
+            RWops::from_bytes(include_bytes!(
+                "res/FantasqueSansMNerdFontPropo-Regular.ttf"
+            ))
+            .unwrap(),
             24,
         )
         .unwrap();
@@ -136,7 +140,7 @@ pub fn main() {
             .unwrap();
 
         // Draw tilemap
-        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        canvas.set_draw_color(Color::WHITE);
         for (x, col) in world_manager.get_floor().map.iter_cols().enumerate() {
             for (y, tile) in col.enumerate() {
                 if *tile == world::Tile::Wall {
