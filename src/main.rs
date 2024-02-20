@@ -2,7 +2,6 @@ use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::res::ResourceManager;
 use esprit2::{character, console::Console, gui, world};
 use sdl2::event::Event;
-use sdl2::image::LoadTexture;
 use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -24,7 +23,7 @@ pub fn main() {
     let texture_creator = canvas.texture_creator();
 
     // Game initialization.
-    let resources = ResourceManager::open("res/", &texture_creator).unwrap();
+    let resources = ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator).unwrap();
     let mut options = Options::default();
     let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
@@ -152,7 +151,7 @@ pub fn main() {
         for character in &world_manager.get_floor().characters {
             canvas
                 .copy(
-                    &sleep_texture,
+                    sleep_texture,
                     None,
                     Some(Rect::new(character.x * 64, character.y * 64, 64, 64)),
                 )
