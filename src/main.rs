@@ -16,7 +16,7 @@ pub fn main() {
     let ttf_context = sdl2::ttf::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let window = video_subsystem
-        .window("Esprit 2", 800, 600)
+        .window("Esprit 2", 1280, 720)
         .resizable()
         .position_centered()
         .build()
@@ -36,20 +36,18 @@ pub fn main() {
             exit(1);
         }
     };
-    let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
+    let mut options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
     let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
     let player = character::Piece {
         player_controlled: true,
         alliance: character::Alliance::Friendly,
-        sheet: resources.get_sheet("luvui").unwrap().clone(),
-        ..Default::default()
+        ..character::Piece::new(resources.get_sheet("luvui").unwrap().clone())
     };
     let ally = character::Piece {
         player_controlled: false,
-        alliance: character::Alliance::Friendly,
-        sheet: resources.get_sheet("aris").unwrap().clone(),
-        ..Default::default()
+        alliance: character::Alliance::Enemy,
+        ..character::Piece::new(resources.get_sheet("aris").unwrap().clone())
     };
     let mut world_manager = world::Manager {
         location: world::Location {
@@ -59,6 +57,29 @@ pub fn main() {
 
         current_level: world::Level::default(),
         party: vec![player.id, ally.id],
+        inventory: vec![
+            "aloe".into(),
+            "apple".into(),
+            "blinkfruit".into(),
+            "fabric_shred".into(),
+            "grapes".into(),
+            "ice_cream".into(),
+            "lily".into(),
+            "pear_on_a_stick".into(),
+            "pear".into(),
+            "pepper".into(),
+            "purefruit".into(),
+            "raspberry".into(),
+            "reviver_seed".into(),
+            "ring_alt".into(),
+            "ring".into(),
+            "scarf".into(),
+            "slimy_apple".into(),
+            "super_pepper".into(),
+            "twig".into(),
+            "water_chestnut".into(),
+            "watermelon".into(),
+        ],
     };
     world_manager.get_floor_mut().characters.push(player);
     world_manager.get_floor_mut().characters.push(ally);
@@ -69,7 +90,7 @@ pub fn main() {
                 "res/FantasqueSansMNerdFontPropo-Regular.ttf"
             ))
             .unwrap(),
-            24,
+            20,
         )
         .unwrap();
 
@@ -117,13 +138,29 @@ pub fn main() {
                             next_character.next_action =
                                 Some(character::Action::Move(character::OrdDir::Down));
                         }
+                        if options.controls.up_left.contains(&(keycode as i32)) {
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::UpLeft));
+                        }
+                        if options.controls.up_right.contains(&(keycode as i32)) {
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::UpRight));
+                        }
+                        if options.controls.down_left.contains(&(keycode as i32)) {
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::DownLeft));
+                        }
+                        if options.controls.down_right.contains(&(keycode as i32)) {
+                            next_character.next_action =
+                                Some(character::Action::Move(character::OrdDir::DownRight));
+                        }
                     }
                 }
                 _ => {}
             }
         }
 
-        world_manager.next_character().act();
+        world_manager.pop_action(&mut console);
 
         // Rendering
         // Clear the screen.
@@ -192,6 +229,8 @@ pub fn main() {
                 window_size.1,
             ),
         );
+        pamphlet.label("Forest: Floor 1/8", &font);
+        pamphlet.advance(0, 10);
         // Draw party stats
         for character_chunk in world_manager.party.chunks(2) {
             let mut character_windows = [None, None];
@@ -213,23 +252,66 @@ pub fn main() {
                         );
                         player_window.label(&format!("Level {}", piece.sheet.level), &font);
                         player_window.label(
-                            &format!(
-                                "HP: {}/{}",
-                                piece.sheet.stats.heart, piece.sheet.stats.heart
-                            ),
+                            &format!("HP: {}/{}", piece.hp, piece.sheet.stats.heart),
                             &font,
                         );
-                        player_window.progress_bar(0.6, Color::GREEN, Color::RED, 10, 10);
+                        player_window.progress_bar(
+                            (piece.hp as f32) / (piece.sheet.stats.heart as f32),
+                            Color::GREEN,
+                            Color::RED,
+                            10,
+                            5,
+                        );
                         player_window.label(
-                            &format!("SP: {}/{}", piece.sheet.stats.soul, piece.sheet.stats.soul),
+                            &format!("SP: {}/{}", piece.sp, piece.sheet.stats.soul),
                             &font,
                         );
-                        player_window.progress_bar(1.0, Color::BLUE, Color::RED, 10, 10);
+                        player_window.progress_bar(
+                            (piece.sp as f32) / (piece.sheet.stats.soul as f32),
+                            Color::BLUE,
+                            Color::RED,
+                            10,
+                            5,
+                        );
                         let stats = &piece.sheet.stats;
-                        player_window.label(&format!("Pwr: {}", stats.power), &font);
-                        player_window.label(&format!("Def: {}", stats.defense), &font);
-                        player_window.label(&format!("Mag: {}", stats.magic), &font);
-                        player_window.label(&format!("Res: {}", stats.resistance), &font);
+                        let physical_stat_info = [("Pwr", stats.power), ("Def", stats.defense)];
+                        let mut physical_stats = [None, None];
+                        for ((stat_name, stat), stat_half) in physical_stat_info
+                            .into_iter()
+                            .zip(physical_stats.iter_mut())
+                        {
+                            let font = &font;
+                            *stat_half = Some(move |stat_half: &mut gui::Context| {
+                                stat_half.label(&format!("{stat_name}: {stat}"), font)
+                            });
+                        }
+                        player_window.hsplit(&mut physical_stats);
+                        let magical_stat_info = [("Mag", stats.magic), ("Res", stats.resistance)];
+                        let mut magical_stats = [None, None];
+                        for ((stat_name, stat), stat_half) in
+                            magical_stat_info.into_iter().zip(magical_stats.iter_mut())
+                        {
+                            let font = &font;
+                            *stat_half = Some(move |stat_half: &mut gui::Context| {
+                                stat_half.label(&format!("{stat_name}: {stat}"), font)
+                            });
+                        }
+                        player_window.hsplit(&mut magical_stats);
+                        player_window.label("Spells", &font);
+                        let mut spells = (0..6).peekable();
+                        while spells.peek().is_some() {
+                            let textures_per_row = player_window.rect.width() / (32 + 8);
+                            player_window.horizontal();
+                            for i in 0..textures_per_row {
+                                if let Some(_) = spells.next() {
+                                    player_window
+                                        .htexture(resources.get_texture("magic_missile"), 32);
+                                    player_window.advance(8, 0);
+                                }
+                            }
+                            player_window.vertical();
+                            player_window.advance(8, 8);
+                        }
                     } else {
                         // If the party array also had a reference to the character's last known character sheet,
                         // a name could be displayed here.
@@ -241,6 +323,26 @@ pub fn main() {
             }
             pamphlet.hsplit(&mut character_windows);
         }
+        pamphlet.advance(0, 10);
+        pamphlet.label("Inventory", &font);
+        let mut items = world_manager.inventory.iter().peekable();
+        while items.peek().is_some() {
+            let textures_per_row = pamphlet.rect.width() / (32 + 8);
+            pamphlet.horizontal();
+            for i in 0..textures_per_row {
+                if let Some(item_name) = items.next() {
+                    pamphlet.htexture(resources.get_texture(item_name), 32);
+                    pamphlet.advance(8, 0);
+                }
+            }
+            pamphlet.vertical();
+            pamphlet.advance(8, 8);
+        }
+        pamphlet.advance(0, 10);
+        pamphlet.label("Options", &font);
+        pamphlet.label("- Settings", &font);
+        pamphlet.label("- Escape", &font);
+        pamphlet.label("- Quit", &font);
 
         canvas.present();
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));

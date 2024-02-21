@@ -1,3 +1,5 @@
+use crate::character::OrdDir;
+use crate::console::Console;
 use crate::{character, item};
 use grid::{grid, Grid};
 use uuid::Uuid;
@@ -15,6 +17,7 @@ pub struct Manager {
     // TODO: It might be useful to store a party ID too,
     // so that multiple party members of the same species can be differentiated.
     pub party: Vec<Uuid>,
+    pub inventory: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -124,5 +127,68 @@ impl Manager {
 
     pub fn next_character(&mut self) -> &mut character::Piece {
         &mut self.get_floor_mut().characters[0]
+    }
+
+    pub fn get_character_at(&self, x: i32, y: i32) -> Option<&character::Piece> {
+        self.get_floor()
+            .characters
+            .iter()
+            .find(|p| p.x == x && p.y == y)
+    }
+
+    pub fn get_character_at_mut(&mut self, x: i32, y: i32) -> Option<&mut character::Piece> {
+        self.get_floor_mut()
+            .characters
+            .iter_mut()
+            .find(|p| p.x == x && p.y == y)
+    }
+}
+
+impl Manager {
+    pub fn pop_action(&mut self, console: &mut Console) {
+        let next_character = self.next_character();
+        let next_character_id = next_character.id;
+
+        let Some(action) = next_character.next_action.take() else {
+            return;
+        };
+        match action {
+            character::Action::Move(dir) => self.move_piece(next_character_id, dir, console),
+        }
+    }
+
+    pub fn move_piece(&mut self, id: Uuid, dir: OrdDir, console: &mut Console) {
+        let Some(character) = self.get_character(id) else {
+            return;
+        };
+        let (x, y) = match dir {
+            OrdDir::Up => (0, -1),
+            OrdDir::UpRight => (1, -1),
+            OrdDir::Right => (1, 0),
+            OrdDir::DownRight => (1, 1),
+            OrdDir::Down => (0, 1),
+            OrdDir::DownLeft => (-1, 1),
+            OrdDir::Left => (-1, 0),
+            OrdDir::UpLeft => (-1, -1),
+        };
+        let x = character.x + x;
+        let y = character.y + y;
+        let character_alliance = character.alliance;
+        // TODO: don't clone this. implement noun replacement instead.
+        let character_nouns = character.sheet.nouns.clone();
+
+        if let Some(target) = self.get_character_at_mut(x, y) {
+            if target.alliance != character_alliance {
+                console.print(format!(
+                    "{} scratched {}",
+                    character_nouns.name, target.sheet.nouns.name
+                ));
+                target.hp -= 1;
+            }
+        } else {
+            let character = self.get_character_mut(id).unwrap();
+            character.x = x;
+            character.y = y;
+        }
     }
 }

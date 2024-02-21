@@ -1,6 +1,6 @@
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, TextureCreator, TextureQuery};
+use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
 use sdl2::ttf::Font;
 use sdl2::video::{Window, WindowContext};
 
@@ -8,7 +8,7 @@ pub struct Context<'canvas> {
     canvas: &'canvas mut Canvas<Window>,
     /// Used by draw_text to store textures of fonts before drawing them.
     font_texture_creator: TextureCreator<WindowContext>,
-    rect: Rect,
+    pub rect: Rect,
     /// These values control the position of the cursor.
     x: i32,
     y: i32,
@@ -136,5 +136,18 @@ impl<'canvas> Context<'canvas> {
         drop(font_texture);
 
         self.advance(width, height);
+    }
+
+    pub fn htexture(&mut self, texture: &Texture, width: u32) {
+        let query = texture.query();
+        let height = width / query.width * query.height;
+        self.canvas
+            .copy(
+                texture,
+                None,
+                Some(Rect::new(self.x, self.y, width, height)),
+            )
+            .unwrap();
+        self.advance(width, height)
     }
 }

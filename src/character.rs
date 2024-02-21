@@ -7,6 +7,8 @@ pub struct Piece {
     pub id: Uuid,
     pub sheet: Sheet,
 
+    pub hp: i32,
+    pub sp: i32,
     pub x: i32,
     pub y: i32,
     pub next_action: Option<Action>,
@@ -17,9 +19,13 @@ pub struct Piece {
 
 impl Piece {
     pub fn new(sheet: Sheet) -> Self {
+        let hp = sheet.stats.heart as i32;
+        let sp = sheet.stats.soul as i32;
         Self {
             id: Uuid::new_v4(),
             sheet,
+            hp,
+            sp,
             x: 0,
             y: 0,
             next_action: None,
@@ -27,33 +33,8 @@ impl Piece {
             alliance: Alliance::default(),
         }
     }
-
-    pub fn act(&mut self) {
-        let Some(action) = self.next_action.take() else {
-            return;
-        };
-        match action {
-            Action::Move(dir) => {
-                self.move_by(dir);
-            }
-        }
-    }
-
-    pub fn move_by(&mut self, dir: OrdDir) {
-        let (x, y) = match dir {
-            OrdDir::Up => (0, -1),
-            OrdDir::UpRight => (1, -1),
-            OrdDir::Right => (1, 0),
-            OrdDir::DownRight => (1, 1),
-            OrdDir::Down => (0, 1),
-            OrdDir::DownLeft => (-1, 1),
-            OrdDir::Left => (-1, 0),
-            OrdDir::UpLeft => (-1, -1),
-        };
-        self.x += x;
-        self.y += y;
-    }
 }
+
 impl Default for Piece {
     fn default() -> Self {
         Self::new(Sheet::default())
@@ -80,7 +61,7 @@ pub enum Action {
     Move(OrdDir),
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub enum Alliance {
     Friendly,
     #[default]
