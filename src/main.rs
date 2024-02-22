@@ -36,7 +36,7 @@ pub fn main() {
             exit(1);
         }
     };
-    let mut options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
+    let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
     let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
     let player = character::Piece {
@@ -58,27 +58,27 @@ pub fn main() {
         current_level: world::Level::default(),
         party: vec![player.id, ally.id],
         inventory: vec![
-            "aloe".into(),
-            "apple".into(),
-            "blinkfruit".into(),
-            "fabric_shred".into(),
-            "grapes".into(),
-            "ice_cream".into(),
-            "lily".into(),
-            "pear_on_a_stick".into(),
-            "pear".into(),
-            "pepper".into(),
-            "purefruit".into(),
-            "raspberry".into(),
-            "reviver_seed".into(),
-            "ring_alt".into(),
-            "ring".into(),
-            "scarf".into(),
-            "slimy_apple".into(),
-            "super_pepper".into(),
-            "twig".into(),
-            "water_chestnut".into(),
-            "watermelon".into(),
+            "items/aloe".into(),
+            "items/apple".into(),
+            "items/blinkfruit".into(),
+            "items/fabric_shred".into(),
+            "items/grapes".into(),
+            "items/ice_cream".into(),
+            "items/lily".into(),
+            "items/pear_on_a_stick".into(),
+            "items/pear".into(),
+            "items/pepper".into(),
+            "items/purefruit".into(),
+            "items/raspberry".into(),
+            "items/reviver_seed".into(),
+            "items/ring_alt".into(),
+            "items/ring".into(),
+            "items/scarf".into(),
+            "items/slimy_apple".into(),
+            "items/super_pepper".into(),
+            "items/twig".into(),
+            "items/water_chestnut".into(),
+            "items/watermelon".into(),
         ],
     };
     world_manager.get_floor_mut().characters.push(player);
@@ -302,7 +302,7 @@ pub fn main() {
                         while spells.peek().is_some() {
                             let textures_per_row = player_window.rect.width() / (32 + 8);
                             player_window.horizontal();
-                            for i in 0..textures_per_row {
+                            for _ in 0..textures_per_row {
                                 if let Some(_) = spells.next() {
                                     player_window
                                         .htexture(resources.get_texture("magic_missile"), 32);
@@ -329,7 +329,7 @@ pub fn main() {
         while items.peek().is_some() {
             let textures_per_row = pamphlet.rect.width() / (32 + 8);
             pamphlet.horizontal();
-            for i in 0..textures_per_row {
+            for _ in 0..textures_per_row {
                 if let Some(item_name) = items.next() {
                     pamphlet.htexture(resources.get_texture(item_name), 32);
                     pamphlet.advance(8, 0);

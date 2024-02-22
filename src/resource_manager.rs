@@ -22,49 +22,59 @@ pub struct ResourceManager<'texture> {
     textures: HashMap<PathBuf, Texture<'texture>>,
 }
 
+fn begin_recurse<T>(
+    container: &mut HashMap<PathBuf, T>,
+    directory: &Path,
+    loader: &dyn Fn(&Path) -> Result<T, ResourceManagerError>,
+) -> Result<(), ResourceManagerError> {
+    recurse(container, directory, directory, loader)
+}
+fn recurse<T>(
+    container: &mut HashMap<PathBuf, T>,
+    base_directory: &Path,
+    directory: &Path,
+    loader: &dyn Fn(&Path) -> Result<T, ResourceManagerError>,
+) -> Result<(), ResourceManagerError> {
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.metadata()?.is_dir() {
+            recurse(container, base_directory, &path, loader)?;
+        } else {
+            let resource = loader(&path)?;
+            let reference = path
+                .strip_prefix(base_directory)
+                .map(PathBuf::from)
+                .unwrap_or_default()
+                .parent()
+                .unwrap_or(Path::new(""))
+                .join(path.file_prefix().unwrap());
+            container.insert(reference, resource);
+        }
+    }
+    Ok(())
+}
+
 impl<'texture> ResourceManager<'texture> {
     pub fn open(
         path: impl AsRef<Path>,
         texture_creator: &'texture TextureCreator<WindowContext>,
     ) -> Result<ResourceManager<'texture>, ResourceManagerError> {
         let path = path.as_ref();
-        macro_rules! open_toml_directory {
-            ($name:ident, $dir:expr) => {
-                let directory = path.join($dir);
-                for entry in fs::read_dir(&directory)? {
-                    let path = entry?.path();
-                    let resource = toml::from_str(&fs::read_to_string(&path)?)?;
-                    let reference = path
-                        .strip_prefix(&directory)
-                        .map(PathBuf::from)
-                        .unwrap_or_default()
-                        .parent()
-                        .unwrap_or(&Path::new(""))
-                        .join(path.file_prefix().unwrap());
-                    $name.insert(reference, resource);
-                }
-            };
-        }
-        let mut sheets = HashMap::new();
-        open_toml_directory!(sheets, "sheets/");
-        let mut textures = HashMap::new();
-        let texture_directory = Path::new("textures/");
-        let directory = path.join(texture_directory);
-        for entry in fs::read_dir(&directory)? {
-            let path = entry?.path();
-            let texture = texture_creator
-                .load_texture(&path)
-                .map_err(ResourceManagerError::Texture)?;
-            let reference = path
-                .strip_prefix(&directory)
-                .map(PathBuf::from)
-                .unwrap_or_default()
-                .parent()
-                .unwrap_or(Path::new(""))
-                .join(path.file_prefix().unwrap());
-            textures.insert(reference, texture);
-        }
 
+        let mut sheets = HashMap::new();
+        begin_recurse(&mut sheets, &path.join("sheets"), &|path| {
+            Ok(toml::from_str(&fs::read_to_string(path)?)?)
+        })?;
+
+        let mut textures = HashMap::new();
+        begin_recurse(&mut textures, &path.join("textures"), &|path| {
+            texture_creator
+                .load_texture(path)
+                .map_err(ResourceManagerError::Texture)
+        })?;
+
+        // Include a missing texture placeholder, rather than returning an Option.
         let missing_texture = texture_creator
             .load_texture_bytes(include_bytes!("res/missing_texture.png"))
             .unwrap();
