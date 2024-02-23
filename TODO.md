@@ -4,7 +4,7 @@
 
 - [x] resource loader.
 - [ ] Actor system
-	- [ ] Pass around actions. inputs|ai -> actions
+	- [x] Pass around actions. inputs|ai -> actions
 	- [x] party
 	- [ ] non-party allies
 - [ ] Spells
@@ -15,4 +15,4 @@
 	- [ ] dcss-style vaults
 		- [ ] defining these with text files (like dcss) is enough
 - [ ] save files via serde. party, flags, etc...
-
+- [ ] really dynamic & varied messages

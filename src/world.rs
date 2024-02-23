@@ -14,10 +14,9 @@ pub struct Manager {
     pub current_level: Level,
     /// Always point to the party's pieces, even across floors.
     /// When exiting a dungeon, these sheets will be saved to a party struct.
-    // TODO: It might be useful to store a party ID too,
-    // so that multiple party members of the same species can be differentiated.
-    pub party: Vec<Uuid>,
+    pub party: Vec<PartyReference>,
     pub inventory: Vec<String>,
+    pub console: Console,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -32,6 +31,21 @@ impl Default for Level {
             name: String::from("New Level"),
             floors: vec![Floor::default()],
         }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PartyReference {
+    /// The piece that is being used by this party member.
+    pub piece: Uuid,
+    /// This party member's ID within the party.
+    /// Used for saving data.
+    pub member: Uuid,
+}
+
+impl PartyReference {
+    pub fn new(piece: Uuid, member: Uuid) -> Self {
+        Self { piece, member }
     }
 }
 
@@ -99,13 +113,40 @@ impl Default for Floor {
     }
 }
 
+macro_rules! get_floor_mut {
+    ($self:ident) => {
+        &mut $self.current_level.floors[$self.location.floor]
+    };
+}
+// Returns none if no entity with the given uuid is currently loaded.
+// This either means they no longer exist, or they're on a different floor;
+// either way they cannot be referenced.
+macro_rules! get_character_mut {
+    ($self:ident, $id:expr) => {
+        $self
+            .get_floor_mut()
+            .characters
+            .iter_mut()
+            .find(|x| x.id == $id)
+    };
+}
+
+macro_rules! get_character_at_mut {
+    ($self:ident, $x:expr, $y:expr) => {
+        get_floor_mut!($self)
+            .characters
+            .iter_mut()
+            .find(|p| p.x == $x && p.y == $y)
+    };
+}
+
 impl Manager {
     pub fn get_floor(&self) -> &Floor {
         &self.current_level.floors[self.location.floor]
     }
 
     pub fn get_floor_mut(&mut self) -> &mut Floor {
-        &mut self.current_level.floors[self.location.floor]
+        get_floor_mut!(self)
     }
 
     // Returns none if no entity with the given uuid is currently loaded.
@@ -119,10 +160,7 @@ impl Manager {
     // This either means they no longer exist, or they're on a different floor;
     // either way they cannot be referenced.
     pub fn get_character_mut(&mut self, id: Uuid) -> Option<&mut character::Piece> {
-        self.get_floor_mut()
-            .characters
-            .iter_mut()
-            .find(|x| x.id == id)
+        get_character_mut!(self, id)
     }
 
     pub fn next_character(&mut self) -> &mut character::Piece {
@@ -137,15 +175,12 @@ impl Manager {
     }
 
     pub fn get_character_at_mut(&mut self, x: i32, y: i32) -> Option<&mut character::Piece> {
-        self.get_floor_mut()
-            .characters
-            .iter_mut()
-            .find(|p| p.x == x && p.y == y)
+        get_character_at_mut!(self, x, y)
     }
 }
 
 impl Manager {
-    pub fn pop_action(&mut self, console: &mut Console) {
+    pub fn pop_action(&mut self) {
         let next_character = self.next_character();
         let next_character_id = next_character.id;
 
@@ -153,11 +188,11 @@ impl Manager {
             return;
         };
         match action {
-            character::Action::Move(dir) => self.move_piece(next_character_id, dir, console),
+            character::Action::Move(dir) => self.move_piece(next_character_id, dir),
         }
     }
 
-    pub fn move_piece(&mut self, id: Uuid, dir: OrdDir, console: &mut Console) {
+    pub fn move_piece(&mut self, id: Uuid, dir: OrdDir) {
         let Some(character) = self.get_character(id) else {
             return;
         };
@@ -177,9 +212,9 @@ impl Manager {
         // TODO: don't clone this. implement noun replacement instead.
         let character_nouns = character.sheet.nouns.clone();
 
-        if let Some(target) = self.get_character_at_mut(x, y) {
+        if let Some(target) = get_character_at_mut!(self, x, y) {
             if target.alliance != character_alliance {
-                console.print(format!(
+                self.console.print(format!(
                     "{} scratched {}",
                     character_nouns.name, target.sheet.nouns.name
                 ));

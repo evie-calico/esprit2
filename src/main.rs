@@ -9,6 +9,7 @@ use sdl2::rwops::RWops;
 use std::process::exit;
 use std::time::Duration;
 use tracing::error;
+use uuid::Uuid;
 
 pub fn main() {
     // SDL initialization.
@@ -37,26 +38,36 @@ pub fn main() {
         }
     };
     let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
-    let mut console = Console::default();
     // Create a piece for the player, and register it with the world manager.
+    let party = [
+        (
+            Uuid::new_v4(),
+            resources.get_sheet("luvui").unwrap().clone(),
+        ),
+        (Uuid::new_v4(), resources.get_sheet("aris").unwrap().clone()),
+    ];
     let player = character::Piece {
         player_controlled: true,
         alliance: character::Alliance::Friendly,
-        ..character::Piece::new(resources.get_sheet("luvui").unwrap().clone())
+        ..character::Piece::new(party[0].1.clone())
     };
     let ally = character::Piece {
         player_controlled: false,
         alliance: character::Alliance::Enemy,
-        ..character::Piece::new(resources.get_sheet("aris").unwrap().clone())
+        ..character::Piece::new(party[1].1.clone())
     };
     let mut world_manager = world::Manager {
         location: world::Location {
             level: String::from("New Level"),
             floor: 0,
         },
+        console: Console::default(),
 
         current_level: world::Level::default(),
-        party: vec![player.id, ally.id],
+        party: vec![
+            world::PartyReference::new(player.id, party[0].0),
+            world::PartyReference::new(ally.id, party[1].0),
+        ],
         inventory: vec![
             "items/aloe".into(),
             "items/apple".into(),
@@ -95,15 +106,19 @@ pub fn main() {
         .unwrap();
 
     // Print some debug messages to test the console.
-    console.print("Hello, world!");
-    console.print("Luvui scratches the cat.");
-    console.print_defeat("The cat ran away.");
-    console.print("Luvui casts Magic Missile.");
-    console.print("Her magic missile strikes the cat!");
-    console.print("The cat scratches Aris");
-    console.print("Aris bites the cat");
-    console.print_defeat("The cat scampered off.");
-    console.print_special("Luvui's level increased to 2!");
+    world_manager.console.print("Hello, world!");
+    world_manager.console.print("Luvui scratches the cat.");
+    world_manager.console.print_defeat("The cat ran away.");
+    world_manager.console.print("Luvui casts Magic Missile.");
+    world_manager
+        .console
+        .print("Her magic missile strikes the cat!");
+    world_manager.console.print("The cat scratches Aris");
+    world_manager.console.print("Aris bites the cat");
+    world_manager.console.print_defeat("The cat scampered off.");
+    world_manager
+        .console
+        .print_special("Luvui's level increased to 2!");
 
     let mut i = 0;
     'running: loop {
@@ -160,7 +175,7 @@ pub fn main() {
             }
         }
 
-        world_manager.pop_action(&mut console);
+        world_manager.pop_action();
 
         // Rendering
         // Clear the screen.
@@ -208,7 +223,7 @@ pub fn main() {
         canvas.set_viewport(None);
 
         // Draw Console
-        console.draw(
+        world_manager.console.draw(
             &mut canvas,
             Rect::new(
                 0,
@@ -236,7 +251,7 @@ pub fn main() {
             let mut character_windows = [None, None];
             for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
                 *window = Some(|player_window: &mut gui::Context| {
-                    if let Some(piece) = world_manager.get_character(*character_id) {
+                    if let Some(piece) = world_manager.get_character(character_id.piece) {
                         player_window.label_color(
                             &format!(
                                 "{} ({:08x})",
