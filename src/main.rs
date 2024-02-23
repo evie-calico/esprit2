@@ -1,6 +1,6 @@
 use esprit2::options::{Options, RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::resource_manager::ResourceManager;
-use esprit2::{character, console::Console, gui, world};
+use esprit2::{character, console::Console, gui, nouns, world};
 use sdl2::event::Event;
 use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
@@ -259,8 +259,8 @@ pub fn main() {
                                 piece.id.as_fields().0
                             ),
                             match piece.sheet.nouns.pronouns {
-                                character::Pronouns::Female => Color::RGB(247, 141, 246),
-                                character::Pronouns::Male => Color::RGB(104, 166, 232),
+                                nouns::Pronouns::Female => Color::RGB(247, 141, 246),
+                                nouns::Pronouns::Male => Color::RGB(104, 166, 232),
                                 _ => Color::WHITE,
                             },
                             &font,

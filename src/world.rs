@@ -1,5 +1,6 @@
 use crate::character::OrdDir;
 use crate::console::Console;
+use crate::nouns::NounsExt;
 use crate::{character, item};
 use grid::{grid, Grid};
 use uuid::Uuid;
@@ -214,10 +215,14 @@ impl Manager {
 
         if let Some(target) = get_character_at_mut!(self, x, y) {
             if target.alliance != character_alliance {
-                self.console.print(format!(
-                    "{} scratched {}",
-                    character_nouns.name, target.sheet.nouns.name
-                ));
+                // TODO: Change this depending on the proprtional amount of damage dealt.
+                let damage_punctuation = ".";
+                let mut message = "{self_Address} scratched {target_indirect}"
+                    .replace_prefixed_nouns(&character_nouns, "self_")
+                    .replace_prefixed_nouns(&target.sheet.nouns, "target_");
+                message.push_str(damage_punctuation);
+
+                self.console.print(message);
                 target.hp -= 1;
             }
         } else {

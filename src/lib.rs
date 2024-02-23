@@ -2,6 +2,7 @@
 
 pub mod character;
 pub mod console;
+pub mod nouns;
 pub mod gui;
 pub mod item;
 pub mod options;
