@@ -3,6 +3,7 @@ use crate::console::Console;
 use crate::nouns::NounsExt;
 use crate::{character, item};
 use grid::{grid, Grid};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use uuid::Uuid;
 
 /// This struct contains all information that is relevant during gameplay.
@@ -209,21 +210,58 @@ impl Manager {
         };
         let x = character.x + x;
         let y = character.y + y;
-        let character_alliance = character.alliance;
-        // TODO: don't clone this. implement noun replacement instead.
-        let character_nouns = character.sheet.nouns.clone();
 
-        if let Some(target) = get_character_at_mut!(self, x, y) {
-            if target.alliance != character_alliance {
-                // TODO: Change this depending on the proprtional amount of damage dealt.
-                let damage_punctuation = ".";
-                let mut message = "{self_Address} scratched {target_indirect}"
-                    .replace_prefixed_nouns(&character_nouns, "self_")
-                    .replace_prefixed_nouns(&target.sheet.nouns, "target_");
-                message.push_str(damage_punctuation);
+        if let Some(target) = self.get_character_at(x, y) {
+            if target.alliance != character.alliance {
+                if let Some(mut attack) = character.attacks.first() {
+                    let mut rng = thread_rng();
+                    let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
+                    let mut point = rng.gen_range(0..max_attack_weight);
+                    for i in &character.attacks {
+                        if point < i.weight {
+                            attack = i;
+                            break;
+                        } else {
+                            point -= i.weight;
+                        }
+                    }
 
-                self.console.print(message);
-                target.hp -= 1;
+                    // Calculate damage
+                    let damage = 0.max(
+                        ((character.sheet.stats.power + attack.bonus) as i32)
+                            - (target.sheet.stats.defense as i32),
+                    );
+                    let is_weak_attack = damage <= 1;
+
+                    const DEFAULT_ATTACK_MESSAGE: &str =
+                        "{self_Address} attacked {target_indirect}";
+                    // TODO: Change this depending on the proportional amount of damage dealt.
+                    let damage_punctuation = match damage {
+                        20.. => "!!!",
+                        10.. => "!!",
+                        5.. => "!",
+                        _ => ".",
+                    };
+                    let message_pool = attack
+                        .messages
+                        .low
+                        .as_ref()
+                        .filter(|_| is_weak_attack)
+                        .unwrap_or(&attack.messages.high);
+                    let message = message_pool.choose(&mut rng);
+
+                    let mut message = message
+                        .map(|s| s.as_str())
+                        .unwrap_or(DEFAULT_ATTACK_MESSAGE)
+                        .replace_prefixed_nouns(&character.sheet.nouns, "self_")
+                        .replace_prefixed_nouns(&target.sheet.nouns, "target_");
+                    message.push_str(damage_punctuation);
+
+                    // Mutable time.
+                    let target = self.get_character_mut(target.id).unwrap();
+                    target.hp -= damage;
+                    self.console.print(message);
+                }
             }
         } else {
             let character = self.get_character_mut(id).unwrap();

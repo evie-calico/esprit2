@@ -1,0 +1,22 @@
+name = "Scratch"
+weight = 100
+bonus = 0
+
+[messages]
+high = [
+	# Having a few of these makes it a little more common.
+	"{self_Address} scratches {target_Address}",
+	"{self_Address} scratches {target_Address}",
+	"{self_Address} scratches {target_Address}",
+	"{self_Address}'s claws rake against {target_Address}",
+	"{target_Address} is struck by {self_Address}'s claws",
+	"{self_Address} grazes {target_Address} with {self_their} claws",
+	"{self_Address} strikes {target_Address} with {self_their} claws",
+	# TODO: {target_body} -- selects a random body part.
+]
+low = [
+	"{self_Address} missed {target_Address}",
+	"{self_Address}'s claws barely missed {target_Address}",
+	"{target_Address} was tickled by {self_address}'s claws",
+	"{self_Address}'s claws lightly slid across {target_Address}",
+]

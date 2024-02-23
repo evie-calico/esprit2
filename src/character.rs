@@ -1,4 +1,4 @@
-use crate::{nouns::Nouns, spell::Spell, Aut};
+use crate::{attack::Attack, nouns::Nouns, resource_manager::ResourceManager, spell::Spell, Aut};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -9,35 +9,37 @@ pub struct Piece {
 
     pub hp: i32,
     pub sp: i32,
+    pub attacks: Vec<Attack>,
+
     pub x: i32,
     pub y: i32,
     pub next_action: Option<Action>,
-
     pub player_controlled: bool,
     pub alliance: Alliance,
 }
 
 impl Piece {
-    pub fn new(sheet: Sheet) -> Self {
+    pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
         let hp = sheet.stats.heart as i32;
         let sp = sheet.stats.soul as i32;
+        let attacks = sheet
+            .attacks
+            .iter()
+            .map(|x| resources.get_attack(x).unwrap().clone())
+            .collect();
+
         Self {
             id: Uuid::new_v4(),
             sheet,
             hp,
             sp,
+            attacks,
             x: 0,
             y: 0,
             next_action: None,
             player_controlled: false,
             alliance: Alliance::default(),
         }
-    }
-}
-
-impl Default for Piece {
-    fn default() -> Self {
-        Self::new(Sheet::default())
     }
 }
 
@@ -74,6 +76,7 @@ pub struct Sheet {
     pub nouns: Nouns,
     pub level: u32,
     pub stats: Stats,
+    pub attacks: Vec<String>,
     pub spells: Vec<Spell>,
     pub speed: Aut,
 }

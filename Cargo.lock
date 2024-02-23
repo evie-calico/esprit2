@@ -37,6 +37,7 @@ dependencies = [
  "grid",
  "lazy_static",
  "paste",
+ "rand",
  "sdl2",
  "serde",
  "thiserror",

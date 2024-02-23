@@ -1,5 +1,6 @@
 level = 1
 spells = []
+attacks = ["scratch"]
 speed = 12
 
 [nouns]

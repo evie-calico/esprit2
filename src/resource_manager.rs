@@ -1,4 +1,4 @@
-use crate::character;
+use crate::{attack::Attack, character};
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
 use sdl2::video::WindowContext;
@@ -18,6 +18,7 @@ pub enum ResourceManagerError {
 
 pub struct ResourceManager<'texture> {
     missing_texture: Texture<'texture>,
+    attacks: HashMap<PathBuf, Attack>,
     sheets: HashMap<PathBuf, character::Sheet>,
     textures: HashMap<PathBuf, Texture<'texture>>,
 }
@@ -67,6 +68,11 @@ impl<'texture> ResourceManager<'texture> {
             Ok(toml::from_str(&fs::read_to_string(path)?)?)
         })?;
 
+        let mut attacks = HashMap::new();
+        begin_recurse(&mut attacks, &path.join("attacks"), &|path| {
+            Ok(toml::from_str(&fs::read_to_string(path)?)?)
+        })?;
+
         let mut textures = HashMap::new();
         begin_recurse(&mut textures, &path.join("textures"), &|path| {
             texture_creator
@@ -80,6 +86,7 @@ impl<'texture> ResourceManager<'texture> {
             .unwrap();
 
         Ok(Self {
+            attacks,
             sheets,
             textures,
             missing_texture,
@@ -88,6 +95,10 @@ impl<'texture> ResourceManager<'texture> {
 
     pub fn get_sheet(&self, path: impl AsRef<Path>) -> Option<&character::Sheet> {
         self.sheets.get(path.as_ref())
+    }
+
+    pub fn get_attack(&self, path: impl AsRef<Path>) -> Option<&Attack> {
+        self.attacks.get(path.as_ref())
     }
 
     pub fn get_texture(&self, path: impl AsRef<Path>) -> &Texture {

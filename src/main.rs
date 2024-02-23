@@ -49,12 +49,12 @@ pub fn main() {
     let player = character::Piece {
         player_controlled: true,
         alliance: character::Alliance::Friendly,
-        ..character::Piece::new(party[0].1.clone())
+        ..character::Piece::new(party[0].1.clone(), &resources)
     };
     let ally = character::Piece {
         player_controlled: false,
         alliance: character::Alliance::Enemy,
-        ..character::Piece::new(party[1].1.clone())
+        ..character::Piece::new(party[1].1.clone(), &resources)
     };
     let mut world_manager = world::Manager {
         location: world::Location {

@@ -1,10 +1,11 @@
 #![feature(path_file_prefix)]
 
+pub mod attack;
 pub mod character;
 pub mod console;
-pub mod nouns;
 pub mod gui;
 pub mod item;
+pub mod nouns;
 pub mod options;
 pub mod resource_manager;
 pub mod spell;
