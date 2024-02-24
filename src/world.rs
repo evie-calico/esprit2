@@ -232,7 +232,7 @@ impl Manager {
 						((character.sheet.stats.power + attack.bonus) as i32)
 							- (target.sheet.stats.defense as i32),
 					);
-					let is_weak_attack = damage <= 1;
+					let is_weak_attack = damage == 0;
 
 					// TODO: Change this depending on the proportional amount of damage dealt.
 					let damage_punctuation = match damage {
@@ -259,7 +259,15 @@ impl Manager {
 					// Mutable time.
 					let target = self.get_character_mut(target.id).unwrap();
 					target.hp -= damage;
-					self.console.print(message);
+					let colors = &self.console.colors;
+					self.console.print_colored(
+						message,
+						if is_weak_attack {
+							colors.unimportant
+						} else {
+							colors.normal
+						},
+					);
 				}
 			}
 		} else {

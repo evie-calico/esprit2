@@ -9,9 +9,9 @@ proper_name = true
 pronouns = "Male"
 
 [stats]
-heart = 10
+heart = 30
 soul = 10
-power = 1
-defense = 1
+power = 6
+defense = 5
 magic = 1
-resistance = 1
+resistance = 7

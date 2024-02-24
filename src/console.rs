@@ -9,24 +9,26 @@ use std::fmt::Display;
 #[derive(Clone, Debug, Default)]
 pub struct Console {
 	history: Vec<Message>,
-	settings: Settings,
+	pub colors: Colors,
 }
 
 #[derive(Clone, Debug)]
-pub struct Settings {
-	normal: Color,
-	system: Color,
-	defeat: Color,
-	danger: Color,
-	important: Color,
-	special: Color,
+pub struct Colors {
+	pub normal: Color,
+	pub system: Color,
+	pub unimportant: Color,
+	pub defeat: Color,
+	pub danger: Color,
+	pub important: Color,
+	pub special: Color,
 }
 
-impl Default for Settings {
+impl Default for Colors {
 	fn default() -> Self {
 		Self {
 			normal: Color::WHITE,
 			system: Color::GREY,
+			unimportant: Color::GREY,
 			defeat: Color::RGB(255, 128, 128),
 			danger: Color::RED,
 			important: Color::YELLOW,
@@ -47,7 +49,7 @@ macro_rules! colored_print {
 			pub fn [<print_ $which>](&mut self, message: impl Display) {
 				self.history.push(Message {
 					text: message.to_string(),
-					color: self.settings.$which,
+					color: self.colors.$which,
 				});
 			}
 		}
@@ -58,7 +60,14 @@ impl Console {
 	pub fn print(&mut self, message: impl Display) {
 		self.history.push(Message {
 			text: message.to_string(),
-			color: self.settings.normal,
+			color: self.colors.normal,
+		});
+	}
+
+	pub fn print_colored(&mut self, message: impl Display, color: Color) {
+		self.history.push(Message {
+			text: message.to_string(),
+			color,
 		});
 	}
 

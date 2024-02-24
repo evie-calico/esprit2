@@ -1,6 +1,6 @@
 level = 1
 spells = []
-attacks = ["scratch"]
+attacks = ["scratch", "bite"]
 speed = 12
 
 [nouns]
@@ -9,9 +9,9 @@ proper_name = true
 pronouns = "Female"
 
 [stats]
-heart = 10
-soul = 10
-power = 1
-defense = 1
-magic = 1
-resistance = 1
+heart = 30
+soul = 15
+power = 3
+defense = 6
+magic = 6
+resistance = 3

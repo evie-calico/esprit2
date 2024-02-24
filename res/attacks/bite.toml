@@ -1,0 +1,17 @@
+name = "Bite"
+weight = 20
+bonus = 10
+
+[messages]
+high = [
+	# Having a few of these makes it a little more common.
+	"{self_Address} bites {target_address}",
+	"{self_Address} bites into {target_address}",
+	"{self_Address} bites {target_address}",
+	"{self_Address} sinks {self_their} teeth into {target_address}",
+]
+low = [
+	"{target_Address} narrowly dodged {self_address}'s teeth",
+	"{self_Address} weakly nibbled {target_address}",
+	"{self_Address} tried to bite {target_address} but missed",
+]
