@@ -1,58 +1,65 @@
-use crate::{attack::Attack, nouns::Nouns, resource_manager::ResourceManager, spell::Spell, Aut};
+use crate::prelude::*;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Piece {
-    // These are nice and serializable :)
-    pub id: Uuid,
-    pub sheet: Sheet,
+	// These are nice and serializable :)
+	pub id: Uuid,
+	pub sheet: Sheet,
 
-    pub hp: i32,
-    pub sp: i32,
-    pub attacks: Vec<Attack>,
+	pub hp: i32,
+	pub sp: i32,
+	pub attacks: Vec<Attack>,
+	pub spells: Vec<Spell>,
 
-    pub x: i32,
-    pub y: i32,
-    pub next_action: Option<Action>,
-    pub player_controlled: bool,
-    pub alliance: Alliance,
+	pub x: i32,
+	pub y: i32,
+	pub next_action: Option<Action>,
+	pub player_controlled: bool,
+	pub alliance: Alliance,
 }
 
 impl Piece {
-    pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
-        let hp = sheet.stats.heart as i32;
-        let sp = sheet.stats.soul as i32;
-        let attacks = sheet
-            .attacks
-            .iter()
-            .map(|x| resources.get_attack(x).unwrap().clone())
-            .collect();
+	pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
+		let hp = sheet.stats.heart as i32;
+		let sp = sheet.stats.soul as i32;
+		let attacks = sheet
+			.attacks
+			.iter()
+			.map(|x| resources.get_attack(x).unwrap().clone())
+			.collect();
+		let spells = sheet
+			.spells
+			.iter()
+			.map(|x| resources.get_spell(x).unwrap().clone())
+			.collect();
 
-        Self {
-            id: Uuid::new_v4(),
-            sheet,
-            hp,
-            sp,
-            attacks,
-            x: 0,
-            y: 0,
-            next_action: None,
-            player_controlled: false,
-            alliance: Alliance::default(),
-        }
-    }
+		Self {
+			id: Uuid::new_v4(),
+			sheet,
+			hp,
+			sp,
+			attacks,
+			spells,
+			x: 0,
+			y: 0,
+			next_action: None,
+			player_controlled: false,
+			alliance: Alliance::default(),
+		}
+	}
 }
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum OrdDir {
-    Up,
-    UpRight,
-    Right,
-    DownRight,
-    Down,
-    DownLeft,
-    Left,
-    UpLeft,
+	Up,
+	UpRight,
+	Right,
+	DownRight,
+	Down,
+	DownLeft,
+	Left,
+	UpLeft,
 }
 
 /// Anything a character piece can "do".
@@ -60,40 +67,40 @@ pub enum OrdDir {
 /// This is the only way that character logic or player input should communicate with pieces.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
-    Move(OrdDir),
+	Move(OrdDir),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub enum Alliance {
-    Friendly,
-    #[default]
-    Enemy,
+	Friendly,
+	#[default]
+	Enemy,
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Sheet {
-    /// Note that this includes the character's name.
-    pub nouns: Nouns,
-    pub level: u32,
-    pub stats: Stats,
-    pub attacks: Vec<String>,
-    pub spells: Vec<Spell>,
-    pub speed: Aut,
+	/// Note that this includes the character's name.
+	pub nouns: Nouns,
+	pub level: u32,
+	pub stats: Stats,
+	pub attacks: Vec<String>,
+	pub spells: Vec<String>,
+	pub speed: Aut,
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Stats {
-    /// Health, or HP; Heart Points
-    pub heart: u32,
-    /// Magic, or SP; Soul Points
-    pub soul: u32,
-    /// Bonus damage applied to physical attacks.
-    pub power: u32,
-    /// Damage reduction when recieving physical attacks.
-    pub defense: u32,
-    /// Bonus damage applied to magical attacks.
-    pub magic: u32,
-    /// Damage reduction when recieving magical attacks.
-    /// Also makes harmful spells more likely to fail.
-    pub resistance: u32,
+	/// Health, or HP; Heart Points
+	pub heart: u32,
+	/// Magic, or SP; Soul Points
+	pub soul: u32,
+	/// Bonus damage applied to physical attacks.
+	pub power: u32,
+	/// Damage reduction when recieving physical attacks.
+	pub defense: u32,
+	/// Bonus damage applied to magical attacks.
+	pub magic: u32,
+	/// Damage reduction when recieving magical attacks.
+	/// Also makes harmful spells more likely to fail.
+	pub resistance: u32,
 }

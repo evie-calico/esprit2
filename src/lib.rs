@@ -1,4 +1,10 @@
-#![feature(path_file_prefix)]
+#![feature(path_file_prefix, lint_reasons)]
+#![warn(
+	clippy::missing_errors_doc,
+	clippy::module_name_repetitions,
+	clippy::items_after_statements,
+	clippy::inconsistent_struct_constructor
+)]
 
 pub mod attack;
 pub mod character;
@@ -20,3 +26,14 @@ type Aut = u32;
 // 12 is divisible by lots of nice numbers!
 #[allow(unused)] // I'm not using this anywhere yet, but it's useful to have written down.
 const TURN: Aut = 12;
+
+pub mod prelude {
+	pub use super::*;
+	pub use attack::Attack;
+	pub use console::Console;
+	pub use item::Item;
+	pub use nouns::Nouns;
+	pub use options::Options;
+	pub use resource_manager::ResourceManager;
+	pub use spell::Spell;
+}
