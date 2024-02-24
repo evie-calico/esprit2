@@ -1,4 +1,5 @@
 use aho_corasick::AhoCorasick;
+use std::sync::LazyLock;
 
 /// For dynamically addressing a character.
 /// This should encompass almost every (dynamic) way of addressing someone or something.
@@ -32,12 +33,13 @@ impl<T: AsRef<str>> StrExt for T {
 	}
 
 	fn replace_nouns(&self, nouns: &Nouns) -> String {
-		// TODO: cache common tables
-		let ac = AhoCorasick::new([
-			"{they}", "{them}", "{their}", "{theirs}", "{are}", "{They}", "{Them}", "{Their}",
-			"{Theirs}", "{Are}",
-		])
-		.unwrap();
+		static PRONOUN_TABLE: LazyLock<AhoCorasick> = LazyLock::new(|| {
+			AhoCorasick::new([
+				"{they}", "{them}", "{their}", "{theirs}", "{are}", "{They}", "{Them}", "{Their}",
+				"{Theirs}", "{Are}",
+			])
+			.unwrap()
+		});
 		let replacements = match nouns.pronouns {
 			Pronouns::Female => &[
 				"she", "her", "her", "hers", "is", "She", "Her", "Her", "Hers", "Is",
@@ -58,7 +60,7 @@ impl<T: AsRef<str>> StrExt for T {
 		let capital_address_name = &["The ", &nouns.name];
 		let address_name = &["the ", &nouns.name];
 
-		let mut s = ac.replace_all(self.as_ref(), replacements);
+		let mut s = PRONOUN_TABLE.replace_all(self.as_ref(), replacements);
 		let mut i = 0;
 		while let Some(start) = s[i..].find('{') {
 			let start = i + start;

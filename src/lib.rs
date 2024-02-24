@@ -1,4 +1,4 @@
-#![feature(path_file_prefix, lint_reasons)]
+#![feature(path_file_prefix, lint_reasons, lazy_cell)]
 #![warn(
 	clippy::missing_errors_doc,
 	clippy::module_name_repetitions,
