@@ -1,8 +1,9 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
+use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
 use std::{process::exit, time::Duration};
-use tracing::error;
+use tracing::*;
 use uuid::Uuid;
 
 pub fn main() {
@@ -10,15 +11,25 @@ pub fn main() {
 	let sdl_context = sdl2::init().unwrap();
 	let ttf_context = sdl2::ttf::init().unwrap();
 	let video_subsystem = sdl_context.video().unwrap();
+	let timer_subsystem = sdl_context.timer().unwrap();
 	let window = video_subsystem
 		.window("Esprit 2", 1280, 720)
 		.resizable()
 		.position_centered()
 		.build()
 		.unwrap();
-	let mut canvas = window.into_canvas().build().unwrap();
+
+	let mut canvas = window
+		.into_canvas()
+		.accelerated()
+		.present_vsync()
+		.build()
+		.unwrap();
 	let texture_creator = canvas.texture_creator();
 	let mut event_pump = sdl_context.event_pump().unwrap();
+
+	let mut last_time;
+	let mut current_time = timer_subsystem.performance_counter() as f64;
 
 	// Logging initialization.
 	tracing_subscriber::fmt::init();
@@ -163,13 +174,30 @@ pub fn main() {
 							next_character.next_action =
 								Some(character::Action::Move(character::OrdDir::DownRight));
 						}
+						if options.controls.talk.contains(&(keycode as i32)) {
+							world_manager.console.say(" Luvui ".into(), "Meow!");
+							world_manager
+								.console
+								.say(" Aris ".into(), "I am a kitty :3");
+						}
 					}
 				}
 				_ => {}
 			}
 		}
 
-		world_manager.pop_action();
+		// Logic
+		// This is the only place where delta time should be used.
+		{
+			last_time = current_time;
+			current_time = timer_subsystem.performance_counter() as f64;
+			let delta = (((current_time - last_time) * 1000.0
+				/ (timer_subsystem.performance_frequency() as f64)) as f64)
+				// Convert milliseconds to seconds.
+				/ 1000.0;
+			world_manager.pop_action();
+			world_manager.console.update(delta);
+		}
 
 		// Rendering
 		// Clear the screen.
@@ -201,6 +229,12 @@ pub fn main() {
 				}
 			}
 		}
+		canvas
+			.rounded_box(50, 400, 400, 500, i as i16, Color::BLUE)
+			.unwrap();
+		canvas
+			.rounded_box(50, 0, 400, 100, i as i16, Color::BLUE)
+			.unwrap();
 
 		// Draw characters
 		for character in &world_manager.get_floor().characters {
@@ -354,6 +388,5 @@ pub fn main() {
 		pamphlet.label("- Quit", &font);
 
 		canvas.present();
-		std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
 	}
 }

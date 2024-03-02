@@ -77,15 +77,18 @@ pub enum Alliance {
 	Enemy,
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Sheet {
 	/// Note that this includes the character's name.
 	pub nouns: Nouns,
+
 	pub level: u32,
 	pub stats: Stats,
+	pub skillset: spell::Skillset,
+	pub speed: Aut,
+
 	pub attacks: Vec<String>,
 	pub spells: Vec<String>,
-	pub speed: Aut,
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

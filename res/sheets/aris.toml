@@ -15,3 +15,6 @@ power = 6
 defense = 5
 magic = 1
 resistance = 7
+
+[skillset]
+major = "Internal"

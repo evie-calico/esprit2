@@ -15,3 +15,7 @@ power = 3
 defense = 6
 magic = 6
 resistance = 3
+
+[skillset]
+major = "Positive"
+minor = "External"
