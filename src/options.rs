@@ -75,6 +75,7 @@ pub struct Controls {
 	pub down_right: Vec<KeycodeIndex>,
 
 	pub talk: Vec<KeycodeIndex>,
+	pub cast: Vec<KeycodeIndex>,
 }
 
 impl Default for Controls {
@@ -91,6 +92,7 @@ impl Default for Controls {
 			down_right: vec![K::N as i32, K::Kp3 as i32],
 
 			talk: vec![K::T as i32],
+			cast: vec![K::Z as i32],
 		}
 	}
 }

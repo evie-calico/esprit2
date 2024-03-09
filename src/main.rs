@@ -1,10 +1,16 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use sdl2::gfx::primitives::DrawRenderer;
+use sdl2::keyboard::Keycode;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
-use std::{process::exit, time::Duration};
+use std::process::exit;
 use tracing::*;
 use uuid::Uuid;
+
+pub enum InputMode {
+	Normal,
+	Cast,
+}
 
 pub fn main() {
 	// SDL initialization.
@@ -69,6 +75,7 @@ pub fn main() {
 		console: Console::default(),
 
 		current_level: world::Level::default(),
+		current_floor: Floor::default(),
 		party: vec![
 			world::PartyReference::new(player.id, party[0].0),
 			world::PartyReference::new(ally.id, party[1].0),
@@ -97,8 +104,8 @@ pub fn main() {
 			"items/watermelon".into(),
 		],
 	};
-	world_manager.get_floor_mut().characters.push(player);
-	world_manager.get_floor_mut().characters.push(ally);
+	world_manager.current_floor.characters.push(player);
+	world_manager.current_floor.characters.push(ally);
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context
 		.load_font_from_rwops(
@@ -125,6 +132,8 @@ pub fn main() {
 		.console
 		.print_special("Luvui's level increased to 2!");
 
+	// TODO: Display this on-screen.
+	let mut input_mode = InputMode::Normal;
 	let mut i = 0;
 	'running: loop {
 		// Input processing
@@ -139,46 +148,66 @@ pub fn main() {
 					keycode: Some(keycode),
 					..
 				} => {
-					// This will need to be refactored.
 					let next_character = world_manager.next_character();
 					if next_character.player_controlled {
-						if options.controls.left.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::Left));
-						}
-						if options.controls.right.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::Right));
-						}
-						if options.controls.up.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::Up));
-						}
-						if options.controls.down.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::Down));
-						}
-						if options.controls.up_left.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::UpLeft));
-						}
-						if options.controls.up_right.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::UpRight));
-						}
-						if options.controls.down_left.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::DownLeft));
-						}
-						if options.controls.down_right.contains(&(keycode as i32)) {
-							next_character.next_action =
-								Some(character::Action::Move(character::OrdDir::DownRight));
-						}
-						if options.controls.talk.contains(&(keycode as i32)) {
-							world_manager.console.say(" Luvui ".into(), "Meow!");
-							world_manager
-								.console
-								.say(" Aris ".into(), "I am a kitty :3");
+						match input_mode {
+							InputMode::Normal => {
+								// This will need to be refactored.
+								if options.controls.left.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::Left));
+								}
+								if options.controls.right.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::Right));
+								}
+								if options.controls.up.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::Up));
+								}
+								if options.controls.down.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::Down));
+								}
+								if options.controls.up_left.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::UpLeft));
+								}
+								if options.controls.up_right.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::UpRight));
+								}
+								if options.controls.down_left.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::DownLeft));
+								}
+								if options.controls.down_right.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(character::OrdDir::DownRight));
+								}
+								if options.controls.cast.contains(&(keycode as i32)) {
+									input_mode = InputMode::Cast;
+								}
+								if options.controls.talk.contains(&(keycode as i32)) {
+									world_manager.console.say("Luvui".into(), "Meow!");
+									world_manager.console.say("Aris".into(), "I am a kitty :3");
+								}
+							}
+							InputMode::Cast => {
+								let selected_index = (keycode as i32) - (Keycode::A as i32);
+								if (0..=26).contains(&selected_index) {
+									if let Some(spell) =
+										next_character.sheet.spells.get(selected_index as usize)
+									{
+										let message = format!("{spell:?}");
+										world_manager.console.print_system(message);
+									}
+									world_manager
+										.console
+										.print_system(format!("{selected_index}"));
+								}
+								input_mode = InputMode::Normal;
+							}
 						}
 					}
 				}
@@ -220,7 +249,7 @@ pub fn main() {
 
 		// Draw tilemap
 		canvas.set_draw_color(Color::WHITE);
-		for (x, col) in world_manager.get_floor().map.iter_cols().enumerate() {
+		for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
 			for (y, tile) in col.enumerate() {
 				if *tile == world::Tile::Wall {
 					canvas
@@ -237,7 +266,7 @@ pub fn main() {
 			.unwrap();
 
 		// Draw characters
-		for character in &world_manager.get_floor().characters {
+		for character in &world_manager.current_floor.characters {
 			canvas
 				.copy(
 					sleep_texture,
@@ -341,14 +370,13 @@ pub fn main() {
 						}
 						player_window.hsplit(&mut magical_stats);
 						player_window.label("Spells", &font);
-						let mut spells = (0..6).peekable();
+						let mut spells = piece.sheet.spells.iter().peekable();
 						while spells.peek().is_some() {
 							let textures_per_row = player_window.rect.width() / (32 + 8);
 							player_window.horizontal();
 							for _ in 0..textures_per_row {
-								if spells.next().is_some() {
-									player_window
-										.htexture(resources.get_texture("magic_missile"), 32);
+								if let Some(spell) = spells.next() {
+									player_window.htexture(resources.get_texture(spell), 32);
 									player_window.advance(8, 0);
 								}
 							}

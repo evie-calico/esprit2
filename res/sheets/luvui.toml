@@ -1,5 +1,5 @@
 level = 1
-spells = []
+spells = ["magic_missile"]
 attacks = ["scratch", "bite"]
 speed = 12
 

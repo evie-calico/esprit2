@@ -1,7 +1,6 @@
 use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
-use grid::{grid, Grid};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use uuid::Uuid;
 
@@ -15,6 +14,7 @@ pub struct Manager {
 	pub location: Location,
 	/// This is the level pointed to by `location.level`.
 	pub current_level: Level,
+	pub current_floor: Floor,
 	/// Always point to the party's pieces, even across floors.
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
 	pub party: Vec<PartyReference>,
@@ -22,17 +22,16 @@ pub struct Manager {
 	pub console: Console,
 }
 
+/// Contains information about what should generate on each floor.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Level {
 	pub name: String,
-	pub floors: Vec<Floor>,
 }
 
 impl Default for Level {
 	fn default() -> Self {
 		Self {
 			name: String::from("New Level"),
-			floors: vec![Floor::default()],
 		}
 	}
 }
@@ -71,63 +70,13 @@ pub enum Tile {
 	Wall,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Floor {
-	pub map: Grid<Tile>,
-	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
-	pub characters: Vec<character::Piece>,
-	pub items: Vec<item::Piece>,
-}
-
-impl Default for Floor {
-	fn default() -> Self {
-		// thanks rustfmt :/
-		let map = grid![
-			[Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall]
-			[
-				Tile::Wall,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Wall
-			]
-			[
-				Tile::Wall,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Wall
-			]
-			[
-				Tile::Wall,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Floor,
-				Tile::Wall
-			]
-			[Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall, Tile::Wall]
-		];
-
-		Self {
-			map,
-			characters: Vec::new(),
-			items: Vec::new(),
-		}
-	}
-}
-
-macro_rules! get_floor_mut {
-	($self:ident) => {
-		&mut $self.current_level.floors[$self.location.floor]
-	};
-}
 // Returns none if no entity with the given uuid is currently loaded.
 // This either means they no longer exist, or they're on a different floor;
 // either way they cannot be referenced.
 macro_rules! get_character_mut {
 	($self:ident, $id:expr) => {
 		$self
-			.get_floor_mut()
+			.current_floor
 			.characters
 			.iter_mut()
 			.find(|x| x.id == $id)
@@ -136,7 +85,8 @@ macro_rules! get_character_mut {
 
 macro_rules! get_character_at_mut {
 	($self:ident, $x:expr, $y:expr) => {
-		get_floor_mut!($self)
+		$self
+			.current_floor
 			.characters
 			.iter_mut()
 			.find(|p| p.x == $x && p.y == $y)
@@ -144,19 +94,11 @@ macro_rules! get_character_at_mut {
 }
 
 impl Manager {
-	pub fn get_floor(&self) -> &Floor {
-		&self.current_level.floors[self.location.floor]
-	}
-
-	pub fn get_floor_mut(&mut self) -> &mut Floor {
-		get_floor_mut!(self)
-	}
-
 	// Returns none if no entity with the given uuid is currently loaded.
 	// This either mean they no longer exist, or they're on a different floor;
 	// either way they cannot be referenced.
 	pub fn get_character(&self, id: Uuid) -> Option<&character::Piece> {
-		self.get_floor().characters.iter().find(|x| x.id == id)
+		self.current_floor.characters.iter().find(|x| x.id == id)
 	}
 
 	// Returns none if no entity with the given uuid is currently loaded.
@@ -167,11 +109,11 @@ impl Manager {
 	}
 
 	pub fn next_character(&mut self) -> &mut character::Piece {
-		&mut self.get_floor_mut().characters[0]
+		&mut self.current_floor.characters[0]
 	}
 
 	pub fn get_character_at(&self, x: i32, y: i32) -> Option<&character::Piece> {
-		self.get_floor()
+		self.current_floor
 			.characters
 			.iter()
 			.find(|p| p.x == x && p.y == y)

@@ -9,6 +9,7 @@
 pub mod attack;
 pub mod character;
 pub mod console;
+pub mod floor;
 pub mod gui;
 pub mod item;
 pub mod nouns;
@@ -31,6 +32,7 @@ pub mod prelude {
 	pub use super::*;
 	pub use attack::Attack;
 	pub use console::Console;
+	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
 	pub use options::Options;
