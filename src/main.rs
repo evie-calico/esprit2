@@ -1,5 +1,6 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
+use esprit2::world::CharacterRef;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::keyboard::Keycode;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
@@ -76,6 +77,9 @@ pub fn main() {
 
 		current_level: world::Level::default(),
 		current_floor: Floor::default(),
+		characters: Vec::new(),
+		items: Vec::new(),
+
 		party: vec![
 			world::PartyReference::new(player.id, party[0].0),
 			world::PartyReference::new(ally.id, party[1].0),
@@ -104,8 +108,8 @@ pub fn main() {
 			"items/watermelon".into(),
 		],
 	};
-	world_manager.current_floor.characters.push(player);
-	world_manager.current_floor.characters.push(ally);
+	world_manager.characters.push(CharacterRef::new(player));
+	world_manager.characters.push(CharacterRef::new(ally));
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context
 		.load_font_from_rwops(
@@ -148,7 +152,7 @@ pub fn main() {
 					keycode: Some(keycode),
 					..
 				} => {
-					let next_character = world_manager.next_character();
+					let mut next_character = world_manager.next_character().borrow_mut();
 					if next_character.player_controlled {
 						match input_mode {
 							InputMode::Normal => {
@@ -188,6 +192,8 @@ pub fn main() {
 								if options.controls.cast.contains(&(keycode as i32)) {
 									input_mode = InputMode::Cast;
 								}
+								drop(next_character);
+
 								if options.controls.talk.contains(&(keycode as i32)) {
 									world_manager.console.say("Luvui".into(), "Meow!");
 									world_manager.console.say("Aris".into(), "I am a kitty :3");
@@ -199,12 +205,8 @@ pub fn main() {
 									if let Some(spell) =
 										next_character.sheet.spells.get(selected_index as usize)
 									{
-										let message = format!("{spell:?}");
-										world_manager.console.print_system(message);
+										let _message = format!("{spell:?}");
 									}
-									world_manager
-										.console
-										.print_system(format!("{selected_index}"));
 								}
 								input_mode = InputMode::Normal;
 							}
@@ -251,7 +253,7 @@ pub fn main() {
 		canvas.set_draw_color(Color::WHITE);
 		for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
 			for (y, tile) in col.enumerate() {
-				if *tile == world::Tile::Wall {
+				if *tile == floor::Tile::Wall {
 					canvas
 						.fill_rect(Rect::new((x as i32) * 64, (y as i32) * 64, 64, 64))
 						.unwrap();
@@ -266,7 +268,7 @@ pub fn main() {
 			.unwrap();
 
 		// Draw characters
-		for character in &world_manager.current_floor.characters {
+		for character in world_manager.characters.iter().map(|x| x.borrow()) {
 			canvas
 				.copy(
 					sleep_texture,
@@ -309,6 +311,7 @@ pub fn main() {
 			for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
 				*window = Some(|player_window: &mut gui::Context| {
 					if let Some(piece) = world_manager.get_character(character_id.piece) {
+						let piece = piece.borrow();
 						player_window.label_color(
 							&format!(
 								"{} ({:08x})",
