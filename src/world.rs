@@ -93,9 +93,27 @@ pub enum MovementResult {
 	Attack(AttackResult),
 }
 
+#[derive(thiserror::Error, Clone, Debug)]
+pub enum MovementError {
+	#[error("hit a wall")]
+	HitWall,
+	#[error("hit the void")]
+	HitVoid,
+	#[error(transparent)]
+	Attack(#[from] AttackError),
+}
+
 #[derive(Clone, Debug)]
 pub enum AttackResult {
 	Hit { message: String, weak: bool },
+}
+
+#[derive(thiserror::Error, Clone, Debug)]
+pub enum AttackError {
+	#[error("attempted to attack an ally")]
+	Ally,
+	#[error("attacker has no attacks defined")]
+	NoAttacks,
 }
 
 impl Manager {
@@ -107,7 +125,7 @@ impl Manager {
 		};
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
-				Some(MovementResult::Attack(AttackResult::Hit { message, weak })) => {
+				Ok(MovementResult::Attack(AttackResult::Hit { message, weak })) => {
 					let colors = &self.console.colors;
 					self.console.print_colored(
 						message,
@@ -118,27 +136,46 @@ impl Manager {
 						},
 					)
 				}
-				Some(_) => (),
-				None => {
-					self.console.print_system("Action failed");
+				Ok(_) => (),
+				Err(MovementError::HitWall) => {
+					let name = next_character.borrow().sheet.nouns.name.clone();
+					self.console.say(name, "Ouch!");
+				}
+				Err(MovementError::HitVoid) => {
+					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.");
+				}
+				Err(MovementError::Attack(AttackError::Ally)) => {
+					self.console.print_system("You can't attack your allies!");
+				}
+				Err(MovementError::Attack(AttackError::NoAttacks)) => {
+					self.console
+						.print_system("You cannot perform any melee attacks right now.");
 				}
 			},
 		};
 	}
 
+	/// # Errors
+	///
+	/// Returns an error if the target is an ally, or if the user has no attacks.
 	pub fn attack_piece(
 		&self,
 		character_ref: &CharacterRef,
 		target_ref: &CharacterRef,
-	) -> Option<AttackResult> {
-		let character = character_ref.borrow();
-		let target = target_ref.borrow();
+	) -> Result<AttackResult, AttackError> {
+		let (damage, message, weak) = {
+			let character = character_ref.borrow();
+			let target = target_ref.borrow();
 
-		if let Some(mut attack) = character.attacks.first()
-			&& target.alliance != character.alliance
-		{
+			if target.alliance == character.alliance {
+				return Err(AttackError::Ally);
+			}
+
 			let mut rng = thread_rng();
+
+			let mut attack = character.attacks.first().ok_or(AttackError::NoAttacks)?;
 			let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
+
 			let mut point = rng.gen_range(0..max_attack_weight);
 			for i in &character.attacks {
 				if point < i.weight {
@@ -177,51 +214,65 @@ impl Manager {
 				.replace_prefixed_nouns(&target.sheet.nouns, "target_");
 			message.push_str(damage_punctuation);
 
-			// Drop references and being mutating.
-			drop(target);
-			drop(character);
-
-			// This is where the damage is actually dealt
-			target_ref.borrow_mut().hp -= damage;
-
-			// `self` is not mutable, so the message needs to be passed up to the manager,
-			// where printing can occur.
-			Some(AttackResult::Hit {
-				message,
-				weak: is_weak_attack,
-			})
-		} else {
-			None
-		}
-	}
-
-	/// `id` must be a valid chracter piece id.
-	pub fn move_piece(&self, character_ref: &CharacterRef, dir: OrdDir) -> Option<MovementResult> {
-		let (x, y) = match dir {
-			OrdDir::Up => (0, -1),
-			OrdDir::UpRight => (1, -1),
-			OrdDir::Right => (1, 0),
-			OrdDir::DownRight => (1, 1),
-			OrdDir::Down => (0, 1),
-			OrdDir::DownLeft => (-1, 1),
-			OrdDir::Left => (-1, 0),
-			OrdDir::UpLeft => (-1, -1),
+			(damage, message, is_weak_attack)
 		};
 
+		// This is where the damage is actually dealt
+		target_ref.borrow_mut().hp -= damage;
+
+		// `self` is not mutable, so the message needs to be passed up to the manager,
+		// where printing can occur.
+		Ok(AttackResult::Hit { message, weak })
+	}
+
+	/// # Errors
+	///
+	/// Fails if a wall or void is in the way, or if an implicit attack failed.
+	pub fn move_piece(
+		&self,
+		character_ref: &CharacterRef,
+		dir: OrdDir,
+	) -> Result<MovementResult, MovementError> {
+		use crate::floor::Tile;
+
 		let (x, y) = {
+			let (x, y) = dir_to_vector(dir);
 			let character = character_ref.borrow();
 			(character.x + x, character.y + y)
 		};
 
+		// There's a really annoying phenomenon in Pokémon Mystery Dungeon where you can't hit ghosts that are inside of walls.
+		// I think that this is super lame, so the attack check comes before any movement.
 		if let Some(target_ref) = self.get_character_at(x, y) {
-			Some(MovementResult::Attack(
+			return Ok(MovementResult::Attack(
 				self.attack_piece(character_ref, target_ref)?,
-			))
-		} else {
-			let mut character = character_ref.borrow_mut();
-			character.x = x;
-			character.y = y;
-			Some(MovementResult::Move)
+			));
+		}
+
+		let tile = self.current_floor.map.get(y, x);
+		match tile {
+			Some(Tile::Floor) => {
+				let mut character = character_ref.borrow_mut();
+				character.x = x;
+				character.y = y;
+				Ok(MovementResult::Move)
+			}
+			Some(Tile::Wall) => Err(MovementError::HitWall),
+			None => Err(MovementError::HitVoid),
 		}
 	}
+}
+
+fn dir_to_vector(dir: OrdDir) -> (i32, i32) {
+	let (x, y) = match dir {
+		OrdDir::Up => (0, -1),
+		OrdDir::UpRight => (1, -1),
+		OrdDir::Right => (1, 0),
+		OrdDir::DownRight => (1, 1),
+		OrdDir::Down => (0, 1),
+		OrdDir::DownLeft => (-1, 1),
+		OrdDir::Left => (-1, 0),
+		OrdDir::UpLeft => (-1, -1),
+	};
+	(x, y)
 }
