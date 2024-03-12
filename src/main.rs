@@ -64,7 +64,7 @@ pub fn main() {
 	};
 	let ally = character::Piece {
 		player_controlled: false,
-		alliance: character::Alliance::Enemy,
+		alliance: character::Alliance::Friendly,
 		..character::Piece::new(party[1].1.clone(), &resources)
 	};
 	let mut world_manager = world::Manager {
@@ -75,11 +75,7 @@ pub fn main() {
 		console: Console::default(),
 
 		current_level: world::Level::default(),
-		current_floor: {
-			let mut floor = Floor::default();
-			floor.blit_vault(1, 1, resources.get_vault("example").unwrap());
-			floor
-		},
+		current_floor: Floor::default(),
 		characters: Vec::new(),
 		items: Vec::new(),
 
@@ -113,6 +109,7 @@ pub fn main() {
 	};
 	world_manager.characters.push(CharacterRef::new(player));
 	world_manager.characters.push(CharacterRef::new(ally));
+	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context
 		.load_font_from_rwops(

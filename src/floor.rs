@@ -31,10 +31,10 @@ impl Floor {
 		for row in vault.tiles.chunks(vault.width) {
 			for tile in row {
 				*self.map.get_mut(x, y).unwrap() = *tile;
-				x += 1;
+				y += 1;
 			}
-			x -= vault.width;
-			y += 1;
+			y -= vault.width;
+			x += 1;
 		}
 	}
 }

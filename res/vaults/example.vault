@@ -1,5 +1,12 @@
-  x
- x x
-x   x
- x x
+[symbols.a]
+Character = "aris"
+
+[symbols."#"]
+Tile = "Wall"
+
+# Layout
+  #
+ x.x
+..a.#
+ x.x
   x

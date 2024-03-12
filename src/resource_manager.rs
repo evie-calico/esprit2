@@ -15,6 +15,8 @@ pub enum Error {
 	Toml(#[from] toml::de::Error),
 	#[error("{0}")]
 	Texture(String),
+	#[error(transparent)]
+	Vault(#[from] vault::Error),
 }
 
 type Resource<T> = HashMap<PathBuf, T>;
@@ -116,7 +118,7 @@ impl<'texture> ResourceManager<'texture> {
 
 		let mut vaults = HashMap::new();
 		begin_recurse(&mut vaults, &path.join("vaults"), &|path| {
-			Ok(Vault::open(path))
+			Ok(Vault::open(path)?)
 		})?;
 
 		// Include a missing texture placeholder, rather than returning an Option.

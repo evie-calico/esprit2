@@ -85,6 +85,18 @@ impl Manager {
 			p.x == x && p.y == y
 		})
 	}
+
+	pub fn apply_vault(&mut self, x: i32, y: i32, vault: &Vault, resources: &ResourceManager) {
+		self.current_floor.blit_vault(x as usize, y as usize, vault);
+		for (xoff, yoff, sheet_name) in &vault.characters {
+			let piece = character::Piece {
+				x: x + xoff,
+				y: y + yoff,
+				..character::Piece::new(resources.get_sheet(sheet_name).unwrap().clone(), resources)
+			};
+			self.characters.push(RefCell::new(piece));
+		}
+	}
 }
 
 #[derive(Clone, Debug)]
