@@ -1,7 +1,6 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use esprit2::world::CharacterRef;
-use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::keyboard::Keycode;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
@@ -76,7 +75,11 @@ pub fn main() {
 		console: Console::default(),
 
 		current_level: world::Level::default(),
-		current_floor: Floor::default(),
+		current_floor: {
+			let mut floor = Floor::default();
+			floor.blit_vault(1, 1, resources.get_vault("example").unwrap());
+			floor
+		},
 		characters: Vec::new(),
 		items: Vec::new(),
 
@@ -260,12 +263,6 @@ pub fn main() {
 				}
 			}
 		}
-		canvas
-			.rounded_box(50, 400, 400, 500, i as i16, Color::BLUE)
-			.unwrap();
-		canvas
-			.rounded_box(50, 0, 400, 100, i as i16, Color::BLUE)
-			.unwrap();
 
 		// Draw characters
 		for character in world_manager.characters.iter().map(|x| x.borrow()) {

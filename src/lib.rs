@@ -16,6 +16,7 @@ pub mod nouns;
 pub mod options;
 pub mod resource_manager;
 pub mod spell;
+pub mod vault;
 pub mod world;
 
 /// Arbitrary Unit of Time.
@@ -38,4 +39,5 @@ pub mod prelude {
 	pub use options::Options;
 	pub use resource_manager::ResourceManager;
 	pub use spell::Spell;
+	pub use vault::Vault;
 }

@@ -17,12 +17,16 @@ pub enum Error {
 	Texture(String),
 }
 
+type Resource<T> = HashMap<PathBuf, T>;
+
 pub struct ResourceManager<'texture> {
+	attacks: Resource<Attack>,
+	spells: Resource<Spell>,
+	sheets: Resource<character::Sheet>,
+	textures: Resource<Texture<'texture>>,
+	vaults: Resource<Vault>,
+
 	missing_texture: Texture<'texture>,
-	attacks: HashMap<PathBuf, Attack>,
-	spells: HashMap<PathBuf, Spell>,
-	sheets: HashMap<PathBuf, character::Sheet>,
-	textures: HashMap<PathBuf, Texture<'texture>>,
 }
 
 fn begin_recurse<T>(
@@ -110,17 +114,24 @@ impl<'texture> ResourceManager<'texture> {
 			texture_creator.load_texture(path).map_err(Error::Texture)
 		})?;
 
+		let mut vaults = HashMap::new();
+		begin_recurse(&mut vaults, &path.join("vaults"), &|path| {
+			Ok(Vault::open(path))
+		})?;
+
 		// Include a missing texture placeholder, rather than returning an Option.
 		let missing_texture = texture_creator
 			.load_texture_bytes(include_bytes!("res/missing_texture.png"))
 			.unwrap();
 
 		Ok(Self {
-			missing_texture,
 			attacks,
 			spells,
 			sheets,
 			textures,
+			vaults,
+
+			missing_texture,
 		})
 	}
 
@@ -140,5 +151,9 @@ impl<'texture> ResourceManager<'texture> {
 		self.textures
 			.get(path.as_ref())
 			.unwrap_or(&self.missing_texture)
+	}
+
+	pub fn get_vault(&self, path: impl AsRef<Path>) -> Option<&Vault> {
+		self.vaults.get(path.as_ref())
 	}
 }
