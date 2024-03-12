@@ -7,6 +7,7 @@ use sdl2::ttf::Font;
 use sdl2::video::Window;
 use std::collections::VecDeque;
 use std::fmt::Display;
+use std::rc::Rc;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
@@ -45,7 +46,7 @@ impl Default for Colors {
 #[derive(Clone, Debug)]
 pub enum MessagePrinter {
 	Console,
-	Dialogue { speaker: String, progress: f64 },
+	Dialogue { speaker: Rc<str>, progress: f64 },
 }
 
 #[derive(Clone, Debug)]
@@ -70,7 +71,7 @@ macro_rules! colored_print {
 }
 
 impl Console {
-	pub fn say(&mut self, speaker: String, message: impl Display) {
+	pub fn say(&mut self, speaker: Rc<str>, message: impl Display) {
 		self.history.push(Message {
 			text: message.to_string(),
 			color: self.colors.normal,

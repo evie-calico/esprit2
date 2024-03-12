@@ -1,11 +1,14 @@
 use aho_corasick::AhoCorasick;
+use std::rc::Rc;
 use std::sync::LazyLock;
 
 /// For dynamically addressing a character.
 /// This should encompass almost every (dynamic) way of addressing someone or something.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Nouns {
-	pub name: String,
+	/// This is an `Rc<str>` rather than a `String` because it's very common to
+	/// store a reference to a character's name (see `Console`).
+	pub name: Rc<str>,
 	/// If true, will be addressed as "Name", rather than "The name" or "A name".
 	pub proper_name: bool,
 	pub pronouns: Pronouns,
@@ -54,7 +57,7 @@ impl<T: AsRef<str>> StrExt for T {
 				"it", "its", "its", "its", "is", "It", "Its", "Its", "Its", "Is",
 			],
 		};
-		let name = &[nouns.name.as_str()];
+		let name = &[&*nouns.name];
 		let capital_indirect_name = &["A ", &nouns.name];
 		let indirect_name = &["a ", &nouns.name];
 		let capital_address_name = &["The ", &nouns.name];

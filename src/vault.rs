@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs, path::Path};
 
 #[derive(Clone, Debug)]
 pub struct Vault {
-	pub tiles: Vec<Tile>,
+	pub tiles: Vec<Option<Tile>>,
 	pub width: usize,
 
 	pub characters: Vec<(i32, i32, String)>,
@@ -26,9 +26,14 @@ pub enum Error {
 	MissingLayout,
 	#[error("failed to parse metadata: {0}")]
 	Toml(#[from] toml::de::Error),
+	#[error("unexpected symbol: {0}")]
+	UnexpectedSymbol(char),
 }
 
 impl Vault {
+	/// # Errors
+	///
+	/// Returns an error if the file could not be opened or parsed.
 	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
 		let mut width = 0;
 
@@ -52,23 +57,24 @@ impl Vault {
 			for (x, c) in line.chars().enumerate() {
 				if let Some(action) = metadata.symbols.get(&c) {
 					match action {
-						SymbolMeaning::Tile(t) => tiles.push(*t),
+						SymbolMeaning::Tile(t) => tiles.push(Some(*t)),
 						SymbolMeaning::Character(sheet) => {
 							characters.push((x as i32, y as i32, sheet.clone()));
-							tiles.push(Tile::Floor);
+							// TODO: What if you want a character standing on something else?
+							tiles.push(Some(Tile::Floor));
 						}
 					}
 				} else {
 					tiles.push(match c {
-						' ' | '.' => Tile::Floor,
-						'x' => Tile::Wall,
-						_ => todo!(),
+						' ' => None,
+						'.' => Some(Tile::Floor),
+						'x' => Some(Tile::Wall),
+						_ => return Err(Error::UnexpectedSymbol(c)),
 					});
 				}
 			}
 			for _ in 0..(width - line.len()) {
-				// TODO: this should be None. vaults don't have to be square.
-				tiles.push(Tile::Floor);
+				tiles.push(None);
 			}
 		}
 

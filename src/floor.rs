@@ -30,7 +30,9 @@ impl Floor {
 	pub fn blit_vault(&mut self, mut x: usize, mut y: usize, vault: &Vault) {
 		for row in vault.tiles.chunks(vault.width) {
 			for tile in row {
-				*self.map.get_mut(x, y).unwrap() = *tile;
+				if let Some(tile) = tile {
+					*self.map.get_mut(x, y).unwrap() = *tile;
+				}
 				y += 1;
 			}
 			y -= vault.width;
