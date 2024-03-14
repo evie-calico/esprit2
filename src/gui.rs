@@ -5,13 +5,13 @@ use sdl2::ttf::Font;
 use sdl2::video::{Window, WindowContext};
 
 pub struct Context<'canvas> {
-	canvas: &'canvas mut Canvas<Window>,
+	pub canvas: &'canvas mut Canvas<Window>,
 	/// Used by draw_text to store textures of fonts before drawing them.
 	font_texture_creator: TextureCreator<WindowContext>,
 	pub rect: Rect,
 	/// These values control the position of the cursor.
-	x: i32,
-	y: i32,
+	pub x: i32,
+	pub y: i32,
 	/// Determines which direction the cursor moves in.
 	orientation: Orientation,
 }

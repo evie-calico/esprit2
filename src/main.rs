@@ -34,8 +34,8 @@ pub fn main() {
 	let texture_creator = canvas.texture_creator();
 	let mut event_pump = sdl_context.event_pump().unwrap();
 
-	let mut last_time;
 	let mut current_time = timer_subsystem.performance_counter() as f64;
+	let mut last_time = current_time;
 
 	// Logging initialization.
 	tracing_subscriber::fmt::init();
@@ -120,6 +120,34 @@ pub fn main() {
 			20,
 		)
 		.unwrap();
+	struct Soul {
+		color: Color,
+		x: f32,
+		y: f32,
+	}
+
+	let mut souls = [
+		Soul {
+			color: Color::RED,
+			x: 0.0,
+			y: 0.0,
+		},
+		Soul {
+			color: Color::YELLOW,
+			x: 1.0,
+			y: 1.0,
+		},
+		Soul {
+			color: Color::GREEN,
+			x: 0.0,
+			y: 1.0,
+		},
+		Soul {
+			color: Color::BLUE,
+			x: 1.0,
+			y: 0.0,
+		},
+	];
 
 	// Print some debug messages to test the console.
 	world_manager.console.print("Hello, world!");
@@ -138,7 +166,7 @@ pub fn main() {
 
 	// TODO: Display this on-screen.
 	let mut input_mode = InputMode::Normal;
-	let mut i = 0;
+	let mut global_time = 0;
 	'running: loop {
 		// Input processing
 		for event in event_pump.poll_iter() {
@@ -220,14 +248,32 @@ pub fn main() {
 		// Logic
 		// This is the only place where delta time should be used.
 		{
-			last_time = current_time;
-			current_time = timer_subsystem.performance_counter() as f64;
-			let delta = (((current_time - last_time) * 1000.0
-				/ (timer_subsystem.performance_frequency() as f64)) as f64)
-				// Convert milliseconds to seconds.
-				/ 1000.0;
+			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
+
 			world_manager.pop_action();
 			world_manager.console.update(delta);
+
+			use std::f32::consts::TAU;
+
+			let progress = ((global_time as f32) / 256.0) * TAU;
+			let souls_len = souls.len() as f32;
+			for (i, soul) in souls.iter_mut().enumerate() {
+				let progress = (progress + (i as f32) / souls_len * TAU) % TAU;
+				let target_position = (progress.cos() / 2.0 + 0.5, progress.sin() / 2.0 + 0.5);
+
+				let delta = delta as f32;
+				if soul.x < target_position.0 {
+					soul.x += delta / 2.0;
+				} else if soul.x > target_position.0 {
+					soul.x -= delta / 2.0;
+				}
+				if soul.y < target_position.1 {
+					soul.y += delta / 2.0;
+				} else if soul.y > target_position.1 {
+					soul.y -= delta / 2.0;
+				}
+				soul.x = target_position.0;
+			}
 		}
 
 		// Rendering
@@ -243,8 +289,8 @@ pub fn main() {
 			window_size.0 - options.ui.pamphlet_width,
 			window_size.1 - options.ui.console_height,
 		));
-		i = (i + 1) % 255;
-		canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
+		global_time = (global_time + 1) % 255;
+		canvas.set_draw_color(Color::RGB(global_time, 64, 255 - global_time));
 		canvas
 			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
 			.unwrap();
@@ -392,20 +438,47 @@ pub fn main() {
 			pamphlet.hsplit(&mut character_windows);
 		}
 		pamphlet.advance(0, 10);
-		pamphlet.label("Inventory", &font);
-		let mut items = world_manager.inventory.iter().peekable();
-		while items.peek().is_some() {
-			let textures_per_row = pamphlet.rect.width() / (32 + 8);
-			pamphlet.horizontal();
-			for _ in 0..textures_per_row {
-				if let Some(item_name) = items.next() {
-					pamphlet.htexture(resources.get_texture(item_name), 32);
-					pamphlet.advance(8, 0);
+
+		let mut inventory_fn = |pamphlet: &mut gui::Context| {
+			pamphlet.label("Inventory", &font);
+			let mut items = world_manager.inventory.iter().peekable();
+			while items.peek().is_some() {
+				let textures_per_row = pamphlet.rect.width() / (32 + 8);
+				pamphlet.horizontal();
+				for _ in 0..textures_per_row {
+					if let Some(item_name) = items.next() {
+						pamphlet.htexture(resources.get_texture(item_name), 32);
+						pamphlet.advance(8, 0);
+					}
 				}
+				pamphlet.vertical();
+				pamphlet.advance(8, 8);
 			}
-			pamphlet.vertical();
-			pamphlet.advance(8, 8);
-		}
+		};
+		let mut souls_fn = |pamphlet: &mut gui::Context| {
+			const SOUL_SIZE: u32 = 10;
+			pamphlet.label("Souls", &font);
+
+			let bx = pamphlet.x as f32;
+			let by = pamphlet.y as f32;
+			let display_size = pamphlet.rect.width();
+
+			for soul in &souls {
+				let display_size = (display_size - SOUL_SIZE) as f32;
+				let ox = soul.x * display_size;
+				let oy = soul.y * display_size;
+				pamphlet.canvas.set_draw_color(soul.color);
+				pamphlet
+					.canvas
+					.draw_rect(Rect::new((bx + ox) as i32, (by + oy) as i32, 10, 10))
+					.unwrap();
+			}
+			pamphlet.advance(0, display_size);
+		};
+		pamphlet.hsplit(&mut [
+			Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
+			Some(&mut souls_fn),
+		]);
 		pamphlet.advance(0, 10);
 		pamphlet.label("Options", &font);
 		pamphlet.label("- Settings", &font);
@@ -414,4 +487,17 @@ pub fn main() {
 
 		canvas.present();
 	}
+}
+
+fn update_delta(
+	last_time: &mut f64,
+	current_time: &mut f64,
+	timer_subsystem: &sdl2::TimerSubsystem,
+) -> f64 {
+	*last_time = *current_time;
+	*current_time = timer_subsystem.performance_counter() as f64;
+	((*current_time - *last_time) * 1000.0
+				    / (timer_subsystem.performance_frequency() as f64))
+				    // Convert milliseconds to seconds.
+				    / 1000.0
 }
