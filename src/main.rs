@@ -1,6 +1,7 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use esprit2::world::CharacterRef;
+use rand::{thread_rng, Rng};
 use sdl2::keyboard::Keycode;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
@@ -10,6 +11,86 @@ use uuid::Uuid;
 pub enum InputMode {
 	Normal,
 	Cast,
+}
+
+struct Soul {
+	color: Color,
+	x: f32,
+	y: f32,
+	/// The souls avoid the edges of walls a bit.
+	/// These variables slightly offset what they consider to be the center.
+	x_offset: f32,
+	y_offset: f32,
+	/// How fast the soul is moving towards its target position.
+	speed: f32,
+	/// Seconds
+	///
+	/// Once this hits 0, speed will be re-calculated.
+	speed_timer: f32,
+	path_position: f32,
+	path_speed: f32,
+}
+
+impl Soul {
+	fn new(color: Color) -> Self {
+		let mut rng = thread_rng();
+		let mut new = Self {
+			color,
+			x: rng.gen(),
+			y: rng.gen(),
+
+			// None of these fields are final; the following function will fill them in.
+			x_offset: 0.0,
+			y_offset: 0.0,
+			speed: 0.0,
+			speed_timer: 0.0,
+			path_position: 0.0,
+			path_speed: 0.0,
+		};
+		new.speed_timer_timeout();
+		new
+	}
+
+	fn speed_timer_timeout(&mut self) {
+		let mut rng = thread_rng();
+		self.speed = rng.gen_range(0.25..0.5);
+		self.x_offset = rng.gen();
+		self.y_offset = rng.gen();
+		if rng.gen_range(0..100) < 20 {
+			self.path_position = rng.gen_range(0.0..100.0);
+		}
+		self.path_speed = rng.gen_range(0.5..1.0);
+		self.speed_timer = rng.gen_range(3.0..8.0);
+	}
+
+	fn tick(&mut self, delta: f32) {
+		let progress = self.path_position;
+		let squish = |pos, by, off| pos * by + (1.0 - by) * off;
+		let target_position = (
+			squish(progress.cos() / 2.0 + 0.5, 0.8, self.x_offset),
+			squish(progress.sin() / 2.0 + 0.5, 0.5, self.y_offset),
+		);
+		let offset = delta * self.speed;
+
+		// Move
+		if self.x < target_position.0 {
+			self.x += offset;
+		} else if self.x > target_position.0 {
+			self.x -= offset;
+		}
+		if self.y < target_position.1 {
+			self.y += offset;
+		} else if self.y > target_position.1 {
+			self.y -= offset;
+		}
+
+		// Update stats.
+		self.path_position += delta * self.path_speed;
+		self.speed_timer -= delta;
+		if self.speed_timer <= 0.0 {
+			self.speed_timer_timeout();
+		}
+	}
 }
 
 pub fn main() {
@@ -120,33 +201,17 @@ pub fn main() {
 			20,
 		)
 		.unwrap();
-	struct Soul {
-		color: Color,
-		x: f32,
-		y: f32,
-	}
 
 	let mut souls = [
-		Soul {
-			color: Color::RED,
-			x: 0.0,
-			y: 0.0,
-		},
-		Soul {
-			color: Color::YELLOW,
-			x: 1.0,
-			y: 1.0,
-		},
-		Soul {
-			color: Color::GREEN,
-			x: 0.0,
-			y: 1.0,
-		},
-		Soul {
-			color: Color::BLUE,
-			x: 1.0,
-			y: 0.0,
-		},
+		Soul::new(Color::RED),
+		Soul::new(Color::YELLOW),
+		Soul::new(Color::BLUE),
+		Soul::new(Color::GREEN),
+		Soul::new(Color::CYAN),
+		Soul::new(Color::RGB(255, 128, 0)),
+		Soul::new(Color::WHITE),
+		Soul::new(Color::RGB(255, 0, 255)),
+		Soul::new(Color::RGB(255, 128, 128)),
 	];
 
 	// Print some debug messages to test the console.
@@ -253,26 +318,8 @@ pub fn main() {
 			world_manager.pop_action();
 			world_manager.console.update(delta);
 
-			use std::f32::consts::TAU;
-
-			let progress = ((global_time as f32) / 256.0) * TAU;
-			let souls_len = souls.len() as f32;
-			for (i, soul) in souls.iter_mut().enumerate() {
-				let progress = (progress + (i as f32) / souls_len * TAU) % TAU;
-				let target_position = (progress.cos() / 2.0 + 0.5, progress.sin() / 2.0 + 0.5);
-
-				let delta = delta as f32;
-				if soul.x < target_position.0 {
-					soul.x += delta / 2.0;
-				} else if soul.x > target_position.0 {
-					soul.x -= delta / 2.0;
-				}
-				if soul.y < target_position.1 {
-					soul.y += delta / 2.0;
-				} else if soul.y > target_position.1 {
-					soul.y -= delta / 2.0;
-				}
-				soul.x = target_position.0;
+			for soul in &mut souls {
+				soul.tick(delta as f32);
 			}
 		}
 
