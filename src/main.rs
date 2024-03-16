@@ -2,6 +2,7 @@ use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use esprit2::world::CharacterRef;
 use rand::{thread_rng, Rng};
+use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
 use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
@@ -53,7 +54,7 @@ impl Soul {
 
 	fn speed_timer_timeout(&mut self) {
 		let mut rng = thread_rng();
-		self.speed = rng.gen_range(0.25..0.5);
+		self.speed = rng.gen_range(0.5..1.0);
 		self.x_offset = rng.gen();
 		self.y_offset = rng.gen();
 		if rng.gen_range(0..100) < 20 {
@@ -70,18 +71,20 @@ impl Soul {
 			squish(progress.cos() / 2.0 + 0.5, 0.8, self.x_offset),
 			squish(progress.sin() / 2.0 + 0.5, 0.5, self.y_offset),
 		);
-		let offset = delta * self.speed;
 
 		// Move
+		let x_diff = (self.x - target_position.0).abs() * delta * self.speed;
 		if self.x < target_position.0 {
-			self.x += offset;
+			self.x += x_diff;
 		} else if self.x > target_position.0 {
-			self.x -= offset;
+			self.x -= x_diff;
 		}
+
+		let y_diff = (self.y - target_position.0).abs() * delta * self.speed;
 		if self.y < target_position.1 {
-			self.y += offset;
+			self.y += y_diff;
 		} else if self.y > target_position.1 {
-			self.y -= offset;
+			self.y -= y_diff;
 		}
 
 		// Update stats.
@@ -192,6 +195,9 @@ pub fn main() {
 	world_manager.characters.push(CharacterRef::new(ally));
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
+	let mut light_texture = texture_creator
+		.load_texture("res/textures/light.png")
+		.unwrap();
 	let font = ttf_context
 		.load_font_from_rwops(
 			RWops::from_bytes(include_bytes!(
@@ -232,83 +238,18 @@ pub fn main() {
 	// TODO: Display this on-screen.
 	let mut input_mode = InputMode::Normal;
 	let mut global_time = 0;
-	'running: loop {
+	loop {
 		// Input processing
-		for event in event_pump.poll_iter() {
-			match event {
-				Event::Quit { .. }
-				| Event::KeyDown {
-					scancode: Some(Scancode::Escape),
-					..
-				} => break 'running,
-				Event::KeyDown {
-					keycode: Some(keycode),
-					..
-				} => {
-					let mut next_character = world_manager.next_character().borrow_mut();
-					if next_character.player_controlled {
-						match input_mode {
-							InputMode::Normal => {
-								// This will need to be refactored.
-								if options.controls.left.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::Left));
-								}
-								if options.controls.right.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::Right));
-								}
-								if options.controls.up.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::Up));
-								}
-								if options.controls.down.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::Down));
-								}
-								if options.controls.up_left.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::UpLeft));
-								}
-								if options.controls.up_right.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::UpRight));
-								}
-								if options.controls.down_left.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::DownLeft));
-								}
-								if options.controls.down_right.contains(&(keycode as i32)) {
-									next_character.next_action =
-										Some(character::Action::Move(character::OrdDir::DownRight));
-								}
-								if options.controls.cast.contains(&(keycode as i32)) {
-									input_mode = InputMode::Cast;
-								}
-								drop(next_character);
-
-								if options.controls.talk.contains(&(keycode as i32)) {
-									world_manager.console.say("Luvui".into(), "Meow!");
-									world_manager.console.say("Aris".into(), "I am a kitty :3");
-								}
-							}
-							InputMode::Cast => {
-								let selected_index = (keycode as i32) - (Keycode::A as i32);
-								if (0..=26).contains(&selected_index) {
-									if let Some(spell) =
-										next_character.sheet.spells.get(selected_index as usize)
-									{
-										let _message = format!("{spell:?}");
-									}
-								}
-								input_mode = InputMode::Normal;
-							}
-						}
-					}
-				}
-				_ => {}
-			}
-		}
+		if input(
+			&mut event_pump,
+			&mut world_manager,
+			&mut input_mode,
+			&options,
+		)
+		.exit
+		{
+			break;
+		};
 
 		// Logic
 		// This is the only place where delta time should be used.
@@ -503,7 +444,7 @@ pub fn main() {
 			}
 		};
 		let mut souls_fn = |pamphlet: &mut gui::Context| {
-			const SOUL_SIZE: u32 = 10;
+			const SOUL_SIZE: u32 = 50;
 			pamphlet.label("Souls", &font);
 
 			let bx = pamphlet.x as f32;
@@ -514,10 +455,14 @@ pub fn main() {
 				let display_size = (display_size - SOUL_SIZE) as f32;
 				let ox = soul.x * display_size;
 				let oy = soul.y * display_size;
-				pamphlet.canvas.set_draw_color(soul.color);
+				light_texture.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
 				pamphlet
 					.canvas
-					.draw_rect(Rect::new((bx + ox) as i32, (by + oy) as i32, 10, 10))
+					.copy(
+						&light_texture,
+						None,
+						Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
+					)
 					.unwrap();
 			}
 			pamphlet.advance(0, display_size);
@@ -534,6 +479,95 @@ pub fn main() {
 
 		canvas.present();
 	}
+}
+
+struct InputResult {
+	exit: bool,
+}
+
+fn input(
+	event_pump: &mut sdl2::EventPump,
+	world_manager: &mut world::Manager,
+	input_mode: &mut InputMode,
+	options: &Options,
+) -> InputResult {
+	for event in event_pump.poll_iter() {
+		match event {
+			Event::Quit { .. }
+			| Event::KeyDown {
+				scancode: Some(Scancode::Escape),
+				..
+			} => return InputResult { exit: true },
+			Event::KeyDown {
+				keycode: Some(keycode),
+				..
+			} => {
+				let mut next_character = world_manager.next_character().borrow_mut();
+				if next_character.player_controlled {
+					match *input_mode {
+						InputMode::Normal => {
+							// This will need to be refactored.
+							if options.controls.left.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::Left));
+							}
+							if options.controls.right.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::Right));
+							}
+							if options.controls.up.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::Up));
+							}
+							if options.controls.down.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::Down));
+							}
+							if options.controls.up_left.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::UpLeft));
+							}
+							if options.controls.up_right.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::UpRight));
+							}
+							if options.controls.down_left.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::DownLeft));
+							}
+							if options.controls.down_right.contains(&(keycode as i32)) {
+								next_character.next_action =
+									Some(character::Action::Move(character::OrdDir::DownRight));
+							}
+							if options.controls.cast.contains(&(keycode as i32)) {
+								*input_mode = InputMode::Cast;
+							}
+							drop(next_character);
+
+							if options.controls.talk.contains(&(keycode as i32)) {
+								world_manager.console.say("Luvui".into(), "Meow!");
+								world_manager.console.say("Aris".into(), "I am a kitty :3");
+							}
+						}
+						InputMode::Cast => {
+							let selected_index = (keycode as i32) - (Keycode::A as i32);
+							if (0..=26).contains(&selected_index) {
+								if let Some(spell) =
+									next_character.sheet.spells.get(selected_index as usize)
+								{
+									let _message = format!("{spell:?}");
+								}
+							}
+							*input_mode = InputMode::Normal;
+						}
+					}
+				}
+			}
+			_ => {}
+		}
+	}
+
+	InputResult { exit: false }
 }
 
 fn update_delta(
