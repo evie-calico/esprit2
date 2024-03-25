@@ -24,6 +24,7 @@ fn get_resource_directory() -> PathBuf {
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Options {
 	pub ui: UserInterface,
 	pub controls: Controls,
@@ -49,9 +50,11 @@ impl Options {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct UserInterface {
 	pub pamphlet_width: u32,
 	pub console_height: u32,
+	pub font_size: u16,
 }
 
 impl Default for UserInterface {
@@ -59,11 +62,13 @@ impl Default for UserInterface {
 		Self {
 			pamphlet_width: 400,
 			console_height: 200,
+			font_size: 18,
 		}
 	}
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct Controls {
 	pub left: Vec<KeycodeIndex>,
 	pub right: Vec<KeycodeIndex>,

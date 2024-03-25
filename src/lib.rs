@@ -1,4 +1,4 @@
-#![feature(path_file_prefix, lint_reasons, lazy_cell, let_chains)]
+#![feature(path_file_prefix, lint_reasons, lazy_cell, let_chains, once_cell_try)]
 #![warn(
 	clippy::missing_errors_doc,
 	clippy::module_name_repetitions,
@@ -11,10 +11,12 @@ pub mod character;
 pub mod console;
 pub mod floor;
 pub mod gui;
+pub mod input;
 pub mod item;
 pub mod nouns;
 pub mod options;
 pub mod resource_manager;
+pub mod soul;
 pub mod spell;
 pub mod vault;
 pub mod world;
@@ -38,6 +40,7 @@ pub mod prelude {
 	pub use nouns::Nouns;
 	pub use options::Options;
 	pub use resource_manager::ResourceManager;
+	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use vault::Vault;
 }

@@ -1,99 +1,22 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use esprit2::world::CharacterRef;
-use rand::{thread_rng, Rng};
-use sdl2::image::LoadTexture;
-use sdl2::keyboard::Keycode;
-use sdl2::{event::Event, keyboard::Scancode, pixels::Color, rect::Rect, rwops::RWops};
+use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
 use tracing::*;
 use uuid::Uuid;
 
-pub enum InputMode {
-	Normal,
-	Cast,
-}
-
-struct Soul {
-	color: Color,
-	x: f32,
-	y: f32,
-	/// The souls avoid the edges of walls a bit.
-	/// These variables slightly offset what they consider to be the center.
-	x_offset: f32,
-	y_offset: f32,
-	/// How fast the soul is moving towards its target position.
-	speed: f32,
-	/// Seconds
-	///
-	/// Once this hits 0, speed will be re-calculated.
-	speed_timer: f32,
-	path_position: f32,
-	path_speed: f32,
-}
-
-impl Soul {
-	fn new(color: Color) -> Self {
-		let mut rng = thread_rng();
-		let mut new = Self {
-			color,
-			x: rng.gen(),
-			y: rng.gen(),
-
-			// None of these fields are final; the following function will fill them in.
-			x_offset: 0.0,
-			y_offset: 0.0,
-			speed: 0.0,
-			speed_timer: 0.0,
-			path_position: 0.0,
-			path_speed: 0.0,
-		};
-		new.speed_timer_timeout();
-		new
-	}
-
-	fn speed_timer_timeout(&mut self) {
-		let mut rng = thread_rng();
-		self.speed = rng.gen_range(0.5..1.0);
-		self.x_offset = rng.gen();
-		self.y_offset = rng.gen();
-		if rng.gen_range(0..100) < 20 {
-			self.path_position = rng.gen_range(0.0..100.0);
-		}
-		self.path_speed = rng.gen_range(0.5..1.0);
-		self.speed_timer = rng.gen_range(3.0..8.0);
-	}
-
-	fn tick(&mut self, delta: f32) {
-		let progress = self.path_position;
-		let squish = |pos, by, off| pos * by + (1.0 - by) * off;
-		let target_position = (
-			squish(progress.cos() / 2.0 + 0.5, 0.8, self.x_offset),
-			squish(progress.sin() / 2.0 + 0.5, 0.5, self.y_offset),
-		);
-
-		// Move
-		let x_diff = (self.x - target_position.0).abs() * delta * self.speed;
-		if self.x < target_position.0 {
-			self.x += x_diff;
-		} else if self.x > target_position.0 {
-			self.x -= x_diff;
-		}
-
-		let y_diff = (self.y - target_position.0).abs() * delta * self.speed;
-		if self.y < target_position.1 {
-			self.y += y_diff;
-		} else if self.y > target_position.1 {
-			self.y -= y_diff;
-		}
-
-		// Update stats.
-		self.path_position += delta * self.path_speed;
-		self.speed_timer -= delta;
-		if self.speed_timer <= 0.0 {
-			self.speed_timer_timeout();
-		}
-	}
+fn update_delta(
+	last_time: &mut f64,
+	current_time: &mut f64,
+	timer_subsystem: &sdl2::TimerSubsystem,
+) -> f64 {
+	*last_time = *current_time;
+	*current_time = timer_subsystem.performance_counter() as f64;
+	((*current_time - *last_time) * 1000.0
+				    / (timer_subsystem.performance_frequency() as f64))
+				    // Convert milliseconds to seconds.
+				    / 1000.0
 }
 
 pub fn main() {
@@ -132,7 +55,10 @@ pub fn main() {
 			exit(1);
 		}
 	};
-	let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_default();
+	let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_else(|msg| {
+		error!("failed to open options.toml: {msg}");
+		Options::default()
+	});
 	// Create a piece for the player, and register it with the world manager.
 	let party = [
 		(
@@ -195,16 +121,14 @@ pub fn main() {
 	world_manager.characters.push(CharacterRef::new(ally));
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
-	let mut light_texture = texture_creator
-		.load_texture("res/textures/light.png")
-		.unwrap();
+	let mut light_texture = resources.get_owned_texture("light").unwrap();
 	let font = ttf_context
 		.load_font_from_rwops(
 			RWops::from_bytes(include_bytes!(
 				"res/FantasqueSansMNerdFontPropo-Regular.ttf"
 			))
 			.unwrap(),
-			20,
+			options.ui.font_size,
 		)
 		.unwrap();
 
@@ -236,11 +160,11 @@ pub fn main() {
 		.print_special("Luvui's level increased to 2!");
 
 	// TODO: Display this on-screen.
-	let mut input_mode = InputMode::Normal;
+	let mut input_mode = input::Mode::Normal;
 	let mut global_time = 0;
 	loop {
 		// Input processing
-		if input(
+		if input::world(
 			&mut event_pump,
 			&mut world_manager,
 			&mut input_mode,
@@ -322,263 +246,181 @@ pub fn main() {
 		);
 
 		// Draw pamphlet
-		let mut pamphlet = gui::Context::new(
+		pamphlet(
 			&mut canvas,
-			Rect::new(
-				(window_size.0 - options.ui.pamphlet_width) as i32,
-				0,
-				options.ui.pamphlet_width,
-				window_size.1,
-			),
+			window_size,
+			&options,
+			&font,
+			&world_manager,
+			&resources,
+			&souls,
+			&mut light_texture,
 		);
-		pamphlet.label("Forest: Floor 1/8", &font);
-		pamphlet.advance(0, 10);
-		// Draw party stats
-		for character_chunk in world_manager.party.chunks(2) {
-			let mut character_windows = [None, None];
-			for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
-				*window = Some(|player_window: &mut gui::Context| {
-					if let Some(piece) = world_manager.get_character(character_id.piece) {
-						let piece = piece.borrow();
-						player_window.label_color(
-							&format!(
-								"{} ({:08x})",
-								piece.sheet.nouns.name,
-								piece.id.as_fields().0
-							),
-							match piece.sheet.nouns.pronouns {
-								nouns::Pronouns::Female => Color::RGB(247, 141, 246),
-								nouns::Pronouns::Male => Color::RGB(104, 166, 232),
-								_ => Color::WHITE,
-							},
-							&font,
-						);
-						player_window.label(&format!("Level {}", piece.sheet.level), &font);
-						player_window.label(
-							&format!("HP: {}/{}", piece.hp, piece.sheet.stats.heart),
-							&font,
-						);
-						player_window.progress_bar(
-							(piece.hp as f32) / (piece.sheet.stats.heart as f32),
-							Color::GREEN,
-							Color::RED,
-							10,
-							5,
-						);
-						player_window.label(
-							&format!("SP: {}/{}", piece.sp, piece.sheet.stats.soul),
-							&font,
-						);
-						player_window.progress_bar(
-							(piece.sp as f32) / (piece.sheet.stats.soul as f32),
-							Color::BLUE,
-							Color::RED,
-							10,
-							5,
-						);
-						let stats = &piece.sheet.stats;
-						let physical_stat_info = [("Pwr", stats.power), ("Def", stats.defense)];
-						let mut physical_stats = [None, None];
-						for ((stat_name, stat), stat_half) in physical_stat_info
-							.into_iter()
-							.zip(physical_stats.iter_mut())
-						{
-							let font = &font;
-							*stat_half = Some(move |stat_half: &mut gui::Context| {
-								stat_half.label(&format!("{stat_name}: {stat}"), font)
-							});
-						}
-						player_window.hsplit(&mut physical_stats);
-						let magical_stat_info = [("Mag", stats.magic), ("Res", stats.resistance)];
-						let mut magical_stats = [None, None];
-						for ((stat_name, stat), stat_half) in
-							magical_stat_info.into_iter().zip(magical_stats.iter_mut())
-						{
-							let font = &font;
-							*stat_half = Some(move |stat_half: &mut gui::Context| {
-								stat_half.label(&format!("{stat_name}: {stat}"), font)
-							});
-						}
-						player_window.hsplit(&mut magical_stats);
-						player_window.label("Spells", &font);
-						let mut spells = piece.sheet.spells.iter().peekable();
-						while spells.peek().is_some() {
-							let textures_per_row = player_window.rect.width() / (32 + 8);
-							player_window.horizontal();
-							for _ in 0..textures_per_row {
-								if let Some(spell) = spells.next() {
-									player_window.htexture(resources.get_texture(spell), 32);
-									player_window.advance(8, 0);
-								}
-							}
-							player_window.vertical();
-							player_window.advance(8, 8);
-						}
-					} else {
-						// If the party array also had a reference to the character's last known character sheet,
-						// a name could be displayed here.
-						// I don't actually know if this is desirable;
-						// this should probably never happen anyways.
-						player_window.label("???", &font);
-					}
-				});
-			}
-			pamphlet.hsplit(&mut character_windows);
-		}
-		pamphlet.advance(0, 10);
-
-		let mut inventory_fn = |pamphlet: &mut gui::Context| {
-			pamphlet.label("Inventory", &font);
-			let mut items = world_manager.inventory.iter().peekable();
-			while items.peek().is_some() {
-				let textures_per_row = pamphlet.rect.width() / (32 + 8);
-				pamphlet.horizontal();
-				for _ in 0..textures_per_row {
-					if let Some(item_name) = items.next() {
-						pamphlet.htexture(resources.get_texture(item_name), 32);
-						pamphlet.advance(8, 0);
-					}
-				}
-				pamphlet.vertical();
-				pamphlet.advance(8, 8);
-			}
-		};
-		let mut souls_fn = |pamphlet: &mut gui::Context| {
-			const SOUL_SIZE: u32 = 50;
-			pamphlet.label("Souls", &font);
-
-			let bx = pamphlet.x as f32;
-			let by = pamphlet.y as f32;
-			let display_size = pamphlet.rect.width();
-
-			for soul in &souls {
-				let display_size = (display_size - SOUL_SIZE) as f32;
-				let ox = soul.x * display_size;
-				let oy = soul.y * display_size;
-				light_texture.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
-				pamphlet
-					.canvas
-					.copy(
-						&light_texture,
-						None,
-						Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
-					)
-					.unwrap();
-			}
-			pamphlet.advance(0, display_size);
-		};
-		pamphlet.hsplit(&mut [
-			Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
-			Some(&mut souls_fn),
-		]);
-		pamphlet.advance(0, 10);
-		pamphlet.label("Options", &font);
-		pamphlet.label("- Settings", &font);
-		pamphlet.label("- Escape", &font);
-		pamphlet.label("- Quit", &font);
 
 		canvas.present();
 	}
 }
 
-struct InputResult {
-	exit: bool,
-}
-
-fn input(
-	event_pump: &mut sdl2::EventPump,
-	world_manager: &mut world::Manager,
-	input_mode: &mut InputMode,
+fn pamphlet(
+	canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+	window_size: (u32, u32),
 	options: &Options,
-) -> InputResult {
-	for event in event_pump.poll_iter() {
-		match event {
-			Event::Quit { .. }
-			| Event::KeyDown {
-				scancode: Some(Scancode::Escape),
-				..
-			} => return InputResult { exit: true },
-			Event::KeyDown {
-				keycode: Some(keycode),
-				..
-			} => {
-				let mut next_character = world_manager.next_character().borrow_mut();
-				if next_character.player_controlled {
-					match *input_mode {
-						InputMode::Normal => {
-							// This will need to be refactored.
-							if options.controls.left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Left));
-							}
-							if options.controls.right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Right));
-							}
-							if options.controls.up.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Up));
-							}
-							if options.controls.down.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Down));
-							}
-							if options.controls.up_left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::UpLeft));
-							}
-							if options.controls.up_right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::UpRight));
-							}
-							if options.controls.down_left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::DownLeft));
-							}
-							if options.controls.down_right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::DownRight));
-							}
-							if options.controls.cast.contains(&(keycode as i32)) {
-								*input_mode = InputMode::Cast;
-							}
-							drop(next_character);
-
-							if options.controls.talk.contains(&(keycode as i32)) {
-								world_manager.console.say("Luvui".into(), "Meow!");
-								world_manager.console.say("Aris".into(), "I am a kitty :3");
-							}
-						}
-						InputMode::Cast => {
-							let selected_index = (keycode as i32) - (Keycode::A as i32);
-							if (0..=26).contains(&selected_index) {
-								if let Some(spell) =
-									next_character.sheet.spells.get(selected_index as usize)
-								{
-									let _message = format!("{spell:?}");
-								}
-							}
-							*input_mode = InputMode::Normal;
-						}
+	font: &sdl2::ttf::Font<'_, '_>,
+	world_manager: &world::Manager,
+	resources: &ResourceManager<'_>,
+	souls: &[Soul; 9],
+	light_texture: &mut sdl2::render::Texture<'_>,
+) {
+	let mut pamphlet = gui::Context::new(
+		canvas,
+		Rect::new(
+			(window_size.0 - options.ui.pamphlet_width) as i32,
+			0,
+			options.ui.pamphlet_width,
+			window_size.1,
+		),
+	);
+	pamphlet.label("Forest: Floor 1/8", font);
+	pamphlet.advance(0, 10);
+	// Draw party stats
+	for character_chunk in world_manager.party.chunks(2) {
+		let mut character_windows = [None, None];
+		for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
+			*window = Some(|player_window: &mut gui::Context| {
+				if let Some(piece) = world_manager.get_character(character_id.piece) {
+					let piece = piece.borrow();
+					player_window.label_color(
+						&format!(
+							"{} ({:08x})",
+							piece.sheet.nouns.name,
+							piece.id.as_fields().0
+						),
+						match piece.sheet.nouns.pronouns {
+							nouns::Pronouns::Female => Color::RGB(247, 141, 246),
+							nouns::Pronouns::Male => Color::RGB(104, 166, 232),
+							_ => Color::WHITE,
+						},
+						font,
+					);
+					player_window.label(&format!("Level {}", piece.sheet.level), font);
+					player_window.label(
+						&format!("HP: {}/{}", piece.hp, piece.sheet.stats.heart),
+						font,
+					);
+					player_window.progress_bar(
+						(piece.hp as f32) / (piece.sheet.stats.heart as f32),
+						Color::GREEN,
+						Color::RED,
+						10,
+						5,
+					);
+					player_window.label(
+						&format!("SP: {}/{}", piece.sp, piece.sheet.stats.soul),
+						font,
+					);
+					player_window.progress_bar(
+						(piece.sp as f32) / (piece.sheet.stats.soul as f32),
+						Color::BLUE,
+						Color::RED,
+						10,
+						5,
+					);
+					let stats = &piece.sheet.stats;
+					let physical_stat_info = [("Pwr", stats.power), ("Def", stats.defense)];
+					let mut physical_stats = [None, None];
+					for ((stat_name, stat), stat_half) in physical_stat_info
+						.into_iter()
+						.zip(physical_stats.iter_mut())
+					{
+						*stat_half = Some(move |stat_half: &mut gui::Context| {
+							stat_half.label(&format!("{stat_name}: {stat}"), font)
+						});
 					}
+					player_window.hsplit(&mut physical_stats);
+					let magical_stat_info = [("Mag", stats.magic), ("Res", stats.resistance)];
+					let mut magical_stats = [None, None];
+					for ((stat_name, stat), stat_half) in
+						magical_stat_info.into_iter().zip(magical_stats.iter_mut())
+					{
+						*stat_half = Some(move |stat_half: &mut gui::Context| {
+							stat_half.label(&format!("{stat_name}: {stat}"), font)
+						});
+					}
+					player_window.hsplit(&mut magical_stats);
+					player_window.label("Spells", font);
+					let mut spells = piece.sheet.spells.iter().peekable();
+					while spells.peek().is_some() {
+						let textures_per_row = player_window.rect.width() / (32 + 8);
+						player_window.horizontal();
+						for _ in 0..textures_per_row {
+							if let Some(spell) = spells.next() {
+								player_window.htexture(resources.get_texture(spell), 32);
+								player_window.advance(8, 0);
+							}
+						}
+						player_window.vertical();
+						player_window.advance(8, 8);
+					}
+				} else {
+					// If the party array also had a reference to the character's last known character sheet,
+					// a name could be displayed here.
+					// I don't actually know if this is desirable;
+					// this should probably never happen anyways.
+					player_window.label("???", font);
+				}
+			});
+		}
+		pamphlet.hsplit(&mut character_windows);
+	}
+	pamphlet.advance(0, 10);
+
+	let mut inventory_fn = |pamphlet: &mut gui::Context| {
+		pamphlet.label("Inventory", font);
+		let mut items = world_manager.inventory.iter().peekable();
+		while items.peek().is_some() {
+			let textures_per_row = pamphlet.rect.width() / (32 + 8);
+			pamphlet.horizontal();
+			for _ in 0..textures_per_row {
+				if let Some(item_name) = items.next() {
+					pamphlet.htexture(resources.get_texture(item_name), 32);
+					pamphlet.advance(8, 0);
 				}
 			}
-			_ => {}
+			pamphlet.vertical();
+			pamphlet.advance(8, 8);
 		}
-	}
+	};
+	let mut souls_fn = |pamphlet: &mut gui::Context| {
+		const SOUL_SIZE: u32 = 50;
+		pamphlet.label("Souls", font);
 
-	InputResult { exit: false }
-}
+		let bx = pamphlet.x as f32;
+		let by = pamphlet.y as f32;
+		let display_size = pamphlet.rect.width();
 
-fn update_delta(
-	last_time: &mut f64,
-	current_time: &mut f64,
-	timer_subsystem: &sdl2::TimerSubsystem,
-) -> f64 {
-	*last_time = *current_time;
-	*current_time = timer_subsystem.performance_counter() as f64;
-	((*current_time - *last_time) * 1000.0
-				    / (timer_subsystem.performance_frequency() as f64))
-				    // Convert milliseconds to seconds.
-				    / 1000.0
+		for soul in souls {
+			let display_size = (display_size - SOUL_SIZE) as f32;
+			let ox = soul.x * display_size;
+			let oy = soul.y * display_size;
+			light_texture.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
+			pamphlet
+				.canvas
+				.copy(
+					&*light_texture,
+					None,
+					Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
+				)
+				.unwrap();
+		}
+		pamphlet.advance(0, display_size);
+	};
+	pamphlet.hsplit(&mut [
+		Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
+		Some(&mut souls_fn),
+	]);
+	pamphlet.advance(0, 10);
+	pamphlet.label("Options", font);
+	pamphlet.label("- Settings", font);
+	pamphlet.label("- Escape", font);
+	pamphlet.label("- Quit", font);
 }

@@ -2,6 +2,7 @@ use crate::prelude::*;
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
 use sdl2::video::WindowContext;
+use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -21,11 +22,24 @@ pub enum Error {
 
 type Resource<T> = HashMap<PathBuf, T>;
 
+#[derive(Default)]
+struct TextureInfo<'texture> {
+	path: PathBuf,
+
+	texture: OnceCell<Texture<'texture>>,
+	image: OnceCell<Vec<u8>>,
+
+	/// If any errors occur, silence further error messages.
+	had_error: Cell<bool>,
+}
+
 pub struct ResourceManager<'texture> {
+	texture_creator: &'texture TextureCreator<WindowContext>,
+
 	attacks: Resource<Attack>,
 	spells: Resource<Spell>,
 	sheets: Resource<character::Sheet>,
-	textures: Resource<Texture<'texture>>,
+	textures: Resource<TextureInfo<'texture>>,
 	vaults: Resource<Vault>,
 
 	missing_texture: Texture<'texture>,
@@ -113,7 +127,10 @@ impl<'texture> ResourceManager<'texture> {
 
 		let mut textures = HashMap::new();
 		begin_recurse(&mut textures, &path.join("textures"), &|path| {
-			texture_creator.load_texture(path).map_err(Error::Texture)
+			Ok(TextureInfo {
+				path: path.to_path_buf(),
+				..Default::default()
+			})
 		})?;
 
 		let mut vaults = HashMap::new();
@@ -127,6 +144,8 @@ impl<'texture> ResourceManager<'texture> {
 			.unwrap();
 
 		Ok(Self {
+			texture_creator,
+
 			attacks,
 			spells,
 			sheets,
@@ -150,9 +169,58 @@ impl<'texture> ResourceManager<'texture> {
 	}
 
 	pub fn get_texture(&self, path: impl AsRef<Path>) -> &Texture {
-		self.textures
-			.get(path.as_ref())
-			.unwrap_or(&self.missing_texture)
+		let path = path.as_ref();
+		let Some(texture_info) = self.textures.get(path) else {
+			return &self.missing_texture;
+		};
+		texture_info
+			.texture
+			.get_or_try_init(|| self.texture_creator.load_texture(&texture_info.path))
+			.unwrap_or_else(|msg| {
+				if !texture_info.had_error.get() {
+					eprintln!(
+						"failed to load {} ({}): {msg}",
+						path.display(),
+						texture_info.path.display()
+					);
+					texture_info.had_error.set(true);
+				}
+				&self.missing_texture
+			})
+	}
+
+	/// `ResourceManager` *must* be immutable to function,
+	/// but sometimes sdl expects you to have ownership over a texture.
+	/// In these situations, `get_owned_texture` can be used to create an owned instance of a texture.
+	/// This *does* allocate more VRAM every time it's called.
+	/// It should *not* be called in a loop or on every frame.
+	///
+	/// The resource manager is still serving a function here:
+	/// paths are abstracted, and the image data is saved in memory instead of vram,
+	/// meaning that repeated calls to this function will not incur a disk read.
+	pub fn get_owned_texture(&self, path: impl AsRef<Path>) -> Option<Texture> {
+		let path = path.as_ref();
+		let texture_info = self.textures.get(path)?;
+		let handle_error = |msg: &str| {
+			if !texture_info.had_error.get() {
+				eprintln!(
+					"failed to load {} ({}): {msg}",
+					path.display(),
+					texture_info.path.display()
+				);
+				texture_info.had_error.set(true);
+			}
+			None
+		};
+		let image = texture_info
+			.image
+			.get_or_try_init(|| fs::read(&texture_info.path))
+			.map_or_else(|msg| handle_error(&msg.to_string()), Some)?;
+		let result = self.texture_creator.load_texture_bytes(image);
+		if let Err(msg) = &result {
+			handle_error(msg);
+		}
+		result.ok()
 	}
 
 	pub fn get_vault(&self, path: impl AsRef<Path>) -> Option<&Vault> {
