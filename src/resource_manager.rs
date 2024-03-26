@@ -10,9 +10,9 @@ use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("{0}")]
+	#[error(transparent)]
 	Io(#[from] io::Error),
-	#[error("{0}")]
+	#[error(transparent)]
 	Toml(#[from] toml::de::Error),
 	#[error("{0}")]
 	Texture(String),
@@ -22,17 +22,30 @@ pub enum Error {
 
 type Resource<T> = HashMap<PathBuf, T>;
 
+/// Handles lazy loading of textures into memory and video memory.
 #[derive(Default)]
 struct TextureInfo<'texture> {
 	path: PathBuf,
 
+	/// This is populated upon calling `get_texture`.
 	texture: OnceCell<Texture<'texture>>,
+	/// Unlike `texture`, this keeps a copy of the texture in memory,
+	/// so that further owned instances can be constructed as needed.
+	/// This isn't always necessary since usually owned textures are only
+	/// for modulation, but it can persist across scene changes unlike owned textures,
+	/// which avoids an uneccessary disk read.
 	image: OnceCell<Vec<u8>>,
 
-	/// If any errors occur, silence further error messages.
+	/// Silence further error messages if any errors occur.
 	had_error: Cell<bool>,
 }
 
+/// Manages all resource loading in a central, abstracted structure.
+///
+/// The primary benefit of using this structure is that it abstracts
+/// the path and extension used to load any given asset.
+/// `ResourceManager` can also cache certain resources to avoid repeated disk reads,
+/// meaning outside code doesn't need to store permanent references to resources.
 pub struct ResourceManager<'texture> {
 	texture_creator: &'texture TextureCreator<WindowContext>,
 
@@ -45,12 +58,13 @@ pub struct ResourceManager<'texture> {
 	missing_texture: Texture<'texture>,
 }
 
-fn begin_recurse<T>(
-	container: &mut HashMap<PathBuf, T>,
+fn register<T>(
 	directory: &Path,
 	loader: &dyn Fn(&Path) -> Result<T, Error>,
-) -> Result<(), Error> {
-	recurse(container, directory, directory, loader)
+) -> Result<Resource<T>, Error> {
+	let mut container = Resource::new();
+	recurse(&mut container, directory, directory, loader)?;
+	Ok(container)
 }
 
 fn recurse<T>(
@@ -110,33 +124,26 @@ impl<'texture> ResourceManager<'texture> {
 	) -> Result<ResourceManager<'texture>, Error> {
 		let path = path.as_ref();
 
-		let mut sheets = HashMap::new();
-		begin_recurse(&mut sheets, &path.join("sheets"), &|path| {
+		let sheets = register(&path.join("sheets"), &|path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let mut attacks = HashMap::new();
-		begin_recurse(&mut attacks, &path.join("attacks"), &|path| {
+		let attacks = register(&path.join("attacks"), &|path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let mut spells = HashMap::new();
-		begin_recurse(&mut spells, &path.join("spells"), &|path| {
+		let spells = register(&path.join("spells"), &|path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let mut textures = HashMap::new();
-		begin_recurse(&mut textures, &path.join("textures"), &|path| {
+		let textures = register(&path.join("textures"), &|path| {
 			Ok(TextureInfo {
 				path: path.to_path_buf(),
 				..Default::default()
 			})
 		})?;
 
-		let mut vaults = HashMap::new();
-		begin_recurse(&mut vaults, &path.join("vaults"), &|path| {
-			Ok(Vault::open(path)?)
-		})?;
+		let vaults = register(&path.join("vaults"), &|path| Ok(Vault::open(path)?))?;
 
 		// Include a missing texture placeholder, rather than returning an Option.
 		let missing_texture = texture_creator
