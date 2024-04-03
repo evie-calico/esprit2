@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::rc::Rc;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -10,7 +11,7 @@ pub struct Piece {
 	pub hp: i32,
 	pub sp: i32,
 	pub attacks: Vec<Attack>,
-	pub spells: Vec<Spell>,
+	pub spells: Vec<Rc<Spell>>,
 
 	pub x: i32,
 	pub y: i32,
@@ -31,7 +32,7 @@ impl Piece {
 		let spells = sheet
 			.spells
 			.iter()
-			.map(|x| resources.get_spell(x).unwrap().clone())
+			.map(|x| Rc::new(resources.get_spell(x).unwrap().clone()))
 			.collect();
 
 		Self {
@@ -62,12 +63,29 @@ pub enum OrdDir {
 	UpLeft,
 }
 
+impl OrdDir {
+	pub fn as_offset(self) -> (i32, i32) {
+		let (x, y) = match self {
+			OrdDir::Up => (0, -1),
+			OrdDir::UpRight => (1, -1),
+			OrdDir::Right => (1, 0),
+			OrdDir::DownRight => (1, 1),
+			OrdDir::Down => (0, 1),
+			OrdDir::DownLeft => (-1, 1),
+			OrdDir::Left => (-1, 0),
+			OrdDir::UpLeft => (-1, -1),
+		};
+		(x, y)
+	}
+}
+
 /// Anything a character piece can "do".
 ///
 /// This is the only way that character logic or player input should communicate with pieces.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
 	Move(OrdDir),
+	Cast(Rc<Spell>),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

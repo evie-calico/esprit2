@@ -164,6 +164,10 @@ impl Manager {
 						.print_system("You cannot perform any melee attacks right now.");
 				}
 			},
+			character::Action::Cast(spell) => {
+				self.console
+					.print_system(&format!("Attempting to cast {}", spell.name));
+			}
 		};
 	}
 
@@ -248,7 +252,7 @@ impl Manager {
 		use crate::floor::Tile;
 
 		let (x, y) = {
-			let (x, y) = dir_to_vector(dir);
+			let (x, y) = dir.as_offset();
 			let character = character_ref.borrow();
 			(character.x + x, character.y + y)
 		};
@@ -273,18 +277,4 @@ impl Manager {
 			None => Err(MovementError::HitVoid),
 		}
 	}
-}
-
-fn dir_to_vector(dir: OrdDir) -> (i32, i32) {
-	let (x, y) = match dir {
-		OrdDir::Up => (0, -1),
-		OrdDir::UpRight => (1, -1),
-		OrdDir::Right => (1, 0),
-		OrdDir::DownRight => (1, 1),
-		OrdDir::Down => (0, 1),
-		OrdDir::DownLeft => (-1, 1),
-		OrdDir::Left => (-1, 0),
-		OrdDir::UpLeft => (-1, -1),
-	};
-	(x, y)
 }

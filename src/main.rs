@@ -1,6 +1,7 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use esprit2::world::CharacterRef;
+use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
 use tracing::*;
@@ -17,6 +18,19 @@ fn update_delta(
 				    / (timer_subsystem.performance_frequency() as f64))
 				    // Convert milliseconds to seconds.
 				    / 1000.0
+}
+
+struct SoulJar<'texture> {
+	souls: Vec<Soul>,
+	light_texture: Texture<'texture>,
+}
+
+impl SoulJar<'_> {
+	fn tick(&mut self, delta: f32) {
+		for i in &mut self.souls {
+			i.tick(delta);
+		}
+	}
 }
 
 pub fn main() {
@@ -121,7 +135,6 @@ pub fn main() {
 	world_manager.characters.push(CharacterRef::new(ally));
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
-	let mut light_texture = resources.get_owned_texture("light").unwrap();
 	let font = ttf_context
 		.load_font_from_rwops(
 			RWops::from_bytes(include_bytes!(
@@ -132,17 +145,20 @@ pub fn main() {
 		)
 		.unwrap();
 
-	let mut souls = [
-		Soul::new(Color::RED),
-		Soul::new(Color::YELLOW),
-		Soul::new(Color::BLUE),
-		Soul::new(Color::GREEN),
-		Soul::new(Color::CYAN),
-		Soul::new(Color::RGB(255, 128, 0)),
-		Soul::new(Color::WHITE),
-		Soul::new(Color::RGB(255, 0, 255)),
-		Soul::new(Color::RGB(255, 128, 128)),
-	];
+	let mut soul_jar = SoulJar {
+		souls: vec![
+			Soul::new(Color::RED),
+			Soul::new(Color::YELLOW),
+			Soul::new(Color::BLUE),
+			Soul::new(Color::GREEN),
+			Soul::new(Color::CYAN),
+			Soul::new(Color::RGB(255, 128, 0)),
+			Soul::new(Color::WHITE),
+			Soul::new(Color::RGB(255, 0, 255)),
+			Soul::new(Color::RGB(255, 128, 128)),
+		],
+		light_texture: resources.get_owned_texture("light").unwrap(),
+	};
 
 	// Print some debug messages to test the console.
 	world_manager.console.print("Hello, world!");
@@ -182,10 +198,7 @@ pub fn main() {
 
 			world_manager.pop_action();
 			world_manager.console.update(delta);
-
-			for soul in &mut souls {
-				soul.tick(delta as f32);
-			}
+			soul_jar.tick(delta as f32);
 		}
 
 		// Rendering
@@ -253,8 +266,7 @@ pub fn main() {
 			&font,
 			&world_manager,
 			&resources,
-			&souls,
-			&mut light_texture,
+			&mut soul_jar,
 		);
 
 		canvas.present();
@@ -268,8 +280,7 @@ fn pamphlet(
 	font: &sdl2::ttf::Font<'_, '_>,
 	world_manager: &world::Manager,
 	resources: &ResourceManager<'_>,
-	souls: &[Soul; 9],
-	light_texture: &mut sdl2::render::Texture<'_>,
+	soul_jar: &mut SoulJar<'_>,
 ) {
 	let mut pamphlet = gui::Context::new(
 		canvas,
@@ -398,15 +409,17 @@ fn pamphlet(
 		let by = pamphlet.y as f32;
 		let display_size = pamphlet.rect.width();
 
-		for soul in souls {
+		for soul in &soul_jar.souls {
 			let display_size = (display_size - SOUL_SIZE) as f32;
 			let ox = soul.x * display_size;
 			let oy = soul.y * display_size;
-			light_texture.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
+			soul_jar
+				.light_texture
+				.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
 			pamphlet
 				.canvas
 				.copy(
-					&*light_texture,
+					&soul_jar.light_texture,
 					None,
 					Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
 				)

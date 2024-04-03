@@ -79,12 +79,12 @@ pub fn world(
 						}
 						Mode::Cast => {
 							let selected_index = (keycode as i32) - (Keycode::A as i32);
-							if (0..=26).contains(&selected_index) {
-								if let Some(spell) =
-									next_character.sheet.spells.get(selected_index as usize)
-								{
-									let _message = format!("{spell:?}");
-								}
+							if (0..=26).contains(&selected_index)
+								&& (selected_index as usize) < next_character.spells.len()
+							{
+								next_character.next_action = Some(character::Action::Cast(
+									next_character.spells[selected_index as usize].clone(),
+								))
 							}
 							*mode = Mode::Normal;
 						}
