@@ -431,9 +431,4 @@ fn pamphlet(
 		Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
 		Some(&mut souls_fn),
 	]);
-	pamphlet.advance(0, 10);
-	pamphlet.label("Options", font);
-	pamphlet.label("- Settings", font);
-	pamphlet.label("- Escape", font);
-	pamphlet.label("- Quit", font);
 }
