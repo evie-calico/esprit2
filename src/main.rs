@@ -246,8 +246,7 @@ pub fn main() {
 		// Render User Interface
 		canvas.set_viewport(None);
 
-		// Draw Console
-		world_manager.console.draw(
+		let mut menu = gui::Context::new(
 			&mut canvas,
 			Rect::new(
 				0,
@@ -255,8 +254,26 @@ pub fn main() {
 				window_size.0 - options.ui.pamphlet_width,
 				options.ui.console_height,
 			),
-			&font,
 		);
+
+		match input_mode {
+			input::Mode::Normal => {
+				// Draw Console
+				world_manager.console.draw(
+					&mut canvas,
+					Rect::new(
+						0,
+						(window_size.1 - options.ui.console_height) as i32,
+						window_size.0 - options.ui.pamphlet_width,
+						options.ui.console_height,
+					),
+					&font,
+				);
+			}
+			input::Mode::Cast => {
+				spell_menu::draw(&mut menu, &font);
+			}
+		}
 
 		// Draw pamphlet
 		pamphlet(

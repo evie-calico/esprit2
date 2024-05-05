@@ -4,8 +4,8 @@ use std::{fs, io};
 
 /// SDL2 Keycodes do not implement serde traits,
 /// but they can be converted to and from i32s.
-/// Thus, this type should be used in their place.
 pub type KeycodeIndex = i32;
+pub type Triggers = Vec<KeycodeIndex>;
 
 lazy_static::lazy_static! {
 	pub static ref USER_DIRECTORY: PathBuf = get_user_directory();
@@ -14,7 +14,7 @@ lazy_static::lazy_static! {
 
 // In the future, this should be a little smarter.
 // Honestly I'm not sure if lazy_static is even the right choice because it precludes the use of clap.
-// I guess I could creeate another clap parser that ignores everything except --user?
+// I guess I could create another clap parser that ignores everything except --user?
 fn get_user_directory() -> PathBuf {
 	PathBuf::from("user/")
 }
@@ -70,17 +70,19 @@ impl Default for UserInterface {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Controls {
-	pub left: Vec<KeycodeIndex>,
-	pub right: Vec<KeycodeIndex>,
-	pub up: Vec<KeycodeIndex>,
-	pub down: Vec<KeycodeIndex>,
-	pub up_left: Vec<KeycodeIndex>,
-	pub up_right: Vec<KeycodeIndex>,
-	pub down_left: Vec<KeycodeIndex>,
-	pub down_right: Vec<KeycodeIndex>,
+	pub left: Triggers,
+	pub right: Triggers,
+	pub up: Triggers,
+	pub down: Triggers,
+	pub up_left: Triggers,
+	pub up_right: Triggers,
+	pub down_left: Triggers,
+	pub down_right: Triggers,
 
-	pub talk: Vec<KeycodeIndex>,
-	pub cast: Vec<KeycodeIndex>,
+	pub talk: Triggers,
+	pub cast: Triggers,
+
+	pub escape: Triggers,
 }
 
 impl Default for Controls {
@@ -98,6 +100,8 @@ impl Default for Controls {
 
 			talk: vec![K::T as i32],
 			cast: vec![K::Z as i32],
+
+			escape: vec![K::Escape as i32],
 		}
 	}
 }

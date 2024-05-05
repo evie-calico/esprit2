@@ -18,6 +18,7 @@ pub mod options;
 pub mod resource_manager;
 pub mod soul;
 pub mod spell;
+pub mod spell_menu;
 pub mod vault;
 pub mod world;
 

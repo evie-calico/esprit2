@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use sdl2::{
-	event::Event,
-	keyboard::{Keycode, Scancode},
-};
+use sdl2::{event::Event, keyboard::Keycode};
 
 pub enum Mode {
 	Normal,
@@ -21,11 +18,7 @@ pub fn world(
 ) -> Result {
 	for event in event_pump.poll_iter() {
 		match event {
-			Event::Quit { .. }
-			| Event::KeyDown {
-				scancode: Some(Scancode::Escape),
-				..
-			} => return Result { exit: true },
+			Event::Quit { .. } => return Result { exit: true },
 			Event::KeyDown {
 				keycode: Some(keycode),
 				..
@@ -34,43 +27,31 @@ pub fn world(
 				if next_character.player_controlled {
 					match *mode {
 						Mode::Normal => {
-							// This will need to be refactored.
-							if options.controls.left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Left));
+							// Eventually this will be a more involved binding.
+							if options.controls.escape.contains(&(keycode as i32)) {
+								return Result { exit: true };
 							}
-							if options.controls.right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Right));
+							let directions = [
+								(&options.controls.left, character::OrdDir::Left),
+								(&options.controls.right, character::OrdDir::Right),
+								(&options.controls.up, character::OrdDir::Up),
+								(&options.controls.down, character::OrdDir::Down),
+								(&options.controls.up_left, character::OrdDir::UpLeft),
+								(&options.controls.up_right, character::OrdDir::UpRight),
+								(&options.controls.down_left, character::OrdDir::DownLeft),
+								(&options.controls.down_right, character::OrdDir::DownRight),
+							];
+							for (triggers, direction) in directions {
+								if triggers.contains(&(keycode as i32)) {
+									next_character.next_action =
+										Some(character::Action::Move(direction));
+								}
 							}
-							if options.controls.up.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Up));
-							}
-							if options.controls.down.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::Down));
-							}
-							if options.controls.up_left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::UpLeft));
-							}
-							if options.controls.up_right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::UpRight));
-							}
-							if options.controls.down_left.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::DownLeft));
-							}
-							if options.controls.down_right.contains(&(keycode as i32)) {
-								next_character.next_action =
-									Some(character::Action::Move(character::OrdDir::DownRight));
-							}
+							drop(next_character);
+
 							if options.controls.cast.contains(&(keycode as i32)) {
 								*mode = Mode::Cast;
 							}
-							drop(next_character);
 
 							if options.controls.talk.contains(&(keycode as i32)) {
 								world_manager.console.say("Luvui".into(), "Meow!");
@@ -78,6 +59,10 @@ pub fn world(
 							}
 						}
 						Mode::Cast => {
+							if options.controls.escape.contains(&(keycode as i32)) {
+								*mode = Mode::Normal;
+							}
+
 							let selected_index = (keycode as i32) - (Keycode::A as i32);
 							if (0..=26).contains(&selected_index)
 								&& (selected_index as usize) < next_character.spells.len()
