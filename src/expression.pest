@@ -1,0 +1,16 @@
+WHITESPACE = _{ " " }
+
+integer = @{ ASCII_DIGIT+ }
+identifier = @{ (ASCII_ALPHANUMERIC | ".")+ }
+
+term = _{ integer | identifier }
+
+add = { "+" }
+sub = { "-" }
+mul = { "*" }
+div = { "/" }
+binary = _{ add | sub | mul | div }
+
+expr = { term ~ (binary ~ term)* }
+equation = _{ SOI ~ expr ~ EOI }
+

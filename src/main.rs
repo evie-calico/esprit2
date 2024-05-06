@@ -4,6 +4,7 @@ use esprit2::world::CharacterRef;
 use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
+use std::str::FromStr;
 use tracing::*;
 use uuid::Uuid;
 
@@ -60,6 +61,24 @@ pub fn main() {
 
 	// Logging initialization.
 	tracing_subscriber::fmt::init();
+
+	struct FakeStats;
+
+	impl expression::Variables for FakeStats {
+		fn get<'expression>(
+			&self,
+			_: &'expression str,
+		) -> Result<u32, expression::Error<'expression>> {
+			Ok(1)
+		}
+	}
+
+	info!(
+		"{:?}",
+		expression::Equation::from_str("2 + magic * 3")
+			.unwrap()
+			.eval(&FakeStats)
+	);
 
 	// Game initialization.
 	let resources = match ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator) {

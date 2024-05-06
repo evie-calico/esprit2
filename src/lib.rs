@@ -1,4 +1,11 @@
-#![feature(path_file_prefix, lint_reasons, lazy_cell, let_chains, once_cell_try)]
+#![feature(
+	ascii_char,
+	path_file_prefix,
+	lint_reasons,
+	lazy_cell,
+	let_chains,
+	once_cell_try
+)]
 #![warn(
 	clippy::missing_errors_doc,
 	clippy::module_name_repetitions,
@@ -9,6 +16,7 @@
 pub mod attack;
 pub mod character;
 pub mod console;
+pub mod expression;
 pub mod floor;
 pub mod gui;
 pub mod input;
