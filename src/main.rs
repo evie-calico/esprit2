@@ -375,6 +375,16 @@ fn pamphlet(
 						});
 					}
 					player_window.hsplit(&mut magical_stats);
+					player_window.advance(0, 10);
+					player_window.label("Attacks", font);
+					for attack in &piece.attacks {
+						player_window.horizontal();
+						player_window.label(&attack.name, font);
+						player_window.advance(20, 0);
+						player_window.expression::<character::Stats>(&attack.damage, font);
+						player_window.vertical();
+					}
+					player_window.advance(0, 10);
 					player_window.label("Spells", font);
 					let mut spells = piece.sheet.spells.iter().peekable();
 					while spells.peek().is_some() {

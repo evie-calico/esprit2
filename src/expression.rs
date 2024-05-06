@@ -6,7 +6,7 @@ use tracing::error;
 pub type Integer = i64;
 
 #[derive(Clone, Debug)]
-enum Operation {
+pub enum Operation {
 	Integer(Integer),
 	Variable(usize, usize),
 
@@ -74,9 +74,9 @@ impl Variables for () {
 
 #[derive(Clone, Debug)]
 pub struct Expression {
-	source: String,
-	root: Operation,
-	leaves: Vec<Operation>,
+	pub source: String,
+	pub root: Operation,
+	pub leaves: Vec<Operation>,
 }
 
 impl Default for Expression {

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use sdl2::pixels::Color;
 use std::rc::Rc;
 use uuid::Uuid;
 
@@ -165,6 +166,27 @@ impl expression::Variables for Stats {
 			"magic" => Ok(self.magic as expression::Integer),
 			"resistance" => Ok(self.resistance as expression::Integer),
 			_ => Err(expression::Error::MissingVariable(s)),
+		}
+	}
+}
+
+const HEART_COLOR: Color = Color::RGB(96, 67, 18);
+const SOUL_COLOR: Color = Color::RGB(128, 128, 128);
+const POWER_COLOR: Color = Color::RGB(255, 11, 64);
+const DEFENSE_COLOR: Color = Color::RGB(222, 120, 64);
+const MAGIC_COLOR: Color = Color::RGB(59, 115, 255);
+const RESISTANCE_COLOR: Color = Color::RGB(222, 64, 255);
+
+impl gui::VariableColors for Stats {
+	fn get(s: &str) -> Option<Color> {
+		match s {
+			"heart" => Some(HEART_COLOR),
+			"soul" => Some(SOUL_COLOR),
+			"power" => Some(POWER_COLOR),
+			"defense" => Some(DEFENSE_COLOR),
+			"magic" => Some(MAGIC_COLOR),
+			"resistance" => Some(RESISTANCE_COLOR),
+			_ => None,
 		}
 	}
 }

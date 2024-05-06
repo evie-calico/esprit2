@@ -204,7 +204,7 @@ impl Manager {
 			// Calculate damage
 			let damage =
 				u32::evalv(&attack.damage, &*character).saturating_sub(target.sheet.stats.defense);
-			let is_weak_attack = damage == 0;
+			let is_weak_attack = damage <= 1;
 
 			// TODO: Change this depending on the proportional amount of damage dealt.
 			let damage_punctuation = match damage {
@@ -227,6 +227,7 @@ impl Manager {
 				.replace_prefixed_nouns(&character.sheet.nouns, "self_")
 				.replace_prefixed_nouns(&target.sheet.nouns, "target_");
 			message.push_str(damage_punctuation);
+			message.push_str(&format!(" (-{damage} HP)"));
 
 			(damage, message, is_weak_attack)
 		};

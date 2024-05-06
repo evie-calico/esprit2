@@ -1,3 +1,6 @@
+use std::ops::Range;
+
+use crate::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
@@ -117,6 +120,7 @@ impl<'canvas> Context<'canvas> {
 	pub fn label(&mut self, s: &str, font: &Font) {
 		self.label_color(s, Color::WHITE, font)
 	}
+
 	pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {
 		let font_texture = font
 			.render(s)
@@ -138,6 +142,65 @@ impl<'canvas> Context<'canvas> {
 		self.advance(width, height);
 	}
 
+	pub fn expression<Colors: VariableColors>(&mut self, expression: &Expression, font: &Font) {
+		fn enter_op(
+			op: &expression::Operation,
+			expression: &Expression,
+			spans: &mut Vec<Range<usize>>,
+		) {
+			match op {
+				expression::Operation::Variable(start, end) => spans.push(*start..*end),
+
+				expression::Operation::Add(a, b)
+				| expression::Operation::Sub(a, b)
+				| expression::Operation::Mul(a, b)
+				| expression::Operation::Div(a, b) => {
+					enter_op(&expression.leaves[*a], expression, spans);
+					enter_op(&expression.leaves[*b], expression, spans);
+				}
+				expression::Operation::AddC(x, _)
+				| expression::Operation::SubC(x, _)
+				| expression::Operation::MulC(x, _)
+				| expression::Operation::DivC(x, _) => enter_op(&expression.leaves[*x], expression, spans),
+
+				expression::Operation::Integer(_) | expression::Operation::Roll(_, _) => {}
+			}
+		}
+
+		let was_horizontal = matches!(self.orientation, Orientation::Horizontal { .. });
+		if was_horizontal {
+			self.horizontal();
+		}
+
+		// This is implicitly sorted
+		let mut variable_spans = Vec::new();
+		enter_op(&expression.root, expression, &mut variable_spans);
+
+		let mut last_char = 0;
+
+		for span in &variable_spans {
+			let uncolored_range = last_char..span.start;
+			if !uncolored_range.is_empty() {
+				self.label(&expression.source[uncolored_range], font);
+			}
+			let colored_range = span.start..span.end;
+			if !colored_range.is_empty() {
+				let var = &expression.source[colored_range];
+				let color = Colors::get(var).unwrap_or(Color::RED);
+				self.label_color(var, color, font);
+			}
+			last_char = span.end;
+		}
+
+		if last_char != expression.source.len() {
+			self.label(&expression.source[last_char..], font);
+		}
+
+		if was_horizontal {
+			self.vertical();
+		}
+	}
+
 	pub fn htexture(&mut self, texture: &Texture, width: u32) {
 		let query = texture.query();
 		let height = width / query.width * query.height;
@@ -149,5 +212,15 @@ impl<'canvas> Context<'canvas> {
 			)
 			.unwrap();
 		self.advance(width, height)
+	}
+}
+
+pub trait VariableColors {
+	fn get(s: &str) -> Option<Color>;
+}
+
+impl VariableColors for () {
+	fn get(_s: &str) -> Option<Color> {
+		None
 	}
 }
