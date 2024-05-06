@@ -61,25 +61,6 @@ pub fn main() {
 	// Logging initialization.
 	tracing_subscriber::fmt::init();
 
-	struct FakeStats;
-
-	impl expression::Variables for FakeStats {
-		fn get<'expression>(
-			&self,
-			_: &'expression str,
-		) -> Result<expression::Integer, expression::Error<'expression>> {
-			Ok(1)
-		}
-	}
-
-	let equation = expression::Equation::try_from(String::from("1 + 2d4")).unwrap();
-	info!("equation: {equation:#?}");
-	info!("result: {}", equation.eval(&FakeStats).unwrap());
-	info!("result: {}", equation.eval(&FakeStats).unwrap());
-	info!("result: {}", equation.eval(&FakeStats).unwrap());
-	info!("result: {}", equation.eval(&FakeStats).unwrap());
-	info!("result: {}", equation.eval(&FakeStats).unwrap());
-
 	// Game initialization.
 	let resources = match ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator) {
 		Ok(resources) => resources,

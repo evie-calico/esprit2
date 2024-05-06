@@ -1,11 +1,12 @@
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
 use rand::Rng;
+use tracing::error;
 
 pub type Integer = i64;
 
 #[derive(Clone, Debug)]
-enum Expression {
+enum Operation {
 	Integer(Integer),
 	Variable(usize, usize),
 
@@ -28,30 +29,32 @@ pub enum Error<'expression> {
 	NoVariables(&'expression str),
 	#[error("variable \"{0}\" not defined")]
 	MissingVariable(&'expression str),
+	#[error("result ({0}) out of range for {1}")]
+	OutOfRange(Integer, &'static str),
 }
 
-impl Expression {
+impl Operation {
 	fn eval<'expression>(
 		&self,
-		equation: &'expression Equation,
-		variables: &'expression impl Variables,
+		equation: &'expression Expression,
+		variables: &impl Variables,
 	) -> Result<Integer, Error<'expression>> {
 		let get_leaf = |i: usize| equation.leaves.get(i).unwrap().eval(equation, variables);
 
 		match self {
-			Expression::Integer(i) => Ok(*i),
-			Expression::Variable(from, to) => variables.get(&equation.source[*from..*to]),
-			Expression::Roll(amount, die) => {
+			Operation::Integer(i) => Ok(*i),
+			Operation::Variable(from, to) => variables.get(&equation.source[*from..*to]),
+			Operation::Roll(amount, die) => {
 				Ok((0..*amount).fold(0, |a, _| a + rand::thread_rng().gen_range(1..=*die)))
 			}
-			Expression::Add(a, b) => Ok(get_leaf(*a)? + get_leaf(*b)?),
-			Expression::Sub(a, b) => Ok(get_leaf(*a)? - get_leaf(*b)?),
-			Expression::Mul(a, b) => Ok(get_leaf(*a)? * get_leaf(*b)?),
-			Expression::Div(a, b) => Ok(get_leaf(*a)? / get_leaf(*b)?),
-			Expression::AddC(x, i) => Ok(get_leaf(*x)? + i),
-			Expression::SubC(x, i) => Ok(get_leaf(*x)? - i),
-			Expression::MulC(x, i) => Ok(get_leaf(*x)? * i),
-			Expression::DivC(x, i) => Ok(get_leaf(*x)? / i),
+			Operation::Add(a, b) => Ok(get_leaf(*a)? + get_leaf(*b)?),
+			Operation::Sub(a, b) => Ok(get_leaf(*a)? - get_leaf(*b)?),
+			Operation::Mul(a, b) => Ok(get_leaf(*a)? * get_leaf(*b)?),
+			Operation::Div(a, b) => Ok(get_leaf(*a)? / get_leaf(*b)?),
+			Operation::AddC(x, i) => Ok(get_leaf(*x)? + i),
+			Operation::SubC(x, i) => Ok(get_leaf(*x)? - i),
+			Operation::MulC(x, i) => Ok(get_leaf(*x)? * i),
+			Operation::DivC(x, i) => Ok(get_leaf(*x)? / i),
 		}
 	}
 }
@@ -70,24 +73,34 @@ impl Variables for () {
 }
 
 #[derive(Clone, Debug)]
-pub struct Equation {
+pub struct Expression {
 	source: String,
-	root: Expression,
-	leaves: Vec<Expression>,
+	root: Operation,
+	leaves: Vec<Operation>,
 }
 
-impl TryFrom<String> for Equation {
+impl Default for Expression {
+	fn default() -> Self {
+		Self {
+			source: String::from("0"),
+			root: Operation::Integer(0),
+			leaves: Vec::new(),
+		}
+	}
+}
+
+impl TryFrom<String> for Expression {
 	type Error = pest::error::Error<Rule>;
 
 	fn try_from(source: String) -> Result<Self, Self::Error> {
-		let pairs = ExpressionParser::parse(Rule::equation, &source)?
+		let pairs = OperationParser::parse(Rule::equation, &source)?
 			.next()
 			.unwrap()
 			.into_inner();
 
 		let mut leaves = Vec::new();
 
-		let mut add_leaf = |leaf: Expression| -> usize {
+		let mut add_leaf = |leaf: Operation| -> usize {
 			leaves.push(leaf);
 			leaves.len() - 1
 		};
@@ -95,14 +108,14 @@ impl TryFrom<String> for Equation {
 		let root =
 			PRATT_PARSER
 				.map_primary(|primary| match primary.as_rule() {
-					Rule::integer => Expression::Integer(primary.as_str().parse().unwrap()),
+					Rule::integer => Operation::Integer(primary.as_str().parse().unwrap()),
 					Rule::identifier => {
 						let span = primary.as_span();
-						Expression::Variable(span.start(), span.end())
+						Operation::Variable(span.start(), span.end())
 					}
 					Rule::roll => {
 						let (amount, die) = primary.as_str().split_once('d').unwrap();
-						Expression::Roll(amount.parse().unwrap(), die.parse().unwrap())
+						Operation::Roll(amount.parse().unwrap(), die.parse().unwrap())
 					}
 					rule => unreachable!(
 						"Expr::parse expected terminal value, found {rule:?} ({})",
@@ -111,18 +124,18 @@ impl TryFrom<String> for Equation {
 				})
 				.map_infix(|lhs, op, rhs| match (lhs, op.as_rule(), rhs) {
 					// Constant resolution
-					(Expression::Integer(i), Rule::add, x)
-					| (x, Rule::add, Expression::Integer(i)) => Expression::AddC(add_leaf(x), i),
-					(Expression::Integer(i), Rule::sub, x)
-					| (x, Rule::sub, Expression::Integer(i)) => Expression::SubC(add_leaf(x), i),
-					(Expression::Integer(i), Rule::mul, x)
-					| (x, Rule::mul, Expression::Integer(i)) => Expression::MulC(add_leaf(x), i),
-					(Expression::Integer(i), Rule::div, x)
-					| (x, Rule::div, Expression::Integer(i)) => Expression::DivC(add_leaf(x), i),
-					(lhs, Rule::add, rhs) => Expression::Add(add_leaf(lhs), add_leaf(rhs)),
-					(lhs, Rule::sub, rhs) => Expression::Sub(add_leaf(lhs), add_leaf(rhs)),
-					(lhs, Rule::mul, rhs) => Expression::Mul(add_leaf(lhs), add_leaf(rhs)),
-					(lhs, Rule::div, rhs) => Expression::Div(add_leaf(lhs), add_leaf(rhs)),
+					(Operation::Integer(i), Rule::add, x)
+					| (x, Rule::add, Operation::Integer(i)) => Operation::AddC(add_leaf(x), i),
+					(Operation::Integer(i), Rule::sub, x)
+					| (x, Rule::sub, Operation::Integer(i)) => Operation::SubC(add_leaf(x), i),
+					(Operation::Integer(i), Rule::mul, x)
+					| (x, Rule::mul, Operation::Integer(i)) => Operation::MulC(add_leaf(x), i),
+					(Operation::Integer(i), Rule::div, x)
+					| (x, Rule::div, Operation::Integer(i)) => Operation::DivC(add_leaf(x), i),
+					(lhs, Rule::add, rhs) => Operation::Add(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::sub, rhs) => Operation::Sub(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::mul, rhs) => Operation::Mul(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::div, rhs) => Operation::Div(add_leaf(lhs), add_leaf(rhs)),
 					rule => unreachable!("Expr::parse expected infix operation, found {rule:?}"),
 				})
 				.parse(pairs);
@@ -134,19 +147,67 @@ impl TryFrom<String> for Equation {
 	}
 }
 
-impl Equation {
-	/// # Errors
-	///
-	/// Returns an error if the variable structure provided does not define a variable within the expression.
-	pub fn eval<'expression>(
-		&'expression self,
-		variables: &'expression impl Variables,
-	) -> Result<Integer, Error<'expression>> {
-		self.root.eval(self, variables)
+pub trait ExpressionResult<'expression, 'variables>: Sized {
+	fn eval(expression: &'expression Expression) -> Self {
+		Self::evalv(expression, &())
 	}
+
+	fn evalv(expression: &'expression Expression, variables: &'variables impl Variables) -> Self;
 }
 
-impl serde::Serialize for Equation {
+macro_rules! impl_int {
+	($type:ident) => {
+		impl<'expression, 'variables> ExpressionResult<'expression, 'variables> for $type {
+			fn evalv(
+				expression: &'expression Expression,
+				variables: &'variables impl Variables,
+			) -> Self {
+				expression
+					.root
+					.eval(expression, variables)
+					.unwrap_or_else(|msg| {
+						error!("failed to evalutate `{}`: {msg}", expression.source);
+						0
+					})
+					.try_into()
+					.unwrap_or_else(|msg| {
+						error!(
+							"failed to convert expression to {}: {msg}",
+							stringify!($type)
+						);
+						0
+					})
+			}
+		}
+
+		impl<'expression, 'variables> ExpressionResult<'expression, 'variables>
+			for Result<$type, Error<'expression>>
+		{
+			fn evalv(
+				expression: &'expression Expression,
+				variables: &'variables impl Variables,
+			) -> Self {
+				expression.root.eval(expression, variables).and_then(|x| {
+					x.try_into()
+						.map_err(|_| Error::OutOfRange(x, stringify!($type)))
+				})
+			}
+		}
+	};
+}
+
+impl_int!(u8);
+impl_int!(u16);
+impl_int!(u32);
+impl_int!(u64);
+impl_int!(u128);
+impl_int!(i8);
+impl_int!(i16);
+impl_int!(i32);
+impl_int!(i64);
+impl_int!(i128);
+
+impl serde::Serialize for Expression {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -155,9 +216,9 @@ impl serde::Serialize for Equation {
 	}
 }
 
-struct EquationVisitor;
+struct ExpressionVisitor;
 
-impl<'de> serde::de::Visitor<'de> for EquationVisitor {
+impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
 	type Value = String;
 
 	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -179,20 +240,20 @@ impl<'de> serde::de::Visitor<'de> for EquationVisitor {
 	}
 }
 
-impl<'de> serde::Deserialize<'de> for Equation {
+impl<'de> serde::Deserialize<'de> for Expression {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: serde::Deserializer<'de>,
 	{
 		use serde::de::Error;
-		Equation::try_from(deserializer.deserialize_string(EquationVisitor)?)
+		Expression::try_from(deserializer.deserialize_string(ExpressionVisitor)?)
 			.map_err(D::Error::custom)
 	}
 }
 
 #[derive(pest_derive::Parser)]
 #[grammar = "expression.pest"]
-struct ExpressionParser;
+struct OperationParser;
 
 lazy_static::lazy_static! {
 	static ref PRATT_PARSER: PrattParser<Rule> = {

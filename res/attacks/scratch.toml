@@ -1,6 +1,6 @@
 name = "Scratch"
+damage = "5"
 weight = 100
-bonus = 5
 
 [messages]
 high = [

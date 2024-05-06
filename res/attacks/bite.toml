@@ -1,6 +1,6 @@
 name = "Bite"
+damage = "10"
 weight = 20
-bonus = 10
 
 [messages]
 high = [

@@ -1,8 +1,10 @@
+use crate::prelude::*;
+
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Attack {
 	pub name: String,
 	pub weight: u8,
-	pub bonus: u32,
+	pub damage: Expression,
 	pub messages: Messages,
 }
 

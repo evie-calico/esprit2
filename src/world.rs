@@ -202,10 +202,8 @@ impl Manager {
 			}
 
 			// Calculate damage
-			let damage = 0.max(
-				((character.sheet.stats.power + attack.bonus) as i32)
-					- (target.sheet.stats.defense as i32),
-			);
+			let damage = (character.sheet.stats.power + u32::eval(&attack.damage))
+				.saturating_sub(target.sheet.stats.defense);
 			let is_weak_attack = damage == 0;
 
 			// TODO: Change this depending on the proportional amount of damage dealt.
@@ -234,7 +232,7 @@ impl Manager {
 		};
 
 		// This is where the damage is actually dealt
-		target_ref.borrow_mut().hp -= damage;
+		target_ref.borrow_mut().hp -= damage as i32;
 
 		// `self` is not mutable, so the message needs to be passed up to the manager,
 		// where printing can occur.
