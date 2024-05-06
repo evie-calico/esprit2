@@ -20,6 +20,19 @@ pub struct Piece {
 	pub alliance: Alliance,
 }
 
+impl expression::Variables for Piece {
+	fn get<'expression>(
+		&self,
+		s: &'expression str,
+	) -> Result<expression::Integer, expression::Error<'expression>> {
+		match s {
+			"hp" => Ok(self.hp as expression::Integer),
+			"sp" => Ok(self.sp as expression::Integer),
+			_ => self.sheet.get(s),
+		}
+	}
+}
+
 impl Piece {
 	pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
 		let hp = sheet.stats.heart as i32;
@@ -109,6 +122,19 @@ pub struct Sheet {
 	pub spells: Vec<String>,
 }
 
+impl expression::Variables for Sheet {
+	fn get<'expression>(
+		&self,
+		s: &'expression str,
+	) -> Result<expression::Integer, expression::Error<'expression>> {
+		match s {
+			"level" => Ok(self.level as expression::Integer),
+			"speed" => Ok(self.speed as expression::Integer),
+			_ => self.stats.get(s),
+		}
+	}
+}
+
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
@@ -124,4 +150,21 @@ pub struct Stats {
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
 	pub resistance: u32,
+}
+
+impl expression::Variables for Stats {
+	fn get<'expression>(
+		&self,
+		s: &'expression str,
+	) -> Result<expression::Integer, expression::Error<'expression>> {
+		match s {
+			"heart" => Ok(self.heart as expression::Integer),
+			"soul" => Ok(self.soul as expression::Integer),
+			"power" => Ok(self.power as expression::Integer),
+			"defense" => Ok(self.defense as expression::Integer),
+			"magic" => Ok(self.magic as expression::Integer),
+			"resistance" => Ok(self.resistance as expression::Integer),
+			_ => Err(expression::Error::MissingVariable(s)),
+		}
+	}
 }

@@ -202,8 +202,8 @@ impl Manager {
 			}
 
 			// Calculate damage
-			let damage = (character.sheet.stats.power + u32::eval(&attack.damage))
-				.saturating_sub(target.sheet.stats.defense);
+			let damage =
+				u32::evalv(&attack.damage, &*character).saturating_sub(target.sheet.stats.defense);
 			let is_weak_attack = damage == 0;
 
 			// TODO: Change this depending on the proportional amount of damage dealt.

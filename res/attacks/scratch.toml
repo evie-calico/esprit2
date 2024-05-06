@@ -1,5 +1,5 @@
 name = "Scratch"
-damage = "5"
+damage = "power + 5"
 weight = 100
 
 [messages]

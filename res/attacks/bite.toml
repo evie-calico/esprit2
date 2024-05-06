@@ -1,5 +1,5 @@
 name = "Bite"
-damage = "10"
+damage = "power + 10"
 weight = 20
 
 [messages]
