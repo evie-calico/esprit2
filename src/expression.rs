@@ -1,8 +1,6 @@
-use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
 use rand::Rng;
-use std::str::FromStr;
 
 pub type Integer = i64;
 
@@ -78,32 +76,15 @@ pub struct Equation {
 	leaves: Vec<Expression>,
 }
 
-impl FromStr for Equation {
-	type Err = pest::error::Error<Rule>;
+impl TryFrom<String> for Equation {
+	type Error = pest::error::Error<Rule>;
 
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		Ok(Equation::parse_pairs(
-			s.to_string(),
-			ExpressionParser::parse(Rule::equation, s)?
-				.next()
-				.unwrap()
-				.into_inner(),
-		))
-	}
-}
+	fn try_from(source: String) -> Result<Self, Self::Error> {
+		let pairs = ExpressionParser::parse(Rule::equation, &source)?
+			.next()
+			.unwrap()
+			.into_inner();
 
-impl Equation {
-	/// # Errors
-	///
-	/// Returns an error if the variable structure provided does not define a variable within the expression.
-	pub fn eval<'expression>(
-		&'expression self,
-		variables: &'expression impl Variables,
-	) -> Result<Integer, Error<'expression>> {
-		self.root.eval(self, variables)
-	}
-
-	fn parse_pairs(source: String, pairs: Pairs<Rule>) -> Self {
 		let mut leaves = Vec::new();
 
 		let mut add_leaf = |leaf: Expression| -> usize {
@@ -145,11 +126,67 @@ impl Equation {
 					rule => unreachable!("Expr::parse expected infix operation, found {rule:?}"),
 				})
 				.parse(pairs);
-		Self {
+		Ok(Self {
 			source,
 			root,
 			leaves,
-		}
+		})
+	}
+}
+
+impl Equation {
+	/// # Errors
+	///
+	/// Returns an error if the variable structure provided does not define a variable within the expression.
+	pub fn eval<'expression>(
+		&'expression self,
+		variables: &'expression impl Variables,
+	) -> Result<Integer, Error<'expression>> {
+		self.root.eval(self, variables)
+	}
+}
+
+impl serde::Serialize for Equation {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.serialize_str(&self.source)
+	}
+}
+
+struct EquationVisitor;
+
+impl<'de> serde::de::Visitor<'de> for EquationVisitor {
+	type Value = String;
+
+	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		formatter.write_str("a string containing an expression")
+	}
+
+	fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+	where
+		E: serde::de::Error,
+	{
+		Ok(value)
+	}
+
+	fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+	where
+		E: serde::de::Error,
+	{
+		Ok(value.to_string())
+	}
+}
+
+impl<'de> serde::Deserialize<'de> for Equation {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		use serde::de::Error;
+		Equation::try_from(deserializer.deserialize_string(EquationVisitor)?)
+			.map_err(D::Error::custom)
 	}
 }
 

@@ -4,7 +4,6 @@ use esprit2::world::CharacterRef;
 use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
-use std::str::FromStr;
 use tracing::*;
 use uuid::Uuid;
 
@@ -73,7 +72,7 @@ pub fn main() {
 		}
 	}
 
-	let equation = expression::Equation::from_str("1 + 2d4").unwrap();
+	let equation = expression::Equation::try_from(String::from("1 + 2d4")).unwrap();
 	info!("equation: {equation:#?}");
 	info!("result: {}", equation.eval(&FakeStats).unwrap());
 	info!("result: {}", equation.eval(&FakeStats).unwrap());
