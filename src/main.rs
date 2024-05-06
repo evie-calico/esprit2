@@ -68,17 +68,18 @@ pub fn main() {
 		fn get<'expression>(
 			&self,
 			_: &'expression str,
-		) -> Result<u32, expression::Error<'expression>> {
+		) -> Result<expression::Integer, expression::Error<'expression>> {
 			Ok(1)
 		}
 	}
 
-	info!(
-		"{:?}",
-		expression::Equation::from_str("2 + magic * 3")
-			.unwrap()
-			.eval(&FakeStats)
-	);
+	let equation = expression::Equation::from_str("1 + 2d4").unwrap();
+	info!("equation: {equation:#?}");
+	info!("result: {}", equation.eval(&FakeStats).unwrap());
+	info!("result: {}", equation.eval(&FakeStats).unwrap());
+	info!("result: {}", equation.eval(&FakeStats).unwrap());
+	info!("result: {}", equation.eval(&FakeStats).unwrap());
+	info!("result: {}", equation.eval(&FakeStats).unwrap());
 
 	// Game initialization.
 	let resources = match ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator) {

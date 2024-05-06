@@ -1,17 +1,27 @@
 use pest::iterators::Pairs;
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
-use std::ascii;
+use rand::Rng;
 use std::str::FromStr;
+
+pub type Integer = i64;
 
 #[derive(Clone, Debug)]
 enum Expression {
-	Integer(u32),
+	Integer(Integer),
 	Variable(usize, usize),
+
+	// Self-referrential
 	Add(usize, usize),
 	Sub(usize, usize),
 	Mul(usize, usize),
 	Div(usize, usize),
+	// Constant operations
+	AddC(usize, Integer),
+	SubC(usize, Integer),
+	MulC(usize, Integer),
+	DivC(usize, Integer),
+	Roll(Integer, Integer),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -27,28 +37,23 @@ impl Expression {
 		&self,
 		equation: &'expression Equation,
 		variables: &'expression impl Variables,
-	) -> Result<u32, Error<'expression>> {
+	) -> Result<Integer, Error<'expression>> {
+		let get_leaf = |i: usize| equation.leaves.get(i).unwrap().eval(equation, variables);
+
 		match self {
 			Expression::Integer(i) => Ok(*i),
-			Expression::Variable(from, to) => {
-				variables.get(equation.identifiers[*from..*to].as_str())
+			Expression::Variable(from, to) => variables.get(&equation.source[*from..*to]),
+			Expression::Roll(amount, die) => {
+				Ok((0..*amount).fold(0, |a, _| a + rand::thread_rng().gen_range(1..=*die)))
 			}
-			Expression::Add(a, b) => {
-				Ok(equation.leaves.get(*a).unwrap().eval(equation, variables)?
-					+ equation.leaves.get(*b).unwrap().eval(equation, variables)?)
-			}
-			Expression::Sub(a, b) => {
-				Ok(equation.leaves.get(*a).unwrap().eval(equation, variables)?
-					- equation.leaves.get(*b).unwrap().eval(equation, variables)?)
-			}
-			Expression::Mul(a, b) => {
-				Ok(equation.leaves.get(*a).unwrap().eval(equation, variables)?
-					* equation.leaves.get(*b).unwrap().eval(equation, variables)?)
-			}
-			Expression::Div(a, b) => {
-				Ok(equation.leaves.get(*a).unwrap().eval(equation, variables)?
-					/ equation.leaves.get(*b).unwrap().eval(equation, variables)?)
-			}
+			Expression::Add(a, b) => Ok(get_leaf(*a)? + get_leaf(*b)?),
+			Expression::Sub(a, b) => Ok(get_leaf(*a)? - get_leaf(*b)?),
+			Expression::Mul(a, b) => Ok(get_leaf(*a)? * get_leaf(*b)?),
+			Expression::Div(a, b) => Ok(get_leaf(*a)? / get_leaf(*b)?),
+			Expression::AddC(x, i) => Ok(get_leaf(*x)? + i),
+			Expression::SubC(x, i) => Ok(get_leaf(*x)? - i),
+			Expression::MulC(x, i) => Ok(get_leaf(*x)? * i),
+			Expression::DivC(x, i) => Ok(get_leaf(*x)? / i),
 		}
 	}
 }
@@ -57,20 +62,20 @@ pub trait Variables {
 	/// # Errors
 	///
 	/// Should return `Err(expression::Error::MissingVariable(s)` if a variable is not defined.
-	fn get<'expression>(&self, s: &'expression str) -> Result<u32, Error<'expression>>;
+	fn get<'expression>(&self, s: &'expression str) -> Result<Integer, Error<'expression>>;
 }
 
 impl Variables for () {
-	fn get<'expression>(&self, s: &'expression str) -> Result<u32, Error<'expression>> {
+	fn get<'expression>(&self, s: &'expression str) -> Result<Integer, Error<'expression>> {
 		Err(Error::NoVariables(s))
 	}
 }
 
 #[derive(Clone, Debug)]
 pub struct Equation {
+	source: String,
 	root: Expression,
 	leaves: Vec<Expression>,
-	identifiers: Vec<ascii::Char>,
 }
 
 impl FromStr for Equation {
@@ -78,6 +83,7 @@ impl FromStr for Equation {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Ok(Equation::parse_pairs(
+			s.to_string(),
 			ExpressionParser::parse(Rule::equation, s)?
 				.next()
 				.unwrap()
@@ -93,47 +99,56 @@ impl Equation {
 	pub fn eval<'expression>(
 		&'expression self,
 		variables: &'expression impl Variables,
-	) -> Result<u32, Error<'expression>> {
+	) -> Result<Integer, Error<'expression>> {
 		self.root.eval(self, variables)
 	}
 
-	fn parse_pairs(pairs: Pairs<Rule>) -> Self {
+	fn parse_pairs(source: String, pairs: Pairs<Rule>) -> Self {
 		let mut leaves = Vec::new();
-		let mut identifiers = Vec::new();
 
-		let root = PRATT_PARSER
-			.map_primary(|primary| match primary.as_rule() {
-				Rule::integer => Expression::Integer(primary.as_str().parse().unwrap()),
-				Rule::identifier => {
-					let start = identifiers.len();
-					identifiers.extend(primary.as_str().as_ascii().unwrap());
-					let end = identifiers.len();
-					Expression::Variable(start, end)
-				}
-				rule => unreachable!(
-					"Expr::parse expected terminal value, found {rule:?} ({})",
-					primary.as_str()
-				),
-			})
-			.map_infix(|lhs, op, rhs| {
-				leaves.push(lhs);
-				let lhs = leaves.len() - 1;
-				leaves.push(rhs);
-				let rhs = leaves.len() - 1;
+		let mut add_leaf = |leaf: Expression| -> usize {
+			leaves.push(leaf);
+			leaves.len() - 1
+		};
 
-				match op.as_rule() {
-					Rule::add => Expression::Add(lhs, rhs),
-					Rule::sub => Expression::Sub(lhs, rhs),
-					Rule::mul => Expression::Mul(lhs, rhs),
-					Rule::div => Expression::Div(lhs, rhs),
+		let root =
+			PRATT_PARSER
+				.map_primary(|primary| match primary.as_rule() {
+					Rule::integer => Expression::Integer(primary.as_str().parse().unwrap()),
+					Rule::identifier => {
+						let span = primary.as_span();
+						Expression::Variable(span.start(), span.end())
+					}
+					Rule::roll => {
+						let (amount, die) = primary.as_str().split_once('d').unwrap();
+						Expression::Roll(amount.parse().unwrap(), die.parse().unwrap())
+					}
+					rule => unreachable!(
+						"Expr::parse expected terminal value, found {rule:?} ({})",
+						primary.as_str()
+					),
+				})
+				.map_infix(|lhs, op, rhs| match (lhs, op.as_rule(), rhs) {
+					// Constant resolution
+					(Expression::Integer(i), Rule::add, x)
+					| (x, Rule::add, Expression::Integer(i)) => Expression::AddC(add_leaf(x), i),
+					(Expression::Integer(i), Rule::sub, x)
+					| (x, Rule::sub, Expression::Integer(i)) => Expression::SubC(add_leaf(x), i),
+					(Expression::Integer(i), Rule::mul, x)
+					| (x, Rule::mul, Expression::Integer(i)) => Expression::MulC(add_leaf(x), i),
+					(Expression::Integer(i), Rule::div, x)
+					| (x, Rule::div, Expression::Integer(i)) => Expression::DivC(add_leaf(x), i),
+					(lhs, Rule::add, rhs) => Expression::Add(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::sub, rhs) => Expression::Sub(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::mul, rhs) => Expression::Mul(add_leaf(lhs), add_leaf(rhs)),
+					(lhs, Rule::div, rhs) => Expression::Div(add_leaf(lhs), add_leaf(rhs)),
 					rule => unreachable!("Expr::parse expected infix operation, found {rule:?}"),
-				}
-			})
-			.parse(pairs);
+				})
+				.parse(pairs);
 		Self {
+			source,
 			root,
 			leaves,
-			identifiers,
 		}
 	}
 }

@@ -2,8 +2,9 @@ WHITESPACE = _{ " " }
 
 integer = @{ ASCII_DIGIT+ }
 identifier = @{ (ASCII_ALPHANUMERIC | ".")+ }
+roll = @{ integer ~ "d" ~ integer }
 
-term = _{ integer | identifier }
+term = _{ roll | integer | identifier }
 
 add = { "+" }
 sub = { "-" }
