@@ -151,22 +151,43 @@ impl Manager {
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
 					let name = next_character.borrow().sheet.nouns.name.clone();
-					self.console.say(name, "Ouch!");
+					self.console.say(name, "Ouch!".into());
 				}
 				Err(MovementError::HitVoid) => {
-					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.");
+					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				}
 				Err(MovementError::Attack(AttackError::Ally)) => {
-					self.console.print_system("You can't attack your allies!");
+					self.console
+						.print_system("You can't attack your allies!".into());
 				}
 				Err(MovementError::Attack(AttackError::NoAttacks)) => {
 					self.console
-						.print_system("You cannot perform any melee attacks right now.");
+						.print_system("You cannot perform any melee attacks right now.".into());
 				}
 			},
 			character::Action::Cast(spell) => {
-				self.console
-					.print_system(&format!("Attempting to cast {}", spell.name));
+				let successful = {
+					let mut next_character = next_character.borrow_mut();
+					if spell.castable_by(&next_character) {
+						next_character.sp -= spell.level as i32;
+						true
+					} else {
+						false
+					}
+				};
+				let next_character = next_character.borrow();
+				if successful {
+					let message = format!("{{Address}} casts {}.", spell.name)
+						.replace_nouns(&next_character.sheet.nouns);
+					drop(next_character);
+					self.console.print(message);
+				} else {
+					let message =
+						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
+							.replace_nouns(&next_character.sheet.nouns);
+					drop(next_character);
+					self.console.print_system(message);
+				}
 			}
 		};
 	}

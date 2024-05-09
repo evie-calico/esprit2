@@ -1,3 +1,5 @@
+use crate::character;
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Energy {
 	/// Positive energy, like heat.
@@ -7,11 +9,11 @@ pub enum Energy {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum Location {
-	/// Spells that take place inside of bodies.
-	Internal,
-	/// Spells that take place outside of bodies.
-	External,
+pub enum Harmony {
+	/// Spells with unconventional, unpredictable effects.
+	Chaos,
+	/// Simple spells with predictable effects.
+	Order,
 }
 
 /// A character's magical skills.
@@ -23,10 +25,10 @@ pub enum Location {
 pub enum Skillset {
 	EnergyMajor {
 		major: Energy,
-		minor: Option<Location>,
+		minor: Option<Harmony>,
 	},
-	LocationMajor {
-		major: Location,
+	HarmonyMajor {
+		major: Harmony,
 		minor: Option<Energy>,
 	},
 }
@@ -50,9 +52,15 @@ pub struct Spell {
 
 	/// Whether the spell concentrates or disperses energy.
 	pub energy: Energy,
-	/// Whether the energy is inside or outside of a body.
-	pub location: Location,
+	/// Whether the spell is ordered or chaotic.
+	pub harmony: Harmony,
 
 	/// This is also the cost of the spell.
 	pub level: u8,
+}
+
+impl Spell {
+	pub fn castable_by(&self, character: &character::Piece) -> bool {
+		character.sp >= self.level as i32
+	}
 }

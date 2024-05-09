@@ -160,21 +160,6 @@ pub fn main() {
 		light_texture: resources.get_owned_texture("light").unwrap(),
 	};
 
-	// Print some debug messages to test the console.
-	world_manager.console.print("Hello, world!");
-	world_manager.console.print("Luvui scratches the cat.");
-	world_manager.console.print_defeat("The cat ran away.");
-	world_manager.console.print("Luvui casts Magic Missile.");
-	world_manager
-		.console
-		.print("Her magic missile strikes the cat!");
-	world_manager.console.print("The cat scratches Aris");
-	world_manager.console.print("Aris bites the cat");
-	world_manager.console.print_defeat("The cat scampered off.");
-	world_manager
-		.console
-		.print_special("Luvui's level increased to 2!");
-
 	// TODO: Display this on-screen.
 	let mut input_mode = input::Mode::Normal;
 	let mut global_time = 0;
@@ -271,7 +256,7 @@ pub fn main() {
 				);
 			}
 			input::Mode::Cast => {
-				spell_menu::draw(&mut menu, &font);
+				spell_menu::draw(&mut menu, &world_manager.next_character().borrow(), &font);
 			}
 		}
 

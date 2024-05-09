@@ -6,7 +6,6 @@ use sdl2::render::{Canvas, TextureQuery};
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 use std::collections::VecDeque;
-use std::fmt::Display;
 use std::rc::Rc;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
@@ -59,9 +58,9 @@ pub struct Message {
 macro_rules! colored_print {
 	($which:ident) => {
 		paste! {
-			pub fn [<print_ $which>](&mut self, message: impl Display) {
+			pub fn [<print_ $which>](&mut self, text: String) {
 				self.history.push(Message {
-					text: message.to_string(),
+					text,
 					color: self.colors.$which,
 					printer: MessagePrinter::Console,
 				});
@@ -71,9 +70,9 @@ macro_rules! colored_print {
 }
 
 impl Console {
-	pub fn say(&mut self, speaker: Rc<str>, message: impl Display) {
+	pub fn say(&mut self, speaker: Rc<str>, text: String) {
 		self.history.push(Message {
-			text: message.to_string(),
+			text,
 			color: self.colors.normal,
 			printer: MessagePrinter::Dialogue {
 				speaker,
@@ -84,17 +83,17 @@ impl Console {
 		self.in_progress.push_back(self.history.len() - 1);
 	}
 
-	pub fn print(&mut self, message: impl Display) {
+	pub fn print(&mut self, text: String) {
 		self.history.push(Message {
-			text: message.to_string(),
+			text,
 			color: self.colors.normal,
 			printer: MessagePrinter::Console,
 		});
 	}
 
-	pub fn print_colored(&mut self, message: impl Display, color: Color) {
+	pub fn print_colored(&mut self, text: String, color: Color) {
 		self.history.push(Message {
-			text: message.to_string(),
+			text,
 			color,
 			printer: MessagePrinter::Console,
 		});

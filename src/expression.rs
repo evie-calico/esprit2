@@ -147,7 +147,7 @@ impl TryFrom<String> for Expression {
 	}
 }
 
-pub trait ExpressionResult<'expression, 'variables>: Sized {
+pub trait Evaluate<'expression, 'variables>: Sized {
 	fn eval(expression: &'expression Expression) -> Self {
 		Self::evalv(expression, &())
 	}
@@ -157,7 +157,7 @@ pub trait ExpressionResult<'expression, 'variables>: Sized {
 
 macro_rules! impl_int {
 	($type:ident) => {
-		impl<'expression, 'variables> ExpressionResult<'expression, 'variables> for $type {
+		impl<'expression, 'variables> Evaluate<'expression, 'variables> for $type {
 			fn evalv(
 				expression: &'expression Expression,
 				variables: &'variables impl Variables,
@@ -180,7 +180,7 @@ macro_rules! impl_int {
 			}
 		}
 
-		impl<'expression, 'variables> ExpressionResult<'expression, 'variables>
+		impl<'expression, 'variables> Evaluate<'expression, 'variables>
 			for Result<$type, Error<'expression>>
 		{
 			fn evalv(

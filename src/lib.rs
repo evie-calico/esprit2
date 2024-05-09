@@ -44,7 +44,7 @@ pub mod prelude {
 	pub use super::*;
 	pub use attack::Attack;
 	pub use console::Console;
-	pub use expression::{Expression, ExpressionResult};
+	pub use expression::{Evaluate, Expression};
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;

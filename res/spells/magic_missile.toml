@@ -2,6 +2,6 @@ name = "Magic Missile"
 icon = "magic_missile"
 
 energy = "Positive"
-location = "External"
+harmony = "Order"
 
 level = 1

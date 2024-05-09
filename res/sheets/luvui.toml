@@ -17,5 +17,5 @@ magic = 6
 resistance = 3
 
 [skillset]
-major = "Positive"
-minor = "External"
+major = "Chaos"
+minor = "Positive"

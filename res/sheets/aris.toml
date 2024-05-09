@@ -17,4 +17,5 @@ magic = 1
 resistance = 7
 
 [skillset]
-major = "Internal"
+major = "Negative"
+minro = "Choas"
