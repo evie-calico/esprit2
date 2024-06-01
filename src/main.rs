@@ -1,9 +1,10 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
-use esprit2::world::CharacterRef;
+use parking_lot::RwLock;
 use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
+use std::sync::Arc;
 use tracing::*;
 use uuid::Uuid;
 
@@ -15,9 +16,9 @@ fn update_delta(
 	*last_time = *current_time;
 	*current_time = timer_subsystem.performance_counter() as f64;
 	((*current_time - *last_time) * 1000.0
-				    / (timer_subsystem.performance_frequency() as f64))
-				    // Convert milliseconds to seconds.
-				    / 1000.0
+		/ (timer_subsystem.performance_frequency() as f64))
+		// Convert milliseconds to seconds.
+		/ 1000.0
 }
 
 struct SoulJar<'texture> {
@@ -96,9 +97,9 @@ pub fn main() {
 			level: String::from("New Level"),
 			floor: 0,
 		},
-		console: Console::default(),
+		console: Arc::new(RwLock::new(Console::default())),
 
-		current_level: world::Level::default(),
+		current_level: Arc::new(RwLock::new(world::Level::default())),
 		current_floor: Floor::default(),
 		characters: Vec::new(),
 		items: Vec::new(),
@@ -131,8 +132,8 @@ pub fn main() {
 			"items/watermelon".into(),
 		],
 	};
-	world_manager.characters.push(CharacterRef::new(player));
-	world_manager.characters.push(CharacterRef::new(ally));
+	world_manager.characters.push(Arc::new(RwLock::new(player)));
+	world_manager.characters.push(Arc::new(RwLock::new(ally)));
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context
@@ -182,7 +183,7 @@ pub fn main() {
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 
 			world_manager.pop_action();
-			world_manager.console.update(delta);
+			world_manager.console.write().update(delta);
 			soul_jar.tick(delta as f32);
 		}
 
@@ -218,7 +219,7 @@ pub fn main() {
 		}
 
 		// Draw characters
-		for character in world_manager.characters.iter().map(|x| x.borrow()) {
+		for character in world_manager.characters.iter().map(|x| x.read()) {
 			canvas
 				.copy(
 					sleep_texture,
@@ -244,7 +245,7 @@ pub fn main() {
 		match input_mode {
 			input::Mode::Normal => {
 				// Draw Console
-				world_manager.console.draw(
+				world_manager.console.read().draw(
 					&mut canvas,
 					Rect::new(
 						0,
@@ -256,7 +257,7 @@ pub fn main() {
 				);
 			}
 			input::Mode::Cast => {
-				spell_menu::draw(&mut menu, &world_manager.next_character().borrow(), &font);
+				spell_menu::draw(&mut menu, &world_manager.next_character().read(), &font);
 			}
 		}
 
@@ -301,44 +302,40 @@ fn pamphlet(
 		for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
 			*window = Some(|player_window: &mut gui::Context| {
 				if let Some(piece) = world_manager.get_character(character_id.piece) {
-					let piece = piece.borrow();
+					let piece = piece.read();
+					let piece_sheet = piece.sheet.read();
+					let stats = &piece_sheet.stats;
+
 					player_window.label_color(
 						&format!(
 							"{} ({:08x})",
-							piece.sheet.nouns.name,
+							piece_sheet.nouns.read().name,
 							piece.id.as_fields().0
 						),
-						match piece.sheet.nouns.pronouns {
+						match piece_sheet.nouns.read().pronouns {
 							nouns::Pronouns::Female => Color::RGB(247, 141, 246),
 							nouns::Pronouns::Male => Color::RGB(104, 166, 232),
 							_ => Color::WHITE,
 						},
 						font,
 					);
-					player_window.label(&format!("Level {}", piece.sheet.level), font);
-					player_window.label(
-						&format!("HP: {}/{}", piece.hp, piece.sheet.stats.heart),
-						font,
-					);
+					player_window.label(&format!("Level {}", piece_sheet.level), font);
+					player_window.label(&format!("HP: {}/{}", piece.hp, stats.heart), font);
 					player_window.progress_bar(
-						(piece.hp as f32) / (piece.sheet.stats.heart as f32),
+						(piece.hp as f32) / (stats.heart as f32),
 						Color::GREEN,
 						Color::RED,
 						10,
 						5,
 					);
-					player_window.label(
-						&format!("SP: {}/{}", piece.sp, piece.sheet.stats.soul),
-						font,
-					);
+					player_window.label(&format!("SP: {}/{}", piece.sp, stats.soul), font);
 					player_window.progress_bar(
-						(piece.sp as f32) / (piece.sheet.stats.soul as f32),
+						(piece.sp as f32) / (stats.soul as f32),
 						Color::BLUE,
 						Color::RED,
 						10,
 						5,
 					);
-					let stats = &piece.sheet.stats;
 					let physical_stat_info = [("Pwr", stats.power), ("Def", stats.defense)];
 					let mut physical_stats = [None, None];
 					for ((stat_name, stat), stat_half) in physical_stat_info
@@ -371,7 +368,7 @@ fn pamphlet(
 					}
 					player_window.advance(0, 10);
 					player_window.label("Spells", font);
-					let mut spells = piece.sheet.spells.iter().peekable();
+					let mut spells = piece_sheet.spells.iter().peekable();
 					while spells.peek().is_some() {
 						let textures_per_row = player_window.rect.width() / (32 + 8);
 						player_window.horizontal();

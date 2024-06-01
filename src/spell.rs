@@ -1,6 +1,6 @@
-use crate::character;
+use crate::prelude::*;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Energy {
 	/// Positive energy, like heat.
 	Positive,
@@ -8,7 +8,7 @@ pub enum Energy {
 	Negative,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Harmony {
 	/// Spells with unconventional, unpredictable effects.
 	Chaos,
@@ -19,7 +19,7 @@ pub enum Harmony {
 /// A character's magical skills.
 ///
 /// Only skill from each axis may be chosen, and the minor skill is optional.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 // This gives the Skillset a cool toml representation.
 #[serde(untagged)]
 pub enum Skillset {
@@ -33,7 +33,7 @@ pub enum Skillset {
 	},
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Affinity {
 	/// No skillset matches; the spell is not castable.
 	Uncastable,
@@ -62,5 +62,38 @@ pub struct Spell {
 impl Spell {
 	pub fn castable_by(&self, character: &character::Piece) -> bool {
 		character.sp >= self.level as i32
+	}
+
+	pub fn affinity(&self, character: &character::Piece) -> Affinity {
+		match character.sheet.read().skillset {
+			Skillset::EnergyMajor { major, minor } => {
+				let minor_affinity = minor.is_some_and(|x| x == self.harmony);
+				if major == self.energy {
+					if minor_affinity {
+						Affinity::Strong
+					} else {
+						Affinity::Average
+					}
+				} else if minor_affinity {
+					Affinity::Weak
+				} else {
+					Affinity::Uncastable
+				}
+			}
+			Skillset::HarmonyMajor { major, minor } => {
+				let minor_affinity = minor.is_some_and(|x| x == self.energy);
+				if major == self.harmony {
+					if minor_affinity {
+						Affinity::Strong
+					} else {
+						Affinity::Average
+					}
+				} else if minor_affinity {
+					Affinity::Weak
+				} else {
+					Affinity::Uncastable
+				}
+			}
+		}
 	}
 }

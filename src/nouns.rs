@@ -1,15 +1,16 @@
 use aho_corasick::AhoCorasick;
-use std::rc::Rc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 /// For dynamically addressing a character.
 /// This should encompass almost every (dynamic) way of addressing someone or something.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Nouns {
-	/// This is an `Rc<str>` rather than a `String` because it's very common to
+	/// This is an `Arc<str>` rather than a `String` because it's very common to
 	/// store a reference to a character's name (see `Console`).
-	pub name: Rc<str>,
+	#[alua(as_lua = "string", get)]
+	pub name: Arc<str>,
 	/// If true, will be addressed as "Name", rather than "The name" or "A name".
+	#[alua(get)]
 	pub proper_name: bool,
 	pub pronouns: Pronouns,
 }

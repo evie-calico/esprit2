@@ -6,7 +6,7 @@ use sdl2::render::{Canvas, TextureQuery};
 use sdl2::ttf::Font;
 use sdl2::video::Window;
 use std::collections::VecDeque;
-use std::rc::Rc;
+use std::sync::Arc;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
@@ -15,6 +15,15 @@ pub struct Console {
 	history: Vec<Message>,
 	in_progress: VecDeque<usize>,
 	pub colors: Colors,
+}
+
+impl mlua::UserData for Console {
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method_mut("print", |_, this, value: String| {
+			this.print(value);
+			Ok(())
+		});
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +54,7 @@ impl Default for Colors {
 #[derive(Clone, Debug)]
 pub enum MessagePrinter {
 	Console,
-	Dialogue { speaker: Rc<str>, progress: f64 },
+	Dialogue { speaker: Arc<str>, progress: f64 },
 }
 
 #[derive(Clone, Debug)]
@@ -70,7 +79,7 @@ macro_rules! colored_print {
 }
 
 impl Console {
-	pub fn say(&mut self, speaker: Rc<str>, text: String) {
+	pub fn say(&mut self, speaker: Arc<str>, text: String) {
 		self.history.push(Message {
 			text,
 			color: self.colors.normal,

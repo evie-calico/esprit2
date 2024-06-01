@@ -23,7 +23,7 @@ pub fn world(
 				keycode: Some(keycode),
 				..
 			} => {
-				let mut next_character = world_manager.next_character().borrow_mut();
+				let mut next_character = world_manager.next_character().write();
 				if next_character.player_controlled {
 					match *mode {
 						Mode::Normal => {
@@ -54,10 +54,9 @@ pub fn world(
 							}
 
 							if options.controls.talk.contains(&(keycode as i32)) {
-								world_manager.console.say("Luvui".into(), "Meow!".into());
-								world_manager
-									.console
-									.say("Aris".into(), "I am a kitty :3".into());
+								let mut console = world_manager.console.write();
+								console.say("Luvui".into(), "Meow!".into());
+								console.say("Aris".into(), "I am a kitty :3".into());
 							}
 						}
 						Mode::Cast => {

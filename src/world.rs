@@ -1,13 +1,14 @@
 use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
+use parking_lot::RwLock;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::cell::RefCell;
+use std::sync::Arc;
 use uuid::Uuid;
 
 const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}";
 
-pub type CharacterRef = RefCell<character::Piece>;
+pub type CharacterRef = Arc<RwLock<character::Piece>>;
 
 /// This struct contains all information that is relevant during gameplay.
 #[derive(Clone, Debug)]
@@ -16,7 +17,7 @@ pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
 	/// This is the level pointed to by `location.level`.
-	pub current_level: Level,
+	pub current_level: Arc<RwLock<Level>>,
 	pub current_floor: Floor,
 	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
 	pub characters: Vec<CharacterRef>,
@@ -25,12 +26,13 @@ pub struct Manager {
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
-	pub console: Console,
+	pub console: Arc<RwLock<Console>>,
 }
 
 /// Contains information about what should generate on each floor.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Level {
+	#[alua(get, set)]
 	pub name: String,
 }
 
@@ -72,7 +74,7 @@ impl Manager {
 	// This either mean they no longer exist, or they're on a different floor;
 	// either way they cannot be referenced.
 	pub fn get_character(&self, id: Uuid) -> Option<&CharacterRef> {
-		self.characters.iter().find(|x| x.borrow().id == id)
+		self.characters.iter().find(|x| x.read().id == id)
 	}
 
 	pub fn next_character(&self) -> &CharacterRef {
@@ -81,7 +83,7 @@ impl Manager {
 
 	pub fn get_character_at(&self, x: i32, y: i32) -> Option<&CharacterRef> {
 		self.characters.iter().find(|p| {
-			let p = p.borrow();
+			let p = p.read();
 			p.x == x && p.y == y
 		})
 	}
@@ -94,7 +96,7 @@ impl Manager {
 				y: y + yoff,
 				..character::Piece::new(resources.get_sheet(sheet_name).unwrap().clone(), resources)
 			};
-			self.characters.push(RefCell::new(piece));
+			self.characters.push(Arc::new(RwLock::new(piece)));
 		}
 	}
 }
@@ -131,43 +133,44 @@ pub enum AttackError {
 impl Manager {
 	pub fn pop_action(&mut self) {
 		let next_character = self.next_character();
+		let mut console = self.console.write();
 
-		let Some(action) = next_character.borrow_mut().next_action.take() else {
+		let Some(action) = next_character.write().next_action.take() else {
 			return;
 		};
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
 				Ok(MovementResult::Attack(AttackResult::Hit { message, weak })) => {
-					let colors = &self.console.colors;
-					self.console.print_colored(
-						message,
-						if weak {
-							colors.unimportant
-						} else {
-							colors.normal
-						},
-					)
+					let colors = &console.colors;
+					let color = if weak {
+						colors.unimportant
+					} else {
+						colors.normal
+					};
+					console.print_colored(message, color);
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
-					let name = next_character.borrow().sheet.nouns.name.clone();
-					self.console.say(name, "Ouch!".into());
+					let name = next_character.read().sheet.read().nouns.read().name.clone();
+					console.say(name, "Ouch!".into());
 				}
 				Err(MovementError::HitVoid) => {
-					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
+					console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				}
 				Err(MovementError::Attack(AttackError::Ally)) => {
 					self.console
+						.write()
 						.print_system("You can't attack your allies!".into());
 				}
 				Err(MovementError::Attack(AttackError::NoAttacks)) => {
 					self.console
+						.write()
 						.print_system("You cannot perform any melee attacks right now.".into());
 				}
 			},
 			character::Action::Cast(spell) => {
-				let successful = {
-					let mut next_character = next_character.borrow_mut();
+				let castable = {
+					let mut next_character = next_character.write();
 					if spell.castable_by(&next_character) {
 						next_character.sp -= spell.level as i32;
 						true
@@ -175,18 +178,22 @@ impl Manager {
 						false
 					}
 				};
-				let next_character = next_character.borrow();
-				if successful {
-					let message = format!("{{Address}} casts {}.", spell.name)
-						.replace_nouns(&next_character.sheet.nouns);
-					drop(next_character);
-					self.console.print(message);
+				if castable {
+					// Pass write access to the console to the lua runtime.
+					drop(console);
+					let lua = mlua::Lua::new();
+					lua.globals()
+						.set("Level", self.current_level.clone())
+						.unwrap();
+					lua.globals().set("Console", self.console.clone()).unwrap();
+					let chunk =
+						lua.load("local caster = ...; Console:print(caster.sheet.nouns.name..\" fired a magic missile.\")");
+					let () = chunk.call(next_character.clone()).unwrap();
 				} else {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-							.replace_nouns(&next_character.sheet.nouns);
-					drop(next_character);
-					self.console.print_system(message);
+							.replace_nouns(&next_character.read().sheet.read().nouns.read());
+					console.print_system(message);
 				}
 			}
 		};
@@ -201,8 +208,10 @@ impl Manager {
 		target_ref: &CharacterRef,
 	) -> Result<AttackResult, AttackError> {
 		let (damage, message, weak) = {
-			let character = character_ref.borrow();
-			let target = target_ref.borrow();
+			let character = character_ref.read();
+			let character_sheet = character.sheet.read();
+			let target = target_ref.read();
+			let target_sheet = target.sheet.read();
 
 			if target.alliance == character.alliance {
 				return Err(AttackError::Ally);
@@ -224,7 +233,7 @@ impl Manager {
 
 			// Calculate damage
 			let damage =
-				u32::evalv(&attack.damage, &*character).saturating_sub(target.sheet.stats.defense);
+				u32::evalv(&attack.damage, &*character).saturating_sub(target_sheet.stats.defense);
 			let is_weak_attack = damage <= 1;
 
 			// TODO: Change this depending on the proportional amount of damage dealt.
@@ -245,8 +254,8 @@ impl Manager {
 			let mut message = message
 				.map(|s| s.as_str())
 				.unwrap_or(DEFAULT_ATTACK_MESSAGE)
-				.replace_prefixed_nouns(&character.sheet.nouns, "self_")
-				.replace_prefixed_nouns(&target.sheet.nouns, "target_");
+				.replace_prefixed_nouns(&character_sheet.nouns.read(), "self_")
+				.replace_prefixed_nouns(&target_sheet.nouns.read(), "target_");
 			message.push_str(damage_punctuation);
 			message.push_str(&format!(" (-{damage} HP)"));
 
@@ -254,7 +263,7 @@ impl Manager {
 		};
 
 		// This is where the damage is actually dealt
-		target_ref.borrow_mut().hp -= damage as i32;
+		target_ref.write().hp -= damage as i32;
 
 		// `self` is not mutable, so the message needs to be passed up to the manager,
 		// where printing can occur.
@@ -273,7 +282,7 @@ impl Manager {
 
 		let (x, y) = {
 			let (x, y) = dir.as_offset();
-			let character = character_ref.borrow();
+			let character = character_ref.read();
 			(character.x + x, character.y + y)
 		};
 
@@ -288,7 +297,7 @@ impl Manager {
 		let tile = self.current_floor.map.get(y, x);
 		match tile {
 			Some(Tile::Floor) => {
-				let mut character = character_ref.borrow_mut();
+				let mut character = character_ref.write();
 				character.x = x;
 				character.y = y;
 				Ok(MovementResult::Move)

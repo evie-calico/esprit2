@@ -1,22 +1,30 @@
 use crate::prelude::*;
+use parking_lot::RwLock;
 use sdl2::pixels::Color;
-use std::rc::Rc;
+use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Piece {
 	// These are nice and serializable :)
+	#[alua(as_lua = "string", get)]
 	pub id: Uuid,
-	pub sheet: Sheet,
+	#[alua(get)]
+	pub sheet: Arc<RwLock<Sheet>>,
 
+	#[alua(get, set)]
 	pub hp: i32,
+	#[alua(get, set)]
 	pub sp: i32,
 	pub attacks: Vec<Attack>,
-	pub spells: Vec<Rc<Spell>>,
+	pub spells: Vec<Arc<Spell>>,
 
+	#[alua(get, set)]
 	pub x: i32,
+	#[alua(get, set)]
 	pub y: i32,
 	pub next_action: Option<Action>,
+	#[alua(get, set)]
 	pub player_controlled: bool,
 	pub alliance: Alliance,
 }
@@ -29,7 +37,7 @@ impl expression::Variables for Piece {
 		match s {
 			"hp" => Ok(self.hp as expression::Integer),
 			"sp" => Ok(self.sp as expression::Integer),
-			_ => self.sheet.get(s),
+			_ => self.sheet.read().get(s),
 		}
 	}
 }
@@ -46,8 +54,9 @@ impl Piece {
 		let spells = sheet
 			.spells
 			.iter()
-			.map(|x| Rc::new(resources.get_spell(x).unwrap().clone()))
+			.map(|x| Arc::new(resources.get_spell(x).unwrap().clone()))
 			.collect();
+		let sheet = Arc::new(RwLock::new(sheet));
 
 		Self {
 			id: Uuid::new_v4(),
@@ -99,7 +108,7 @@ impl OrdDir {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
 	Move(OrdDir),
-	Cast(Rc<Spell>),
+	Cast(Arc<Spell>),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -109,10 +118,11 @@ pub enum Alliance {
 	Enemy,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Sheet {
 	/// Note that this includes the character's name.
-	pub nouns: Nouns,
+	#[alua(get)]
+	pub nouns: Arc<parking_lot::RwLock<Nouns>>,
 
 	pub level: u32,
 	pub stats: Stats,
