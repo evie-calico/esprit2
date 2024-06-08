@@ -124,12 +124,17 @@ pub struct Sheet {
 	#[alua(get)]
 	pub nouns: Arc<parking_lot::RwLock<Nouns>>,
 
+	#[alua(get)]
 	pub level: u32,
+	#[alua(get)]
 	pub stats: Stats,
 	pub skillset: spell::Skillset,
+	#[alua(get)]
 	pub speed: Aut,
 
+	#[alua(get)]
 	pub attacks: Vec<String>,
+	#[alua(get)]
 	pub spells: Vec<String>,
 }
 
@@ -146,20 +151,26 @@ impl expression::Variables for Sheet {
 	}
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
+	#[alua(get)]
 	pub heart: u32,
 	/// Magic, or SP; Soul Points
+	#[alua(get)]
 	pub soul: u32,
 	/// Bonus damage applied to physical attacks.
+	#[alua(get)]
 	pub power: u32,
 	/// Damage reduction when recieving physical attacks.
+	#[alua(get)]
 	pub defense: u32,
 	/// Bonus damage applied to magical attacks.
+	#[alua(get)]
 	pub magic: u32,
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
+	#[alua(get)]
 	pub resistance: u32,
 }
 

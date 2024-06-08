@@ -47,6 +47,27 @@ pub enum Affinity {
 	Strong,
 }
 
+impl Affinity {
+	pub fn magnitude(self, magnitude: u32) -> u32 {
+		match self {
+			Affinity::Uncastable => 0,
+			Affinity::Weak => magnitude / 4,
+			Affinity::Average => magnitude * 3 / 4,
+			Affinity::Strong => magnitude,
+		}
+	}
+}
+
+impl mlua::UserData for Affinity {
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method_mut("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
+		methods.add_method_mut("average", |_, this, ()| {
+			Ok(matches!(this, Affinity::Average))
+		});
+		methods.add_method_mut("strong", |_, this, ()| Ok(matches!(this, Affinity::Strong)));
+	}
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Spell {
 	pub name: String,
@@ -62,6 +83,10 @@ pub struct Spell {
 
 	/// This is also the cost of the spell.
 	pub level: u8,
+	/// Optional field for magnitude calculation.
+	/// This could easily be part of a script,
+	/// but expressions allow the magnitude formula to be displayed.
+	pub magnitude: Option<Expression>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -74,7 +99,7 @@ pub enum ScriptOrInline {
 impl ScriptOrInline {
 	pub fn contents(&self) -> &str {
 		match self {
-			ScriptOrInline::Inline(s) => &s,
+			ScriptOrInline::Inline(s) => s,
 			ScriptOrInline::Path(expression) => &expression.contents,
 		}
 	}

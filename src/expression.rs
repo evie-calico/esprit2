@@ -72,6 +72,12 @@ impl Variables for () {
 	}
 }
 
+impl Variables for Integer {
+	fn get<'expression>(&self, _: &'expression str) -> Result<Integer, Error<'expression>> {
+		Ok(*self)
+	}
+}
+
 #[derive(Clone, Debug)]
 pub struct Expression {
 	pub source: String,

@@ -23,6 +23,10 @@ impl mlua::UserData for Console {
 			this.print(value);
 			Ok(())
 		});
+		methods.add_method_mut("print_unimportant", |_, this, value: String| {
+			this.print_unimportant(value);
+			Ok(())
+		});
 	}
 }
 
@@ -109,6 +113,7 @@ impl Console {
 	}
 
 	colored_print!(system);
+	colored_print!(unimportant);
 	colored_print!(danger);
 	colored_print!(defeat);
 	colored_print!(important);

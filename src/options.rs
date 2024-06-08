@@ -82,6 +82,7 @@ pub struct Controls {
 	pub talk: Triggers,
 	pub cast: Triggers,
 
+	pub confirm: Triggers,
 	pub escape: Triggers,
 }
 
@@ -101,6 +102,7 @@ impl Default for Controls {
 			talk: vec![K::T as i32],
 			cast: vec![K::Z as i32],
 
+			confirm: vec![K::Return as i32],
 			escape: vec![K::Escape as i32],
 		}
 	}

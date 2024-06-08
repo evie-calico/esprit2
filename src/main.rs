@@ -110,7 +110,7 @@ pub fn main() {
 
 	// TODO: Display this on-screen.
 	let mut input_mode = input::Mode::Normal;
-	let mut global_time = 0;
+	let mut action_request = None;
 	loop {
 		// Input processing
 		if input::world(
@@ -129,7 +129,50 @@ pub fn main() {
 		{
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 
-			world_manager.pop_action();
+			match action_request {
+				Some(world::ActionRequest::BeginCursor { x, y, callback }) => {
+					match input_mode {
+						input::Mode::Cursor {
+							x,
+							y,
+							submitted: true,
+						} => {
+							input_mode = input::Mode::Normal;
+							action_request = callback(&mut world_manager, x, y);
+						}
+						input::Mode::Cursor {
+							x: _,
+							y: _,
+							submitted: false,
+						} => {
+							// This match statement currently has ownership of `action_request`
+							// since the callback is `FnOnce`.
+							// Because of this, `action_request` needs to be reconstructed in all match arms,
+							// even if this is a no-op.
+							action_request =
+								Some(world::ActionRequest::BeginCursor { x, y, callback })
+						}
+						_ => {
+							// If cursor mode is cancelled in any way, the callback will be destroyed.
+							action_request = None;
+						}
+					}
+				}
+				None => {
+					action_request = world_manager.pop_action();
+
+					// Set up any new action requests.
+					if let Some(world::ActionRequest::BeginCursor { x, y, callback: _ }) =
+						action_request
+					{
+						input_mode = input::Mode::Cursor {
+							x,
+							y,
+							submitted: false,
+						};
+					}
+				}
+			}
 			world_manager.console.write().update(delta);
 			soul_jar.tick(delta as f32);
 		}
@@ -147,8 +190,7 @@ pub fn main() {
 			window_size.0 - options.ui.pamphlet_width,
 			window_size.1 - options.ui.console_height,
 		));
-		global_time = (global_time + 1) % 255;
-		canvas.set_draw_color(Color::RGB(global_time, 64, 255 - global_time));
+		canvas.set_draw_color(Color::BLACK);
 		canvas
 			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
 			.unwrap();
@@ -190,7 +232,10 @@ pub fn main() {
 		);
 
 		match input_mode {
-			input::Mode::Normal => {
+			input::Mode::Cast => {
+				spell_menu::draw(&mut menu, &world_manager.next_character().read(), &font);
+			}
+			_ => {
 				// Draw Console
 				world_manager.console.read().draw(
 					&mut canvas,
@@ -202,9 +247,6 @@ pub fn main() {
 					),
 					&font,
 				);
-			}
-			input::Mode::Cast => {
-				spell_menu::draw(&mut menu, &world_manager.next_character().read(), &font);
 			}
 		}
 

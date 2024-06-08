@@ -1,9 +1,11 @@
 use crate::prelude::*;
 use sdl2::{event::Event, keyboard::Keycode};
+use tracing::warn;
 
 pub enum Mode {
 	Normal,
 	Cast,
+	Cursor { x: i32, y: i32, submitted: bool },
 }
 
 pub struct Result {
@@ -25,7 +27,7 @@ pub fn world(
 			} => {
 				let mut next_character = world_manager.next_character().write();
 				if next_character.player_controlled {
-					match *mode {
+					match mode {
 						Mode::Normal => {
 							// Eventually this will be a more involved binding.
 							if options.controls.escape.contains(&(keycode as i32)) {
@@ -73,6 +75,38 @@ pub fn world(
 								))
 							}
 							*mode = Mode::Normal;
+						}
+						Mode::Cursor {
+							ref mut x,
+							ref mut y,
+							ref mut submitted,
+						} => {
+							if *submitted {
+								warn!("entering cursor mode after submission");
+							}
+
+							let directions = [
+								(-1, 0, &options.controls.left),
+								(1, 0, &options.controls.right),
+								(0, -1, &options.controls.up),
+								(0, 1, &options.controls.down),
+								(-1, -1, &options.controls.up_left),
+								(1, -1, &options.controls.up_right),
+								(-1, 1, &options.controls.down_left),
+								(1, 1, &options.controls.down_right),
+							];
+							for (x_off, y_off, triggers) in directions {
+								if triggers.contains(&(keycode as i32)) {
+									*x += x_off;
+									*y += y_off;
+								}
+							}
+
+							if options.controls.escape.contains(&(keycode as i32)) {
+								*mode = Mode::Normal;
+							} else if options.controls.confirm.contains(&(keycode as i32)) {
+								*submitted = true;
+							}
 						}
 					}
 				}

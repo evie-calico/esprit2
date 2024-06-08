@@ -106,9 +106,8 @@ impl Manager {
 				level: String::from("New Level"),
 				floor: 0,
 			},
-			console: Arc::new(RwLock::new(Console::default())),
-
-			current_level: Arc::new(RwLock::new(world::Level::default())),
+			console,
+			current_level,
 			current_floor: Floor::default(),
 			characters,
 			items: Vec::new(),
@@ -202,13 +201,23 @@ pub enum AttackError {
 	NoAttacks,
 }
 
+/// Used to "escape" the world and request extra information, such as inputs.
+pub enum ActionRequest {
+	/// This callback will be called in place of `pop_action` once a position is selected.
+	BeginCursor {
+		x: i32,
+		y: i32,
+		callback: Box<dyn FnOnce(&mut Manager, i32, i32) -> Option<ActionRequest>>,
+	},
+}
+
 impl Manager {
-	pub fn pop_action(&mut self) {
+	pub fn pop_action(&mut self) -> Option<ActionRequest> {
 		let next_character = self.next_character();
 		let mut console = self.console.write();
 
 		let Some(action) = next_character.write().next_action.take() else {
-			return;
+			return None;
 		};
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
@@ -251,13 +260,41 @@ impl Manager {
 					}
 				};
 				if castable {
-					// Pass write access over the console to the lua runtime.
-					drop(console);
-					let () = self
-						.lua
-						.load(spell.on_cast.contents())
-						.call(next_character.clone())
-						.unwrap();
+					let x = next_character.read().x;
+					let y = next_character.read().y;
+					// Create a reference for the callback to use.
+					let caster = next_character.clone();
+
+					let target_callback =
+						move |world: &mut Manager, x: i32, y: i32| -> Option<ActionRequest> {
+							let Some(target) = world.get_character_at(x, y) else {
+								// Assume the player is giving up.
+								return None;
+							};
+							// TODO: This should return another action request to confirm that the player wants to target themselves
+
+							world.lua.sandbox(true).unwrap();
+
+							let affinity = spell.affinity(&caster.read());
+							let magnitude = spell
+								.magnitude
+								.as_ref()
+								.map(|x| affinity.magnitude(u32::evalv(x, &*caster.read())));
+
+							world.lua.globals().set("caster", caster).unwrap();
+							world.lua.globals().set("target", target.clone()).unwrap();
+							world.lua.globals().set("magnitude", magnitude).unwrap();
+							world.lua.globals().set("affinity", affinity).unwrap();
+
+							world.lua.load(spell.on_cast.contents()).exec().unwrap();
+							world.lua.sandbox(false).unwrap();
+							None
+						};
+					return Some(ActionRequest::BeginCursor {
+						x,
+						y,
+						callback: Box::new(target_callback),
+					});
 				} else {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
@@ -266,6 +303,7 @@ impl Manager {
 				}
 			}
 		};
+		None
 	}
 
 	/// # Errors
