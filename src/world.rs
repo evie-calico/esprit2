@@ -11,7 +11,7 @@ const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}"
 pub type CharacterRef = Arc<RwLock<character::Piece>>;
 
 /// This struct contains all information that is relevant during gameplay.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Manager {
 	// I know I'm going to have to change this in the future to add multiple worlds.
 	/// Where in the world the characters are.
@@ -27,6 +27,10 @@ pub struct Manager {
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
 	pub console: Arc<RwLock<Console>>,
+
+	/// Lua runtime for scripts operating on the world.
+	/// Configured to have access to most fields within this struct.
+	pub lua: mlua::Lua,
 }
 
 /// Contains information about what should generate on each floor.
@@ -70,6 +74,74 @@ pub struct Location {
 }
 
 impl Manager {
+	pub fn new(
+		party_blueprint: impl Iterator<Item = (Uuid, character::Sheet)>,
+		resources: &ResourceManager,
+	) -> Self {
+		let mut party = Vec::new();
+		let mut characters = Vec::new();
+
+		let mut player_controlled = true;
+
+		for (id, sheet) in party_blueprint {
+			let character = character::Piece {
+				player_controlled,
+				alliance: character::Alliance::Friendly,
+				..character::Piece::new(sheet.clone(), resources)
+			};
+			party.push(world::PartyReference::new(character.id, id));
+			characters.push(Arc::new(RwLock::new(character)));
+			player_controlled = false;
+		}
+
+		let console = Arc::new(RwLock::new(Console::default()));
+		let current_level = Arc::new(RwLock::new(world::Level::default()));
+
+		let lua = mlua::Lua::new();
+		lua.globals().set("Level", current_level.clone()).unwrap();
+		lua.globals().set("Console", console.clone()).unwrap();
+
+		world::Manager {
+			location: world::Location {
+				level: String::from("New Level"),
+				floor: 0,
+			},
+			console: Arc::new(RwLock::new(Console::default())),
+
+			current_level: Arc::new(RwLock::new(world::Level::default())),
+			current_floor: Floor::default(),
+			characters,
+			items: Vec::new(),
+
+			party,
+			inventory: vec![
+				"items/aloe".into(),
+				"items/apple".into(),
+				"items/blinkfruit".into(),
+				"items/fabric_shred".into(),
+				"items/grapes".into(),
+				"items/ice_cream".into(),
+				"items/lily".into(),
+				"items/pear_on_a_stick".into(),
+				"items/pear".into(),
+				"items/pepper".into(),
+				"items/purefruit".into(),
+				"items/raspberry".into(),
+				"items/reviver_seed".into(),
+				"items/ring_alt".into(),
+				"items/ring".into(),
+				"items/scarf".into(),
+				"items/slimy_apple".into(),
+				"items/super_pepper".into(),
+				"items/twig".into(),
+				"items/water_chestnut".into(),
+				"items/watermelon".into(),
+			],
+
+			lua,
+		}
+	}
+
 	// Returns none if no entity with the given uuid is currently loaded.
 	// This either mean they no longer exist, or they're on a different floor;
 	// either way they cannot be referenced.
@@ -179,16 +251,13 @@ impl Manager {
 					}
 				};
 				if castable {
-					// Pass write access to the console to the lua runtime.
+					// Pass write access over the console to the lua runtime.
 					drop(console);
-					let lua = mlua::Lua::new();
-					lua.globals()
-						.set("Level", self.current_level.clone())
+					let () = self
+						.lua
+						.load(spell.on_cast.contents())
+						.call(next_character.clone())
 						.unwrap();
-					lua.globals().set("Console", self.console.clone()).unwrap();
-					let chunk =
-						lua.load("local caster = ...; Console:print(caster.sheet.nouns.name..\" fired a magic missile.\")");
-					let () = chunk.call(next_character.clone()).unwrap();
 				} else {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)

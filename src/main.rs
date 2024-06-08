@@ -1,10 +1,8 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
-use parking_lot::RwLock;
 use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::process::exit;
-use std::sync::Arc;
 use tracing::*;
 use uuid::Uuid;
 
@@ -75,65 +73,14 @@ pub fn main() {
 		Options::default()
 	});
 	// Create a piece for the player, and register it with the world manager.
-	let party = [
+	let party_blueprint = [
 		(
 			Uuid::new_v4(),
 			resources.get_sheet("luvui").unwrap().clone(),
 		),
 		(Uuid::new_v4(), resources.get_sheet("aris").unwrap().clone()),
 	];
-	let player = character::Piece {
-		player_controlled: true,
-		alliance: character::Alliance::Friendly,
-		..character::Piece::new(party[0].1.clone(), &resources)
-	};
-	let ally = character::Piece {
-		player_controlled: false,
-		alliance: character::Alliance::Friendly,
-		..character::Piece::new(party[1].1.clone(), &resources)
-	};
-	let mut world_manager = world::Manager {
-		location: world::Location {
-			level: String::from("New Level"),
-			floor: 0,
-		},
-		console: Arc::new(RwLock::new(Console::default())),
-
-		current_level: Arc::new(RwLock::new(world::Level::default())),
-		current_floor: Floor::default(),
-		characters: Vec::new(),
-		items: Vec::new(),
-
-		party: vec![
-			world::PartyReference::new(player.id, party[0].0),
-			world::PartyReference::new(ally.id, party[1].0),
-		],
-		inventory: vec![
-			"items/aloe".into(),
-			"items/apple".into(),
-			"items/blinkfruit".into(),
-			"items/fabric_shred".into(),
-			"items/grapes".into(),
-			"items/ice_cream".into(),
-			"items/lily".into(),
-			"items/pear_on_a_stick".into(),
-			"items/pear".into(),
-			"items/pepper".into(),
-			"items/purefruit".into(),
-			"items/raspberry".into(),
-			"items/reviver_seed".into(),
-			"items/ring_alt".into(),
-			"items/ring".into(),
-			"items/scarf".into(),
-			"items/slimy_apple".into(),
-			"items/super_pepper".into(),
-			"items/twig".into(),
-			"items/water_chestnut".into(),
-			"items/watermelon".into(),
-		],
-	};
-	world_manager.characters.push(Arc::new(RwLock::new(player)));
-	world_manager.characters.push(Arc::new(RwLock::new(ally)));
+	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &resources);
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context

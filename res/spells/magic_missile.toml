@@ -5,3 +5,10 @@ energy = "Positive"
 harmony = "Order"
 
 level = 1
+
+[on_cast]
+type = "Inline"
+source = '''
+local caster = ...
+Console:print(caster.sheet.nouns.name.." fired a magic missile.")
+'''
