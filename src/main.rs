@@ -2,6 +2,7 @@ use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use sdl2::render::Texture;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
+use std::fs;
 use std::process::exit;
 use tracing::*;
 use uuid::Uuid;
@@ -69,8 +70,15 @@ pub fn main() {
 		}
 	};
 	let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_else(|msg| {
-		error!("failed to open options.toml: {msg}");
-		Options::default()
+		info!("failed to open options.toml ({msg}), initializing instead");
+		let options = Options::default();
+		if let Err(msg) = fs::write(
+			USER_DIRECTORY.join("options.toml"),
+			toml::to_string(&options).unwrap(),
+		) {
+			error!("failed to initialize options.toml: {msg}");
+		}
+		options
 	});
 	// Create a piece for the player, and register it with the world manager.
 	let party_blueprint = [
@@ -263,11 +271,15 @@ fn menu(
 	);
 
 	match input_mode {
-		input::Mode::Normal => menu.label("Normal", font),
-		input::Mode::Cast => menu.label("Cast", font),
-		input::Mode::Cursor { x, y, submitted: _ } => {
-			menu.label(&format!("Cursor ({x}, {y})"), font)
+		input::Mode::Normal => {
+			menu.label_color("Normal", options.ui.normal_mode_color.into(), font)
 		}
+		input::Mode::Cast => menu.label_color("Cast", options.ui.cast_mode_color.into(), font),
+		input::Mode::Cursor { x, y, submitted: _ } => menu.label_color(
+			&format!("Cursor ({x}, {y})"),
+			options.ui.cursor_mode_color.into(),
+			font,
+		),
 	}
 
 	match input_mode {

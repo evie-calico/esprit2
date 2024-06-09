@@ -54,6 +54,11 @@ impl Options {
 pub struct UserInterface {
 	pub pamphlet_width: u32,
 	pub console_height: u32,
+
+	pub normal_mode_color: (u8, u8, u8),
+	pub cast_mode_color: (u8, u8, u8),
+	pub cursor_mode_color: (u8, u8, u8),
+
 	pub font_size: u16,
 }
 
@@ -62,6 +67,11 @@ impl Default for UserInterface {
 		Self {
 			pamphlet_width: 400,
 			console_height: 200,
+
+			normal_mode_color: (0x77, 0xE7, 0xA2),
+			cast_mode_color: (0xA2, 0x77, 0xE7),
+			cursor_mode_color: (0xE7, 0xA2, 0x77),
+
 			font_size: 18,
 		}
 	}

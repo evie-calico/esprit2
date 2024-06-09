@@ -239,14 +239,10 @@ impl Manager {
 					console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				}
 				Err(MovementError::Attack(AttackError::Ally)) => {
-					self.console
-						.write()
-						.print_system("You can't attack your allies!".into());
+					console.print_system("You can't attack your allies!".into());
 				}
 				Err(MovementError::Attack(AttackError::NoAttacks)) => {
-					self.console
-						.write()
-						.print_system("You cannot perform any melee attacks right now.".into());
+					console.print_system("You cannot perform any melee attacks right now.".into());
 				}
 			},
 			character::Action::Cast(spell) => {

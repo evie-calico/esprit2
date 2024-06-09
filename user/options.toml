@@ -1,6 +1,10 @@
 [ui]
 pamphlet_width = 400
 console_height = 200
+normal_mode_color = [119, 231, 162]
+cast_mode_color = [162, 119, 231]
+cursor_mode_color = [231, 162, 119]
+font_size = 18
 
 [controls]
 left = [104, 1073741904, 1073741916]
@@ -11,3 +15,7 @@ up_left = [121, 1073741919]
 up_right = [117, 1073741921]
 down_left = [98, 1073741913]
 down_right = [110, 1073741915]
+talk = [116]
+cast = [122]
+confirm = [13]
+escape = [27]
