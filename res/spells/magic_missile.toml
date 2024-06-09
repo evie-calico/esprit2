@@ -12,6 +12,7 @@ type = "Inline"
 source = '''
 local damage = math.max(magnitude - target.sheet.stats.resistance, 0)
 target.hp -= damage
+caster.sp -= level
 
 local damage_messages = {
   "{self_Address}'s magic missile strikes {target_address}",

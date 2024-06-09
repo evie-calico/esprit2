@@ -246,16 +246,7 @@ impl Manager {
 				}
 			},
 			character::Action::Cast(spell) => {
-				let castable = {
-					let mut next_character = next_character.write();
-					if spell.castable_by(&next_character) {
-						next_character.sp -= spell.level as i32;
-						true
-					} else {
-						false
-					}
-				};
-				if castable {
+				if spell.castable_by(&next_character.read()) {
 					let x = next_character.read().x;
 					let y = next_character.read().y;
 					// Create a reference for the callback to use.
@@ -279,7 +270,9 @@ impl Manager {
 
 							world.lua.globals().set("caster", caster).unwrap();
 							world.lua.globals().set("target", target.clone()).unwrap();
+							// Maybe these should be members of the spell?
 							world.lua.globals().set("magnitude", magnitude).unwrap();
+							world.lua.globals().set("level", spell.level).unwrap();
 							world.lua.globals().set("affinity", affinity).unwrap();
 
 							world.lua.load(spell.on_cast.contents()).exec().unwrap();
@@ -295,7 +288,7 @@ impl Manager {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 							.replace_nouns(&next_character.read().sheet.read().nouns.read());
-					console.print_system(message);
+					self.console.write().print_system(message);
 				}
 			}
 		};

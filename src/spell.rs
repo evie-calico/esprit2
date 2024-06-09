@@ -159,6 +159,7 @@ impl<'de> serde::Deserialize<'de> for Script {
 
 impl Spell {
 	pub fn castable_by(&self, character: &character::Piece) -> bool {
+		// if this ever changes, a result should be returned instead to print more detailed messages.
 		character.sp >= self.level as i32
 	}
 
