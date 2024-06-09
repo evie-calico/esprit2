@@ -201,13 +201,15 @@ pub enum AttackError {
 	NoAttacks,
 }
 
+type CursorCallback = dyn FnOnce(&mut Manager, i32, i32) -> Option<ActionRequest>;
+
 /// Used to "escape" the world and request extra information, such as inputs.
 pub enum ActionRequest {
 	/// This callback will be called in place of `pop_action` once a position is selected.
 	BeginCursor {
 		x: i32,
 		y: i32,
-		callback: Box<dyn FnOnce(&mut Manager, i32, i32) -> Option<ActionRequest>>,
+		callback: Box<CursorCallback>,
 	},
 }
 
@@ -216,9 +218,7 @@ impl Manager {
 		let next_character = self.next_character();
 		let mut console = self.console.write();
 
-		let Some(action) = next_character.write().next_action.take() else {
-			return None;
-		};
+		let action = next_character.write().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
 				Ok(MovementResult::Attack(AttackResult::Hit { message, weak })) => {

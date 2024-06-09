@@ -2,11 +2,12 @@ use paste::paste;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, TextureQuery};
+use sdl2::render::TextureQuery;
 use sdl2::ttf::Font;
-use sdl2::video::Window;
 use std::collections::VecDeque;
 use std::sync::Arc;
+
+use crate::gui;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
@@ -154,7 +155,14 @@ impl Console {
 		}
 	}
 
-	pub fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, font: &Font) {
+	pub fn draw(&self, gui: &mut gui::Context, font: &Font) {
+		let canvas = &mut gui.canvas;
+		let rect = Rect::new(
+			gui.x,
+			gui.y,
+			(gui.rect.right() - gui.x) as u32,
+			(gui.rect.bottom() - gui.y) as u32,
+		);
 		let font_texture_creator = canvas.texture_creator();
 		canvas.set_clip_rect(rect);
 

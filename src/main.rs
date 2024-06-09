@@ -108,7 +108,6 @@ pub fn main() {
 		light_texture: resources.get_owned_texture("light").unwrap(),
 	};
 
-	// TODO: Display this on-screen.
 	let mut input_mode = input::Mode::Normal;
 	let mut action_request = None;
 	loop {
@@ -221,34 +220,14 @@ pub fn main() {
 		// Render User Interface
 		canvas.set_viewport(None);
 
-		let mut menu = gui::Context::new(
+		menu(
 			&mut canvas,
-			Rect::new(
-				0,
-				(window_size.1 - options.ui.console_height) as i32,
-				window_size.0 - options.ui.pamphlet_width,
-				options.ui.console_height,
-			),
+			window_size,
+			&options,
+			&font,
+			&input_mode,
+			&world_manager,
 		);
-
-		match input_mode {
-			input::Mode::Cast => {
-				spell_menu::draw(&mut menu, &world_manager.next_character().read(), &font);
-			}
-			_ => {
-				// Draw Console
-				world_manager.console.read().draw(
-					&mut canvas,
-					Rect::new(
-						0,
-						(window_size.1 - options.ui.console_height) as i32,
-						window_size.0 - options.ui.pamphlet_width,
-						options.ui.console_height,
-					),
-					&font,
-				);
-			}
-		}
 
 		// Draw pamphlet
 		pamphlet(
@@ -262,6 +241,42 @@ pub fn main() {
 		);
 
 		canvas.present();
+	}
+}
+
+fn menu(
+	canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+	window_size: (u32, u32),
+	options: &Options,
+	font: &sdl2::ttf::Font<'_, '_>,
+	input_mode: &input::Mode,
+	world_manager: &world::Manager,
+) {
+	let mut menu = gui::Context::new(
+		canvas,
+		Rect::new(
+			0,
+			(window_size.1 - options.ui.console_height) as i32,
+			window_size.0 - options.ui.pamphlet_width,
+			options.ui.console_height,
+		),
+	);
+
+	match input_mode {
+		input::Mode::Normal => menu.label("Normal", font),
+		input::Mode::Cast => menu.label("Cast", font),
+		input::Mode::Cursor { x, y, submitted: _ } => {
+			menu.label(&format!("Cursor ({x}, {y})"), font)
+		}
+	}
+
+	match input_mode {
+		input::Mode::Cast => {
+			spell_menu::draw(&mut menu, &world_manager.next_character().read(), font);
+		}
+		_ => {
+			world_manager.console.read().draw(&mut menu, font);
+		}
 	}
 }
 
