@@ -26,7 +26,7 @@ pub struct Manager {
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
-	pub console: Arc<RwLock<Console>>,
+	pub console: Console,
 
 	/// Lua runtime for scripts operating on the world.
 	/// Configured to have access to most fields within this struct.
@@ -94,12 +94,12 @@ impl Manager {
 			player_controlled = false;
 		}
 
-		let console = Arc::new(RwLock::new(Console::default()));
+		let console = Console::default();
 		let current_level = Arc::new(RwLock::new(world::Level::default()));
 
 		let lua = mlua::Lua::new();
 		lua.globals().set("Level", current_level.clone()).unwrap();
-		lua.globals().set("Console", console.clone()).unwrap();
+		lua.globals().set("Console", console.handle()).unwrap();
 
 		world::Manager {
 			location: world::Location {
@@ -216,33 +216,34 @@ pub enum ActionRequest {
 impl Manager {
 	pub fn pop_action(&mut self) -> Option<ActionRequest> {
 		let next_character = self.next_character();
-		let mut console = self.console.write();
 
 		let action = next_character.write().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
 				Ok(MovementResult::Attack(AttackResult::Hit { message, weak })) => {
-					let colors = &console.colors;
+					let colors = &self.console.colors;
 					let color = if weak {
 						colors.unimportant
 					} else {
 						colors.normal
 					};
-					console.print_colored(message, color);
+					self.console.print_colored(message, color);
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
 					let name = next_character.read().sheet.read().nouns.read().name.clone();
-					console.say(name, "Ouch!".into());
+					self.console.say(name, "Ouch!".into());
 				}
 				Err(MovementError::HitVoid) => {
-					console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
+					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				}
 				Err(MovementError::Attack(AttackError::Ally)) => {
-					console.print_system("You can't attack your allies!".into());
+					self.console
+						.print_system("You can't attack your allies!".into());
 				}
 				Err(MovementError::Attack(AttackError::NoAttacks)) => {
-					console.print_system("You cannot perform any melee attacks right now.".into());
+					self.console
+						.print_system("You cannot perform any melee attacks right now.".into());
 				}
 			},
 			character::Action::Cast(spell) => {
@@ -288,7 +289,7 @@ impl Manager {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 							.replace_nouns(&next_character.read().sheet.read().nouns.read());
-					self.console.write().print_system(message);
+					self.console.print_system(message);
 				}
 			}
 		};

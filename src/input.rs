@@ -56,9 +56,10 @@ pub fn world(
 							}
 
 							if options.controls.talk.contains(&(keycode as i32)) {
-								let mut console = world_manager.console.write();
-								console.say("Luvui".into(), "Meow!".into());
-								console.say("Aris".into(), "I am a kitty :3".into());
+								world_manager.console.say("Luvui".into(), "Meow!".into());
+								world_manager
+									.console
+									.say("Aris".into(), "I am a kitty :3".into());
 							}
 						}
 						Mode::Cast => {

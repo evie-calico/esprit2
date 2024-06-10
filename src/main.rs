@@ -180,7 +180,7 @@ pub fn main() {
 					}
 				}
 			}
-			world_manager.console.write().update(delta);
+			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
 		}
 
@@ -287,7 +287,7 @@ fn menu(
 			spell_menu::draw(&mut menu, &world_manager.next_character().read(), font);
 		}
 		_ => {
-			world_manager.console.read().draw(&mut menu, font);
+			world_manager.console.draw(&mut menu, font);
 		}
 	}
 }

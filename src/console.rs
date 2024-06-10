@@ -5,55 +5,25 @@ use sdl2::rect::Rect;
 use sdl2::render::TextureQuery;
 use sdl2::ttf::Font;
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 use crate::gui;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct Console {
+	message_reciever: mpsc::Receiver<Message>,
+	message_sender: mpsc::Sender<Message>,
 	history: Vec<Message>,
 	in_progress: VecDeque<usize>,
 	pub colors: Colors,
 }
 
-impl mlua::UserData for Console {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method_mut("print", |_, this, value: String| {
-			this.print(value);
-			Ok(())
-		});
-		methods.add_method_mut("print_unimportant", |_, this, value: String| {
-			this.print_unimportant(value);
-			Ok(())
-		});
-	}
-}
-
 #[derive(Clone, Debug)]
-pub struct Colors {
-	pub normal: Color,
-	pub system: Color,
-	pub unimportant: Color,
-	pub defeat: Color,
-	pub danger: Color,
-	pub important: Color,
-	pub special: Color,
-}
-
-impl Default for Colors {
-	fn default() -> Self {
-		Self {
-			normal: Color::WHITE,
-			system: Color::GREY,
-			unimportant: Color::GREY,
-			defeat: Color::RGB(255, 128, 128),
-			danger: Color::RED,
-			important: Color::YELLOW,
-			special: Color::GREEN,
-		}
-	}
+pub struct Handle {
+	message_sender: mpsc::Sender<Message>,
+	pub colors: Colors,
 }
 
 #[derive(Clone, Debug)]
@@ -69,7 +39,17 @@ pub struct Message {
 	printer: MessagePrinter,
 }
 
-macro_rules! colored_print {
+macro_rules! console_colored_print {
+	(normal) => {
+		pub fn print(&mut self, text: String) {
+			self.history.push(Message {
+				text,
+				color: self.colors.normal,
+				printer: MessagePrinter::Console,
+			});
+		}
+	};
+
 	($which:ident) => {
 		paste! {
 			pub fn [<print_ $which>](&mut self, text: String) {
@@ -83,46 +63,124 @@ macro_rules! colored_print {
 	};
 }
 
+macro_rules! handle_colored_print {
+	(normal) => {
+		$methods.add_method_mut("print", |_, this, value: String| {
+			this.message_sender
+				.send(Message {
+					text: value,
+					color: this.colors.normal,
+					printer: MessagePrinter::Console,
+				})
+				.map_err(mlua::Error::external)
+		});
+	};
+
+	($which:ident, $methods:ident) => {
+		paste! {
+			$methods.add_method_mut(concat!("print_", stringify!($which)), |_, this, value: String| {
+				this.message_sender
+					.send(Message {
+						text: value,
+						color: this.colors.$which,
+						printer: MessagePrinter::Console,
+					})
+					.map_err(mlua::Error::external)
+			});
+		}
+	};
+}
+
+macro_rules! impl_console {
+	($($colors:ident: $value:expr),+$(,)?) => {
+		#[derive(Clone, Debug)]
+		pub struct Colors {
+			$(pub $colors: Color,)*
+		}
+
+		impl Default for Colors {
+			fn default() -> Self {
+				Self {
+					$($colors: $value,)*
+				}
+			}
+		}
+
+		impl Console {
+			$(console_colored_print! { $colors } )*
+
+			pub fn print_colored(&mut self, text: String, color: Color) {
+				self.history.push(Message {
+					text,
+					color,
+					printer: MessagePrinter::Console,
+				});
+			}
+
+			pub fn say(&mut self, speaker: Arc<str>, text: String) {
+				self.history.push(Message {
+					text,
+					color: self.colors.normal,
+					printer: MessagePrinter::Dialogue {
+						speaker,
+						progress: 0.0,
+					},
+				});
+
+				self.in_progress.push_back(self.history.len() - 1);
+			}
+		}
+
+		impl mlua::UserData for Handle {
+			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+				$(handle_colored_print! { $colors, methods } )*
+			}
+		}
+	};
+}
+
+impl_console! {
+	normal: Color::WHITE,
+	system: Color::GREY,
+	unimportant: Color::GREY,
+	defeat: Color::RGB(255, 128, 128),
+	danger: Color::RED,
+	important: Color::YELLOW,
+	special: Color::GREEN,
+}
+
+impl Default for Console {
+	fn default() -> Self {
+		let (message_sender, message_reciever) = mpsc::channel();
+		Self {
+			message_reciever,
+			message_sender,
+			history: Vec::new(),
+			in_progress: VecDeque::new(),
+			colors: Colors::default(),
+		}
+	}
+}
+
 impl Console {
-	pub fn say(&mut self, speaker: Arc<str>, text: String) {
-		self.history.push(Message {
-			text,
-			color: self.colors.normal,
-			printer: MessagePrinter::Dialogue {
-				speaker,
-				progress: 0.0,
-			},
-		});
-
-		self.in_progress.push_back(self.history.len() - 1);
+	pub fn handle(&self) -> Handle {
+		Handle {
+			message_sender: self.message_sender.clone(),
+			colors: self.colors.clone(),
+		}
 	}
-
-	pub fn print(&mut self, text: String) {
-		self.history.push(Message {
-			text,
-			color: self.colors.normal,
-			printer: MessagePrinter::Console,
-		});
-	}
-
-	pub fn print_colored(&mut self, text: String, color: Color) {
-		self.history.push(Message {
-			text,
-			color,
-			printer: MessagePrinter::Console,
-		});
-	}
-
-	colored_print!(system);
-	colored_print!(unimportant);
-	colored_print!(danger);
-	colored_print!(defeat);
-	colored_print!(important);
-	colored_print!(special);
 }
 
 impl Console {
 	pub fn update(&mut self, delta: f64) {
+		for message in self.message_reciever.try_iter() {
+			let is_dialogue = matches!(message.printer, MessagePrinter::Dialogue { .. });
+			self.history.push(message);
+			if is_dialogue {
+				self.in_progress.push_back(self.history.len() - 1);
+			}
+		}
+
 		let delta_progress = delta / 0.1;
 
 		for i in &self.in_progress {
