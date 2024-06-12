@@ -319,23 +319,22 @@ fn pamphlet(
 			*window = Some(|player_window: &mut gui::Context| {
 				if let Some(piece) = world_manager.get_character(character_id.piece) {
 					let piece = piece.read();
-					let piece_sheet = piece.sheet.read();
-					let stats = &piece_sheet.stats;
+					let stats = &piece.sheet.stats;
 
 					player_window.label_color(
 						&format!(
 							"{} ({:08x})",
-							piece_sheet.nouns.read().name,
+							piece.sheet.nouns.name,
 							piece.id.as_fields().0
 						),
-						match piece_sheet.nouns.read().pronouns {
+						match piece.sheet.nouns.pronouns {
 							nouns::Pronouns::Female => Color::RGB(247, 141, 246),
 							nouns::Pronouns::Male => Color::RGB(104, 166, 232),
 							_ => Color::WHITE,
 						},
 						font,
 					);
-					player_window.label(&format!("Level {}", piece_sheet.level), font);
+					player_window.label(&format!("Level {}", piece.sheet.level), font);
 					player_window.label(&format!("HP: {}/{}", piece.hp, stats.heart), font);
 					player_window.progress_bar(
 						(piece.hp as f32) / (stats.heart as f32),
@@ -384,7 +383,7 @@ fn pamphlet(
 					}
 					player_window.advance(0, 10);
 					player_window.label("Spells", font);
-					let mut spells = piece_sheet.spells.iter().peekable();
+					let mut spells = piece.sheet.spells.iter().peekable();
 					while spells.peek().is_some() {
 						let textures_per_row = player_window.rect.width() / (32 + 8);
 						player_window.horizontal();

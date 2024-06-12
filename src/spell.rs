@@ -164,7 +164,7 @@ impl Spell {
 	}
 
 	pub fn affinity(&self, character: &character::Piece) -> Affinity {
-		match character.sheet.read().skillset {
+		match character.sheet.skillset {
 			Skillset::EnergyMajor { major, minor } => {
 				let minor_affinity = minor.is_some_and(|x| x == self.harmony);
 				if major == self.energy {

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use parking_lot::RwLock;
 use sdl2::pixels::Color;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -10,13 +9,13 @@ pub struct Piece {
 	#[alua(as_lua = "string", get)]
 	pub id: Uuid,
 	#[alua(get)]
-	pub sheet: Arc<RwLock<Sheet>>,
+	pub sheet: Sheet,
 
 	#[alua(get, set)]
 	pub hp: i32,
 	#[alua(get, set)]
 	pub sp: i32,
-	pub attacks: Vec<Attack>,
+	pub attacks: Vec<Arc<Attack>>,
 	pub spells: Vec<Arc<Spell>>,
 
 	#[alua(get, set)]
@@ -37,7 +36,7 @@ impl expression::Variables for Piece {
 		match s {
 			"hp" => Ok(self.hp as expression::Integer),
 			"sp" => Ok(self.sp as expression::Integer),
-			_ => self.sheet.read().get(s),
+			_ => self.sheet.get(s),
 		}
 	}
 }
@@ -54,9 +53,8 @@ impl Piece {
 		let spells = sheet
 			.spells
 			.iter()
-			.map(|x| Arc::new(resources.get_spell(x).unwrap().clone()))
+			.map(|x| resources.get_spell(x).unwrap().clone())
 			.collect();
-		let sheet = Arc::new(RwLock::new(sheet));
 
 		Self {
 			id: Uuid::new_v4(),
@@ -122,7 +120,7 @@ pub enum Alliance {
 pub struct Sheet {
 	/// Note that this includes the character's name.
 	#[alua(get)]
-	pub nouns: Arc<parking_lot::RwLock<Nouns>>,
+	pub nouns: Nouns,
 
 	#[alua(get)]
 	pub level: u32,

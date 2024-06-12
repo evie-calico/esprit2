@@ -17,7 +17,7 @@ pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
 	/// This is the level pointed to by `location.level`.
-	pub current_level: Arc<RwLock<Level>>,
+	pub current_level: Level,
 	pub current_floor: Floor,
 	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
 	pub characters: Vec<CharacterRef>,
@@ -95,10 +95,8 @@ impl Manager {
 		}
 
 		let console = Console::default();
-		let current_level = Arc::new(RwLock::new(world::Level::default()));
 
 		let lua = mlua::Lua::new();
-		lua.globals().set("Level", current_level.clone()).unwrap();
 		lua.globals().set("Console", console.handle()).unwrap();
 
 		world::Manager {
@@ -107,7 +105,7 @@ impl Manager {
 				floor: 0,
 			},
 			console,
-			current_level,
+			current_level: Level::default(),
 			current_floor: Floor::default(),
 			characters,
 			items: Vec::new(),
@@ -231,7 +229,7 @@ impl Manager {
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
-					let name = next_character.read().sheet.read().nouns.read().name.clone();
+					let name = next_character.read().sheet.nouns.name.clone();
 					self.console.say(name, "Ouch!".into());
 				}
 				Err(MovementError::HitVoid) => {
@@ -288,7 +286,7 @@ impl Manager {
 				} else {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-							.replace_nouns(&next_character.read().sheet.read().nouns.read());
+							.replace_nouns(&next_character.read().sheet.nouns);
 					self.console.print_system(message);
 				}
 			}
@@ -306,9 +304,7 @@ impl Manager {
 	) -> Result<AttackResult, AttackError> {
 		let (damage, message, weak) = {
 			let character = character_ref.read();
-			let character_sheet = character.sheet.read();
 			let target = target_ref.read();
-			let target_sheet = target.sheet.read();
 
 			if target.alliance == character.alliance {
 				return Err(AttackError::Ally);
@@ -330,7 +326,7 @@ impl Manager {
 
 			// Calculate damage
 			let damage =
-				u32::evalv(&attack.damage, &*character).saturating_sub(target_sheet.stats.defense);
+				u32::evalv(&attack.damage, &*character).saturating_sub(target.sheet.stats.defense);
 			let is_weak_attack = damage <= 1;
 
 			// TODO: Change this depending on the proportional amount of damage dealt.
@@ -351,8 +347,8 @@ impl Manager {
 			let mut message = message
 				.map(|s| s.as_str())
 				.unwrap_or(DEFAULT_ATTACK_MESSAGE)
-				.replace_prefixed_nouns(&character_sheet.nouns.read(), "self_")
-				.replace_prefixed_nouns(&target_sheet.nouns.read(), "target_");
+				.replace_prefixed_nouns(&character.sheet.nouns, "self_")
+				.replace_prefixed_nouns(&target.sheet.nouns, "target_");
 			message.push_str(damage_punctuation);
 			message.push_str(&format!(" (-{damage} HP)"));
 

@@ -5,6 +5,7 @@ use sdl2::video::WindowContext;
 use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{fs, io};
 use tracing::error;
 
@@ -49,8 +50,11 @@ struct TextureInfo<'texture> {
 pub struct ResourceManager<'texture> {
 	texture_creator: &'texture TextureCreator<WindowContext>,
 
-	attacks: Resource<Attack>,
-	spells: Resource<Spell>,
+	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Arc`.
+	attacks: Resource<Arc<Attack>>,
+	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Arc`.
+	spells: Resource<Arc<Spell>>,
+	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
 	sheets: Resource<character::Sheet>,
 	textures: Resource<TextureInfo<'texture>>,
 	vaults: Resource<Vault>,
@@ -167,11 +171,11 @@ impl<'texture> ResourceManager<'texture> {
 		self.sheets.get(path.as_ref())
 	}
 
-	pub fn get_attack(&self, path: impl AsRef<Path>) -> Option<&Attack> {
+	pub fn get_attack(&self, path: impl AsRef<Path>) -> Option<&Arc<Attack>> {
 		self.attacks.get(path.as_ref())
 	}
 
-	pub fn get_spell(&self, path: impl AsRef<Path>) -> Option<&Spell> {
+	pub fn get_spell(&self, path: impl AsRef<Path>) -> Option<&Arc<Spell>> {
 		self.spells.get(path.as_ref())
 	}
 
