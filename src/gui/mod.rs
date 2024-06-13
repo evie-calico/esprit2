@@ -1,11 +1,12 @@
-use std::ops::Range;
-
 use crate::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
 use sdl2::ttf::Font;
 use sdl2::video::{Window, WindowContext};
+use std::ops::Range;
+
+pub mod widget;
 
 pub struct Context<'canvas> {
 	pub canvas: &'canvas mut Canvas<Window>,
