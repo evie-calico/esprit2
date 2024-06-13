@@ -2,10 +2,40 @@ use crate::prelude::*;
 use sdl2::{event::Event, keyboard::Keycode};
 use tracing::warn;
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SinWave(u16);
+
+impl SinWave {
+	pub fn increment(&mut self, delta: f64) {
+		self.0 = self.0.wrapping_add((u16::MAX as f64 * delta) as u16);
+	}
+
+	pub fn as_sin_period(self) -> f64 {
+		(self.0 as f64) / (u16::MAX as f64) * std::f64::consts::TAU
+	}
+
+	pub fn sin(self) -> f64 {
+		self.as_sin_period().sin()
+	}
+}
+
+/// Anything beyond the bare minimum for cursor input.
+/// This doesn't have anything to do with input,
+/// but it is exclusive to the `Cursor` `input::Mode`.
+#[derive(Clone, Copy, Default)]
+pub struct CursorState {
+	pub float: SinWave,
+}
+
 pub enum Mode {
 	Normal,
 	Cast,
-	Cursor { x: i32, y: i32, submitted: bool },
+	Cursor {
+		x: i32,
+		y: i32,
+		submitted: bool,
+		state: CursorState,
+	},
 }
 
 pub struct Result {
@@ -81,6 +111,7 @@ pub fn world(
 							ref mut x,
 							ref mut y,
 							ref mut submitted,
+							..
 						} => {
 							if *submitted {
 								warn!("entering cursor mode after submission");

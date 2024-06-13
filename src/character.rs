@@ -3,7 +3,18 @@ use sdl2::pixels::Color;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use self::nouns::StrExt;
+
+fn replace_prefixed_nouns(
+	_lua: &mlua::Lua,
+	this: &mut Piece,
+	(prefix, string): (String, String),
+) -> mlua::Result<String> {
+	Ok(string.replace_prefixed_nouns(&this.sheet.nouns, &prefix))
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[alua(method = replace_prefixed_nouns)]
 pub struct Piece {
 	// These are nice and serializable :)
 	#[alua(as_lua = "string", get)]

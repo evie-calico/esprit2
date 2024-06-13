@@ -64,7 +64,7 @@ macro_rules! console_colored_print {
 }
 
 macro_rules! handle_colored_print {
-	(normal) => {
+	(normal, $methods:ident) => {
 		$methods.add_method_mut("print", |_, this, value: String| {
 			this.message_sender
 				.send(Message {

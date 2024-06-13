@@ -1,3 +1,4 @@
+use esprit2::nouns::StrExt;
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use sdl2::render::Texture;
@@ -6,6 +7,9 @@ use std::fs;
 use std::process::exit;
 use tracing::*;
 use uuid::Uuid;
+
+const TILE_SIZE: u32 = 64;
+const ITILE_SIZE: i32 = TILE_SIZE as i32;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -143,14 +147,13 @@ pub fn main() {
 							x,
 							y,
 							submitted: true,
+							..
 						} => {
 							input_mode = input::Mode::Normal;
 							action_request = callback(&mut world_manager, x, y);
 						}
 						input::Mode::Cursor {
-							x: _,
-							y: _,
-							submitted: false,
+							submitted: false, ..
 						} => {
 							// This match statement currently has ownership of `action_request`
 							// since the callback is `FnOnce`.
@@ -176,12 +179,16 @@ pub fn main() {
 							x,
 							y,
 							submitted: false,
+							state: input::CursorState::default(),
 						};
 					}
 				}
 			}
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
+			if let input::Mode::Cursor { state, .. } = &mut input_mode {
+				state.float.increment(delta);
+			}
 		}
 
 		// Rendering
@@ -208,7 +215,12 @@ pub fn main() {
 			for (y, tile) in col.enumerate() {
 				if *tile == floor::Tile::Wall {
 					canvas
-						.fill_rect(Rect::new((x as i32) * 64, (y as i32) * 64, 64, 64))
+						.fill_rect(Rect::new(
+							(x as i32) * ITILE_SIZE,
+							(y as i32) * ITILE_SIZE,
+							TILE_SIZE,
+							TILE_SIZE,
+						))
 						.unwrap();
 				}
 			}
@@ -220,9 +232,71 @@ pub fn main() {
 				.copy(
 					sleep_texture,
 					None,
-					Some(Rect::new(character.x * 64, character.y * 64, 64, 64)),
+					Some(Rect::new(
+						character.x * ITILE_SIZE,
+						character.y * ITILE_SIZE,
+						TILE_SIZE,
+						TILE_SIZE,
+					)),
 				)
 				.unwrap();
+		}
+
+		// Draw cursor
+		if let input::Mode::Cursor {
+			x,
+			y,
+			state: input::CursorState { float, .. },
+			..
+		} = input_mode
+		{
+			enum Side {
+				TopLeft,
+				TopRight,
+				BottomLeft,
+				BottomRight,
+			}
+
+			let cursor = resources.get_texture("cursor");
+			let cursor_info = cursor.query();
+			let cursor_scale = TILE_SIZE / 16;
+			let cursor_width = cursor_info.width * cursor_scale;
+			let cursor_height = cursor_info.height * cursor_scale;
+			let right_offset = ITILE_SIZE - cursor_width as i32;
+			let bottom_offset = ITILE_SIZE - cursor_height as i32;
+			let float = ((float.sin() + 1.0) * ((TILE_SIZE / 16) as f64)) as i32;
+
+			for side in [
+				Side::TopLeft,
+				Side::TopRight,
+				Side::BottomLeft,
+				Side::BottomRight,
+			] {
+				let (x_off, y_off) = match side {
+					Side::TopLeft => (-float, -float),
+					Side::TopRight => (right_offset + float, -float),
+					Side::BottomLeft => (-float, bottom_offset + float),
+					Side::BottomRight => (right_offset + float, bottom_offset + float),
+				};
+				let hflip = match side {
+					Side::TopLeft | Side::BottomLeft => false,
+					Side::TopRight | Side::BottomRight => true,
+				};
+				let vflip = match side {
+					Side::TopLeft | Side::TopRight => false,
+					Side::BottomLeft | Side::BottomRight => true,
+				};
+
+				let rect = Rect::new(
+					x * ITILE_SIZE + x_off,
+					y * ITILE_SIZE + y_off,
+					cursor_width,
+					cursor_height,
+				);
+				canvas
+					.copy_ex(cursor, None, Some(rect), 0.0, None, hflip, vflip)
+					.unwrap();
+			}
 		}
 
 		// Render User Interface
@@ -272,22 +346,20 @@ fn menu(
 
 	match input_mode {
 		input::Mode::Normal => {
-			menu.label_color("Normal", options.ui.normal_mode_color.into(), font)
+			menu.label_color("Normal", options.ui.normal_mode_color.into(), font);
+			world_manager.console.draw(&mut menu, font);
 		}
-		input::Mode::Cast => menu.label_color("Cast", options.ui.cast_mode_color.into(), font),
-		input::Mode::Cursor { x, y, submitted: _ } => menu.label_color(
-			&format!("Cursor ({x}, {y})"),
-			options.ui.cursor_mode_color.into(),
-			font,
-		),
-	}
-
-	match input_mode {
 		input::Mode::Cast => {
+			menu.label_color("Cast", options.ui.cast_mode_color.into(), font);
 			spell_menu::draw(&mut menu, &world_manager.next_character().read(), font);
 		}
-		_ => {
-			world_manager.console.draw(&mut menu, font);
+		input::Mode::Cursor { x, y, .. } => {
+			menu.label_color("Cursor", options.ui.cursor_mode_color.into(), font);
+			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
+				character_info(&mut menu, &selected_character.read(), font);
+			} else {
+				world_manager.console.draw(&mut menu, font);
+			}
 		}
 	}
 }
@@ -319,59 +391,8 @@ fn pamphlet(
 			*window = Some(|player_window: &mut gui::Context| {
 				if let Some(piece) = world_manager.get_character(character_id.piece) {
 					let piece = piece.read();
-					let stats = &piece.sheet.stats;
 
-					player_window.label_color(
-						&format!(
-							"{} ({:08x})",
-							piece.sheet.nouns.name,
-							piece.id.as_fields().0
-						),
-						match piece.sheet.nouns.pronouns {
-							nouns::Pronouns::Female => Color::RGB(247, 141, 246),
-							nouns::Pronouns::Male => Color::RGB(104, 166, 232),
-							_ => Color::WHITE,
-						},
-						font,
-					);
-					player_window.label(&format!("Level {}", piece.sheet.level), font);
-					player_window.label(&format!("HP: {}/{}", piece.hp, stats.heart), font);
-					player_window.progress_bar(
-						(piece.hp as f32) / (stats.heart as f32),
-						Color::GREEN,
-						Color::RED,
-						10,
-						5,
-					);
-					player_window.label(&format!("SP: {}/{}", piece.sp, stats.soul), font);
-					player_window.progress_bar(
-						(piece.sp as f32) / (stats.soul as f32),
-						Color::BLUE,
-						Color::RED,
-						10,
-						5,
-					);
-					let physical_stat_info = [("Pwr", stats.power), ("Def", stats.defense)];
-					let mut physical_stats = [None, None];
-					for ((stat_name, stat), stat_half) in physical_stat_info
-						.into_iter()
-						.zip(physical_stats.iter_mut())
-					{
-						*stat_half = Some(move |stat_half: &mut gui::Context| {
-							stat_half.label(&format!("{stat_name}: {stat}"), font)
-						});
-					}
-					player_window.hsplit(&mut physical_stats);
-					let magical_stat_info = [("Mag", stats.magic), ("Res", stats.resistance)];
-					let mut magical_stats = [None, None];
-					for ((stat_name, stat), stat_half) in
-						magical_stat_info.into_iter().zip(magical_stats.iter_mut())
-					{
-						*stat_half = Some(move |stat_half: &mut gui::Context| {
-							stat_half.label(&format!("{stat_name}: {stat}"), font)
-						});
-					}
-					player_window.hsplit(&mut magical_stats);
+					character_info(player_window, &piece, font);
 					player_window.advance(0, 10);
 					player_window.label("Attacks", font);
 					for attack in &piece.attacks {
@@ -455,4 +476,80 @@ fn pamphlet(
 		Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
 		Some(&mut souls_fn),
 	]);
+}
+
+fn character_info(
+	player_window: &mut gui::Context<'_>,
+	piece: &character::Piece,
+	font: &sdl2::ttf::Font<'_, '_>,
+) {
+	let character::Piece {
+		sheet:
+			character::Sheet {
+				nouns,
+				level,
+				stats:
+					character::Stats {
+						heart,
+						soul,
+						power,
+						defense,
+						magic,
+						resistance,
+					},
+				..
+			},
+		hp,
+		sp,
+		..
+	} = piece;
+	let name = &nouns.name;
+
+	player_window.label_color(
+		&format!("{name} ({:08x})", piece.id.as_fields().0),
+		match piece.sheet.nouns.pronouns {
+			nouns::Pronouns::Female => Color::RGB(247, 141, 246),
+			nouns::Pronouns::Male => Color::RGB(104, 166, 232),
+			_ => Color::WHITE,
+		},
+		font,
+	);
+	player_window.label(&format!("Level {level}"), font);
+	player_window.label(&format!("HP: {hp}/{heart}"), font);
+	player_window.progress_bar(
+		(*hp as f32) / (*heart as f32),
+		Color::GREEN,
+		Color::RED,
+		10,
+		5,
+	);
+	player_window.label(&format!("SP: {sp}/{soul}"), font);
+	player_window.progress_bar(
+		(*sp as f32) / (*soul as f32),
+		Color::BLUE,
+		Color::RED,
+		10,
+		5,
+	);
+	let physical_stat_info = [("Pwr", power), ("Def", defense)];
+	let mut physical_stats = [None, None];
+	for ((stat_name, stat), stat_half) in physical_stat_info
+		.into_iter()
+		.zip(physical_stats.iter_mut())
+	{
+		*stat_half = Some(move |stat_half: &mut gui::Context| {
+			stat_half.label(&format!("{stat_name}: {stat}"), font)
+		});
+	}
+	player_window.hsplit(&mut physical_stats);
+	let magical_stat_info = [("Mag", magic), ("Res", resistance)];
+	let mut magical_stats = [None, None];
+	for ((stat_name, stat), stat_half) in
+		magical_stat_info.into_iter().zip(magical_stats.iter_mut())
+	{
+		*stat_half = Some(move |stat_half: &mut gui::Context| {
+			stat_half.label(&format!("{stat_name}: {stat}"), font)
+		});
+	}
+	player_window.hsplit(&mut magical_stats);
 }

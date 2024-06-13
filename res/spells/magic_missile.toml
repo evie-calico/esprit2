@@ -34,7 +34,13 @@ local unskilled_messages = {
 }
 
 function pick(table)
-  return table[math.random(#table)]
+  return target:replace_prefixed_nouns(
+    "target_",
+    caster:replace_prefixed_nouns(
+      "self_",
+      table[math.random(#table)]
+    )
+  )
 end
 
 if damage == 0 and affinity:weak() and math.random(0, 1) == 1 then
