@@ -156,21 +156,25 @@ impl CloudState {
 		let width = rect.width() as i16;
 		let height = rect.height() as i16;
 		let spacing = radius;
-		canvas
-			.rounded_box(bx, by, bx + width, by + height, radius, color)
-			.unwrap();
 
 		let cloud_width = width / radius;
 		let cloud_height = height / radius;
 
 		let mut last_random = xorshift(self.current_seed);
 		let mut next_random = xorshift(self.next_seed);
-		for (x, y) in (0..=cloud_width)
+		for (x, y) in (1..cloud_width)
 			.map(|x| (x, 0))
-			.chain((0..=cloud_height).map(|y| (0, y)))
-			.chain((0..=cloud_width).map(|x| (x, cloud_height)))
-			.chain((0..=cloud_height).map(|y| (cloud_width, y)))
+			.chain((1..cloud_height).map(|y| (0, y)))
+			.chain((1..cloud_width).map(|x| (x, cloud_height)))
+			.chain((1..cloud_height).map(|y| (cloud_width, y)))
 		{
+			let bias = 0.2;
+			let x_middle_weight =
+				(x as f64 / cloud_width as f64 * std::f64::consts::PI).sin() * (1.0 - bias) + bias;
+			let y_middle_weight =
+				(y as f64 / cloud_height as f64 * std::f64::consts::PI).sin() * (1.0 - bias) + bias;
+			let weight = x_middle_weight.max(y_middle_weight);
+
 			let is_active = |rand| rand & 1 == 0;
 			let last_radius = if is_active(last_random) {
 				radius / 4 * 3
@@ -185,10 +189,37 @@ impl CloudState {
 			let percent = self.timer % 1.0;
 			let radius = last_radius as f64 * (1.0 - percent) + next_radius as f64 * (percent);
 			canvas
-				.filled_circle(bx + x * spacing, by + y * spacing, radius as i16, color)
+				.filled_circle(
+					bx + x * spacing,
+					by + y * spacing,
+					(radius * weight) as i16,
+					color,
+				)
 				.unwrap();
 			last_random = xorshift(last_random);
 			next_random = xorshift(next_random);
+		}
+
+		// fill in the corners to hide sharp edges
+		for (x, y) in [
+			(
+				rect.left() as i16 + radius / 3,
+				rect.top() as i16 + radius / 3,
+			),
+			(
+				rect.right() as i16 - radius / 3,
+				rect.top() as i16 + radius / 3,
+			),
+			(
+				rect.left() as i16 + radius / 3,
+				rect.bottom() as i16 - radius / 3,
+			),
+			(
+				rect.right() as i16 - radius / 3,
+				rect.bottom() as i16 - radius / 3,
+			),
+		] {
+			canvas.filled_circle(x, y, radius / 2, color).unwrap();
 		}
 	}
 }
