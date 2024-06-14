@@ -16,6 +16,7 @@
 pub mod attack;
 pub mod character;
 pub mod console;
+pub mod draw;
 pub mod expression;
 pub mod floor;
 pub mod gui;

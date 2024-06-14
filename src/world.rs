@@ -139,6 +139,58 @@ impl Manager {
 		}
 	}
 
+	pub fn update(
+		&mut self,
+		action_request: Option<world::ActionRequest>,
+		input_mode: &mut input::Mode,
+	) -> Option<world::ActionRequest> {
+		match action_request {
+			Some(world::ActionRequest::BeginCursor { x, y, callback }) => {
+				match *input_mode {
+					input::Mode::Cursor {
+						x,
+						y,
+						submitted: true,
+						..
+					} => {
+						*input_mode = input::Mode::Normal;
+						callback(self, x, y)
+					}
+					input::Mode::Cursor {
+						submitted: false, ..
+					} => {
+						// This match statement currently has ownership of `action_request`
+						// since the callback is `FnOnce`.
+						// Because of this, `action_request` needs to be reconstructed in all match arms,
+						// even if this is a no-op.
+						Some(world::ActionRequest::BeginCursor { x, y, callback })
+					}
+					_ => {
+						// If cursor mode is cancelled in any way, the callback will be destroyed.
+						None
+					}
+				}
+			}
+			None => {
+				let action_request = self.pop_action();
+
+				// Set up any new action requests.
+				if let Some(world::ActionRequest::BeginCursor { x, y, callback: _ }) =
+					action_request
+				{
+					*input_mode = input::Mode::Cursor {
+						x,
+						y,
+						submitted: false,
+						state: input::CursorState::default(),
+					};
+				}
+
+				action_request
+			}
+		}
+	}
+
 	// Returns none if no entity with the given uuid is currently loaded.
 	// This either mean they no longer exist, or they're on a different floor;
 	// either way they cannot be referenced.

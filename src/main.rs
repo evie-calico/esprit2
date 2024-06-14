@@ -6,9 +6,6 @@ use std::process::exit;
 use tracing::*;
 use uuid::Uuid;
 
-const TILE_SIZE: u32 = 64;
-const ITILE_SIZE: i32 = TILE_SIZE as i32;
-
 fn update_delta(
 	last_time: &mut f64,
 	current_time: &mut f64,
@@ -112,50 +109,7 @@ pub fn main() {
 		{
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 
-			match action_request {
-				Some(world::ActionRequest::BeginCursor { x, y, callback }) => {
-					match input_mode {
-						input::Mode::Cursor {
-							x,
-							y,
-							submitted: true,
-							..
-						} => {
-							input_mode = input::Mode::Normal;
-							action_request = callback(&mut world_manager, x, y);
-						}
-						input::Mode::Cursor {
-							submitted: false, ..
-						} => {
-							// This match statement currently has ownership of `action_request`
-							// since the callback is `FnOnce`.
-							// Because of this, `action_request` needs to be reconstructed in all match arms,
-							// even if this is a no-op.
-							action_request =
-								Some(world::ActionRequest::BeginCursor { x, y, callback })
-						}
-						_ => {
-							// If cursor mode is cancelled in any way, the callback will be destroyed.
-							action_request = None;
-						}
-					}
-				}
-				None => {
-					action_request = world_manager.pop_action();
-
-					// Set up any new action requests.
-					if let Some(world::ActionRequest::BeginCursor { x, y, callback: _ }) =
-						action_request
-					{
-						input_mode = input::Mode::Cursor {
-							x,
-							y,
-							submitted: false,
-							state: input::CursorState::default(),
-						};
-					}
-				}
-			}
+			action_request = world_manager.update(action_request, &mut input_mode);
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
 			if let input::Mode::Cursor { state, .. } = &mut input_mode {
@@ -181,95 +135,9 @@ pub fn main() {
 			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
 			.unwrap();
 
-		// Draw tilemap
-		canvas.set_draw_color(Color::WHITE);
-		for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
-			for (y, tile) in col.enumerate() {
-				if *tile == floor::Tile::Wall {
-					canvas
-						.fill_rect(Rect::new(
-							(x as i32) * ITILE_SIZE,
-							(y as i32) * ITILE_SIZE,
-							TILE_SIZE,
-							TILE_SIZE,
-						))
-						.unwrap();
-				}
-			}
-		}
-
-		// Draw characters
-		for character in world_manager.characters.iter().map(|x| x.read()) {
-			canvas
-				.copy(
-					sleep_texture,
-					None,
-					Some(Rect::new(
-						character.x * ITILE_SIZE,
-						character.y * ITILE_SIZE,
-						TILE_SIZE,
-						TILE_SIZE,
-					)),
-				)
-				.unwrap();
-		}
-
-		// Draw cursor
-		if let input::Mode::Cursor {
-			x,
-			y,
-			state: input::CursorState { float, .. },
-			..
-		} = input_mode
-		{
-			enum Side {
-				TopLeft,
-				TopRight,
-				BottomLeft,
-				BottomRight,
-			}
-
-			let cursor = resources.get_texture("cursor");
-			let cursor_info = cursor.query();
-			let cursor_scale = TILE_SIZE / 16;
-			let cursor_width = cursor_info.width * cursor_scale;
-			let cursor_height = cursor_info.height * cursor_scale;
-			let right_offset = ITILE_SIZE - cursor_width as i32;
-			let bottom_offset = ITILE_SIZE - cursor_height as i32;
-			let float = ((float.sin() + 1.0) * ((TILE_SIZE / 16) as f64)) as i32;
-
-			for side in [
-				Side::TopLeft,
-				Side::TopRight,
-				Side::BottomLeft,
-				Side::BottomRight,
-			] {
-				let (x_off, y_off) = match side {
-					Side::TopLeft => (-float, -float),
-					Side::TopRight => (right_offset + float, -float),
-					Side::BottomLeft => (-float, bottom_offset + float),
-					Side::BottomRight => (right_offset + float, bottom_offset + float),
-				};
-				let hflip = match side {
-					Side::TopLeft | Side::BottomLeft => false,
-					Side::TopRight | Side::BottomRight => true,
-				};
-				let vflip = match side {
-					Side::TopLeft | Side::TopRight => false,
-					Side::BottomLeft | Side::BottomRight => true,
-				};
-
-				let rect = Rect::new(
-					x * ITILE_SIZE + x_off,
-					y * ITILE_SIZE + y_off,
-					cursor_width,
-					cursor_height,
-				);
-				canvas
-					.copy_ex(cursor, None, Some(rect), 0.0, None, hflip, vflip)
-					.unwrap();
-			}
-		}
+		draw::tilemap(&mut canvas, &world_manager);
+		draw::characters(&world_manager, &mut canvas, sleep_texture);
+		draw::cursor(&input_mode, &resources, &mut canvas);
 
 		// Render User Interface
 		canvas.set_viewport(None);
