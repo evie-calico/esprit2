@@ -125,7 +125,7 @@ impl<'canvas> Context<'canvas> {
 	pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {
 		let font_texture = font
 			.render(s)
-			.shaded(color, Color::BLACK)
+			.blended(color)
 			.unwrap()
 			.as_texture(&self.font_texture_creator)
 			.unwrap();
@@ -138,6 +138,41 @@ impl<'canvas> Context<'canvas> {
 			)
 			.unwrap();
 		// I feel like this drop is kinda silly?
+		drop(font_texture);
+
+		self.advance(width, height);
+	}
+
+	pub fn opposing_labels(&mut self, s1: &str, s2: &str, color: Color, font: &Font) {
+		let font_texture = font
+			.render(s1)
+			.blended(color)
+			.unwrap()
+			.as_texture(&self.font_texture_creator)
+			.unwrap();
+		let TextureQuery { width, height, .. } = font_texture.query();
+		self.canvas
+			.copy(
+				&font_texture,
+				None,
+				Rect::new(self.x, self.y, width, height),
+			)
+			.unwrap();
+		drop(font_texture);
+		let font_texture = font
+			.render(s2)
+			.blended(color)
+			.unwrap()
+			.as_texture(&self.font_texture_creator)
+			.unwrap();
+		let TextureQuery { width, height, .. } = font_texture.query();
+		self.canvas
+			.copy(
+				&font_texture,
+				None,
+				Rect::new((self.rect.width() - width) as i32, self.y, width, height),
+			)
+			.unwrap();
 		drop(font_texture);
 
 		self.advance(width, height);

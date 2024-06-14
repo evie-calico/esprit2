@@ -48,6 +48,14 @@ impl Default for Level {
 	}
 }
 
+/// Anything not strictly tied to the party reference's "logic",
+/// but still associated with its rendering
+#[derive(Clone, Default, Debug)]
+pub struct PartyReferenceDrawState {
+	pub cloud: draw::CloudState,
+	pub cloud_trail: draw::CloudTrail,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
@@ -55,12 +63,27 @@ pub struct PartyReference {
 	/// This party member's ID within the party.
 	/// Used for saving data.
 	pub member: Uuid,
+	/// Displayed on the pamphlet.
+	pub accent_color: (u8, u8, u8),
+	#[serde(skip)]
+	pub draw_state: PartyReferenceDrawState,
 }
 
 impl PartyReference {
-	pub fn new(piece: Uuid, member: Uuid) -> Self {
-		Self { piece, member }
+	pub fn new(piece: Uuid, member: Uuid, accent_color: (u8, u8, u8)) -> Self {
+		Self {
+			piece,
+			member,
+			accent_color,
+			draw_state: PartyReferenceDrawState::default(),
+		}
 	}
+}
+
+// this is probably uneccessary and just makes main.rs look nicer
+pub struct PartyReferenceBase {
+	pub sheet: &'static str,
+	pub accent_color: (u8, u8, u8),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -75,7 +98,7 @@ pub struct Location {
 
 impl Manager {
 	pub fn new(
-		party_blueprint: impl Iterator<Item = (Uuid, character::Sheet)>,
+		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
 		resources: &ResourceManager,
 	) -> Self {
 		let mut party = Vec::new();
@@ -83,13 +106,22 @@ impl Manager {
 
 		let mut player_controlled = true;
 
-		for (id, sheet) in party_blueprint {
+		for PartyReferenceBase {
+			sheet,
+			accent_color,
+		} in party_blueprint
+		{
+			let sheet = resources.get_sheet(sheet).unwrap();
 			let character = character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
 				..character::Piece::new(sheet.clone(), resources)
 			};
-			party.push(world::PartyReference::new(character.id, id));
+			party.push(world::PartyReference::new(
+				character.id,
+				Uuid::new_v4(),
+				accent_color,
+			));
 			characters.push(Arc::new(RwLock::new(character)));
 			player_controlled = false;
 		}

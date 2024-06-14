@@ -50,7 +50,7 @@ pub fn menu(
 		input::Mode::Cursor { x, y, .. } => {
 			menu.label_color("Cursor", options.ui.cursor_mode_color.into(), font);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
-				character_info(menu, &selected_character.read(), font);
+				character_info(menu, &selected_character.read(), Color::WHITE, font);
 			} else {
 				world_manager.console.draw(menu, font);
 			}
@@ -74,32 +74,10 @@ pub fn pamphlet(
 			*window = Some(|player_window: &mut gui::Context| {
 				if let Some(piece) = world_manager.get_character(character_id.piece) {
 					let piece = piece.read();
-
-					character_info(player_window, &piece, font);
-					player_window.advance(0, 10);
-					player_window.label("Attacks", font);
-					for attack in &piece.attacks {
-						player_window.horizontal();
-						player_window.label(&attack.name, font);
-						player_window.advance(20, 0);
-						player_window.expression::<character::Stats>(&attack.damage, font);
-						player_window.vertical();
-					}
-					player_window.advance(0, 10);
-					player_window.label("Spells", font);
-					let mut spells = piece.sheet.spells.iter().peekable();
-					while spells.peek().is_some() {
-						let textures_per_row = player_window.rect.width() / (32 + 8);
-						player_window.horizontal();
-						for _ in 0..textures_per_row {
-							if let Some(spell) = spells.next() {
-								player_window.htexture(resources.get_texture(spell), 32);
-								player_window.advance(8, 0);
-							}
-						}
-						player_window.vertical();
-						player_window.advance(8, 8);
-					}
+					let texture = resources.get_texture("luvui_sleep");
+					character_thinking(character_id, player_window, texture, |player_window| {
+						character_info(player_window, &piece, Color::WHITE, font);
+					});
 				} else {
 					// If the party array also had a reference to the character's last known character sheet,
 					// a name could be displayed here.
@@ -161,9 +139,96 @@ pub fn pamphlet(
 	]);
 }
 
+fn character_thinking(
+	character_id: &world::PartyReference,
+	player_window: &mut gui::Context<'_>,
+	texture: &Texture,
+	f: impl FnOnce(&mut gui::Context),
+) {
+	on_cloud(
+		&character_id.draw_state.cloud,
+		20,
+		character_id.accent_color.into(),
+		player_window,
+		f,
+	);
+	let center = player_window.x + player_window.rect.width() as i32 * 2 / 3;
+	let corner = player_window.x + player_window.rect.width() as i32 * 9 / 10;
+	character_id.draw_state.cloud_trail.draw(
+		player_window.canvas,
+		center,
+		player_window.y + 10,
+		corner,
+		player_window.y - 25,
+		15.0,
+		4,
+		character_id.accent_color.into(),
+	);
+	let query = texture.query();
+	let width = query.width * 4;
+	let height = query.height * 4;
+	player_window
+		.canvas
+		.copy(
+			texture,
+			None,
+			Rect::new(center - (width / 2) as i32, player_window.y, width, height),
+		)
+		.unwrap();
+	player_window.advance(0, 10 + height);
+}
+
+fn on_cloud(
+	cloud: &draw::CloudState,
+	radius: u32,
+	color: Color,
+	pamphlet: &mut gui::Context<'_>,
+	f: impl FnOnce(&mut gui::Context),
+) {
+	let width = pamphlet.rect.width();
+	let height = pamphlet.rect.height();
+
+	let texture_creator = pamphlet.canvas.texture_creator();
+	let mut player_texture = texture_creator
+		.create_texture_target(texture_creator.default_pixel_format(), width, height)
+		.unwrap();
+	let mut height_used = 0;
+
+	pamphlet
+		.canvas
+		.with_texture_canvas(&mut player_texture, |canvas| {
+			canvas.set_draw_color(color);
+			canvas.clear();
+			let mut gui = gui::Context::new(
+				canvas,
+				Rect::new(0, 0, width - radius * 2, height - radius * 2),
+			);
+			f(&mut gui);
+			height_used = gui.y as u32;
+		})
+		.unwrap();
+	let target = Rect::new(
+		pamphlet.x + radius as i32,
+		pamphlet.y + radius as i32,
+		width - radius * 2,
+		height_used,
+	);
+	cloud.draw(pamphlet.canvas, target, radius as i16, color);
+	pamphlet
+		.canvas
+		.copy(
+			&player_texture,
+			Rect::new(0, 0, width - radius * 2, height_used),
+			target,
+		)
+		.unwrap();
+	pamphlet.advance(width, height_used + radius * 2);
+}
+
 fn character_info(
 	player_window: &mut gui::Context<'_>,
 	piece: &character::Piece,
+	color: Color,
 	font: &sdl2::ttf::Font<'_, '_>,
 ) {
 	let character::Piece {
@@ -188,17 +253,8 @@ fn character_info(
 	} = piece;
 	let name = &nouns.name;
 
-	player_window.label_color(
-		&format!("{name} ({:08x})", piece.id.as_fields().0),
-		match piece.sheet.nouns.pronouns {
-			nouns::Pronouns::Female => Color::RGB(247, 141, 246),
-			nouns::Pronouns::Male => Color::RGB(104, 166, 232),
-			_ => Color::WHITE,
-		},
-		font,
-	);
-	player_window.label(&format!("Level {level}"), font);
-	player_window.label(&format!("HP: {hp}/{heart}"), font);
+	player_window.opposing_labels(name, &format!("Level {level}"), color, font);
+	player_window.label_color(&format!("HP: {hp}/{heart}"), color, font);
 	player_window.progress_bar(
 		(*hp as f32) / (*heart as f32),
 		Color::GREEN,
@@ -206,7 +262,7 @@ fn character_info(
 		10,
 		5,
 	);
-	player_window.label(&format!("SP: {sp}/{soul}"), font);
+	player_window.label_color(&format!("SP: {sp}/{soul}"), color, font);
 	player_window.progress_bar(
 		(*sp as f32) / (*soul as f32),
 		Color::BLUE,
@@ -221,7 +277,7 @@ fn character_info(
 		.zip(physical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"), font)
+			stat_half.label_color(&format!("{stat_name}: {stat}"), color, font)
 		});
 	}
 	player_window.hsplit(&mut physical_stats);
@@ -231,7 +287,7 @@ fn character_info(
 		magical_stat_info.into_iter().zip(magical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"), font)
+			stat_half.label_color(&format!("{stat_name}: {stat}"), color, font)
 		});
 	}
 	player_window.hsplit(&mut magical_stats);

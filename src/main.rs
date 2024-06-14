@@ -4,7 +4,6 @@ use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::fs;
 use std::process::exit;
 use tracing::*;
-use uuid::Uuid;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -68,11 +67,14 @@ pub fn main() {
 	});
 	// Create a piece for the player, and register it with the world manager.
 	let party_blueprint = [
-		(
-			Uuid::new_v4(),
-			resources.get_sheet("luvui").unwrap().clone(),
-		),
-		(Uuid::new_v4(), resources.get_sheet("aris").unwrap().clone()),
+		world::PartyReferenceBase {
+			sheet: "luvui",
+			accent_color: (0xDA, 0x2D, 0x5C),
+		},
+		world::PartyReferenceBase {
+			sheet: "aris",
+			accent_color: (0x0C, 0x94, 0xFF),
+		},
 	];
 	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &resources);
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
@@ -109,6 +111,10 @@ pub fn main() {
 		{
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 
+			for i in &mut world_manager.party {
+				i.draw_state.cloud.tick(delta);
+				i.draw_state.cloud_trail.tick(delta / 4.0);
+			}
 			action_request = world_manager.update(action_request, &mut input_mode);
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
@@ -119,7 +125,7 @@ pub fn main() {
 
 		// Rendering
 		// Clear the screen.
-		canvas.set_draw_color(Color::RGB(0, 0, 0));
+		canvas.set_draw_color(Color::RGB(20, 20, 20));
 		canvas.clear();
 
 		// Configure world viewport.
