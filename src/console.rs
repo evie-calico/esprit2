@@ -231,7 +231,7 @@ impl Console {
 				MessagePrinter::Console => {
 					let font_texture = font
 						.render(&message.text)
-						.shaded(message.color, Color::BLACK)
+						.blended(message.color)
 						.unwrap()
 						.as_texture(&font_texture_creator)
 						.unwrap();

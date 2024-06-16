@@ -1,3 +1,5 @@
+use std::f64::consts::{PI, TAU};
+
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -5,6 +7,8 @@ use sdl2::rect::Point;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use sdl2::{pixels::Color, rect::Rect};
+
+use self::gui::widget::pamphlet;
 
 const TILE_SIZE: u32 = 64;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
@@ -292,6 +296,28 @@ impl CloudyWave {
 				radius as u32 * 2,
 			);
 			pamphlet.canvas.fill_rect(rect).unwrap();
+		}
+
+		let mut seed = 0x12345678;
+		for _ in 0..(pamphlet.rect.width() * pamphlet.rect.height() / 9000) {
+			seed = xorshift(seed);
+			let twinkle = seed % 3 == 0
+				&& (self.timer + TAU * (xorshift(seed) as f64 / u32::MAX as f64)) % TAU > 5.0;
+			if twinkle {
+				continue;
+			}
+			let x = pamphlet.rect.x
+				+ radius as i32 + (pamphlet.rect.width() as f64 * (seed & 0xFFFF) as f64
+				/ u16::MAX as f64) as i32;
+			let y = pamphlet.rect.y
+				+ (pamphlet.rect.height() as f64 * (seed >> 16) as f64 / u16::MAX as f64) as i32;
+			let color = match y % 3 {
+				0 => Color::RED,
+				1 => Color::GREEN,
+				_ => Color::BLUE,
+			};
+			pamphlet.canvas.set_draw_color(color);
+			pamphlet.canvas.draw_point((x, y)).unwrap();
 		}
 	}
 }

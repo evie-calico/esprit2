@@ -94,19 +94,54 @@ pub fn pamphlet(
 	resources: &ResourceManager<'_>,
 	soul_jar: &mut SoulJar<'_>,
 ) {
-	pamphlet.label("Forest: Floor 1/8", font);
-	pamphlet.advance(0, 10);
+	pamphlet.advance(0, 32);
+	struct MemberPosition {
+		x: i32,
+		y: i32,
+		flipped: bool,
+	}
+	let member_layout = [
+		MemberPosition {
+			x: -30,
+			y: -30,
+			flipped: false,
+		},
+		MemberPosition {
+			x: -40,
+			y: 0,
+			flipped: true,
+		},
+	];
 	// Draw party stats
-	for character_chunk in world_manager.party.chunks(2) {
+	for (character_chunk, layout_chunk) in
+		world_manager.party.chunks(2).zip(member_layout.chunks(2))
+	{
 		let mut character_windows = [None, None];
-		for (character_id, window) in character_chunk.iter().zip(character_windows.iter_mut()) {
+		for ((character_id, window), layout) in character_chunk
+			.iter()
+			.zip(character_windows.iter_mut())
+			.zip(layout_chunk)
+		{
 			*window = Some(|player_window: &mut gui::Context| {
+				let rect = player_window.rect;
+				player_window.relocate(Rect::new(
+					rect.x + layout.x,
+					rect.y + layout.y,
+					rect.width(),
+					rect.height(),
+				));
 				if let Some(piece) = world_manager.get_character(character_id.piece) {
 					let piece = piece.read();
 					let texture = resources.get_texture("luvui_sleep");
-					character_thinking(character_id, player_window, texture, |player_window| {
-						character_info(player_window, &piece, Color::WHITE, font);
-					});
+					character_thinking(
+						character_id,
+						player_window,
+						texture,
+						layout.flipped,
+						|player_window| {
+							character_info(player_window, &piece, Color::WHITE, font);
+						},
+					);
 				} else {
 					// If the party array also had a reference to the character's last known character sheet,
 					// a name could be displayed here.
@@ -172,6 +207,7 @@ fn character_thinking(
 	character_id: &world::PartyReference,
 	player_window: &mut gui::Context<'_>,
 	texture: &Texture,
+	flipped: bool,
 	f: impl FnOnce(&mut gui::Context),
 ) {
 	on_cloud(
@@ -181,11 +217,12 @@ fn character_thinking(
 		player_window,
 		f,
 	);
-	let center = player_window.x + player_window.rect.width() as i32 * 2 / 3;
+	let center =
+		player_window.x + player_window.rect.width() as i32 * if flipped { 1 } else { 2 } / 3;
 	let corner = player_window.x + player_window.rect.width() as i32 * 9 / 10;
 	character_id.draw_state.cloud_trail.draw(
 		player_window.canvas,
-		4,
+		if flipped { 8 } else { 4 },
 		Point::new(center, player_window.y + 10),
 		Point::new(corner, player_window.y - 25),
 		15.0,
@@ -196,10 +233,14 @@ fn character_thinking(
 	let height = query.height * 4;
 	player_window
 		.canvas
-		.copy(
+		.copy_ex(
 			texture,
 			None,
 			Rect::new(center - (width / 2) as i32, player_window.y, width, height),
+			0.0,
+			None,
+			flipped,
+			false,
 		)
 		.unwrap();
 	player_window.advance(0, 10 + height);

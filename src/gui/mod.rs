@@ -38,6 +38,12 @@ impl<'canvas> Context<'canvas> {
 		}
 	}
 
+	pub fn relocate(&mut self, rect: Rect) {
+		self.rect = rect;
+		self.x = rect.x;
+		self.y = rect.y;
+	}
+
 	pub fn advance(&mut self, width: u32, height: u32) {
 		let (width, height) = (width as i32, height as i32);
 		match self.orientation {
