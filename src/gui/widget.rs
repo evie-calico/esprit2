@@ -1,5 +1,9 @@
 use crate::prelude::*;
-use sdl2::{pixels::Color, rect::Rect, render::Texture};
+use sdl2::{
+	pixels::Color,
+	rect::{Point, Rect},
+	render::Texture,
+};
 
 pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
@@ -38,6 +42,31 @@ pub fn menu(
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 ) {
+	for (i, color) in (0..3).zip(
+		[
+			Color::RGB(0x14, 0x17, 0x14),
+			Color::RGB(0xE3, 0xBD, 0xEF),
+			Color::RGB(0x14, 0x17, 0x14),
+		]
+		.into_iter(),
+	) {
+		menu.canvas.set_draw_color(color);
+		menu.canvas
+			.fill_rect(menu.rect.top_shifted(i * -10))
+			.unwrap();
+	}
+	menu.advance(0, 30);
+	// Paint scanlines on the rest of the terminal
+	for (i, y) in ((menu.y + 5)..menu.rect.bottom()).step_by(25).enumerate() {
+		menu.canvas.set_draw_color(if i % 3 == 2 {
+			Color::RGB(0x20, 0x37, 0x21)
+		} else {
+			Color::RGB(0x18, 0x23, 0x18)
+		});
+		menu.canvas
+			.fill_rect(Rect::new(menu.x, y, menu.rect.width(), 2))
+			.unwrap();
+	}
 	match input_mode {
 		input::Mode::Normal => {
 			menu.label_color("Normal", options.ui.normal_mode_color.into(), font);
@@ -156,12 +185,10 @@ fn character_thinking(
 	let corner = player_window.x + player_window.rect.width() as i32 * 9 / 10;
 	character_id.draw_state.cloud_trail.draw(
 		player_window.canvas,
-		center,
-		player_window.y + 10,
-		corner,
-		player_window.y - 25,
-		15.0,
 		4,
+		Point::new(center, player_window.y + 10),
+		Point::new(corner, player_window.y - 25),
+		15.0,
 		character_id.accent_color.into(),
 	);
 	let query = texture.query();
@@ -178,24 +205,23 @@ fn character_thinking(
 	player_window.advance(0, 10 + height);
 }
 
-fn on_cloud(
+pub fn on_cloud(
 	cloud: &draw::CloudState,
 	radius: u32,
 	color: Color,
-	pamphlet: &mut gui::Context<'_>,
+	gui: &mut gui::Context<'_>,
 	f: impl FnOnce(&mut gui::Context),
 ) {
-	let width = pamphlet.rect.width();
-	let height = pamphlet.rect.height();
+	let width = gui.rect.width();
+	let height = gui.rect.height();
 
-	let texture_creator = pamphlet.canvas.texture_creator();
+	let texture_creator = gui.canvas.texture_creator();
 	let mut player_texture = texture_creator
 		.create_texture_target(texture_creator.default_pixel_format(), width, height)
 		.unwrap();
 	let mut height_used = 0;
 
-	pamphlet
-		.canvas
+	gui.canvas
 		.with_texture_canvas(&mut player_texture, |canvas| {
 			canvas.set_draw_color(color);
 			canvas.clear();
@@ -208,21 +234,20 @@ fn on_cloud(
 		})
 		.unwrap();
 	let target = Rect::new(
-		pamphlet.x + radius as i32,
-		pamphlet.y + radius as i32,
+		gui.x + radius as i32,
+		gui.y + radius as i32,
 		width - radius * 2,
 		height_used,
 	);
-	cloud.draw(pamphlet.canvas, target, radius as i16, color);
-	pamphlet
-		.canvas
+	cloud.draw(gui.canvas, target, radius as i16, color);
+	gui.canvas
 		.copy(
 			&player_texture,
 			Rect::new(0, 0, width - radius * 2, height_used),
 			target,
 		)
 		.unwrap();
-	pamphlet.advance(width, height_used + radius * 2);
+	gui.advance(width, height_used + radius * 2);
 }
 
 fn character_info(

@@ -1,15 +1,15 @@
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
+use sdl2::rect::Point;
+use sdl2::render::{Canvas, Texture};
+use sdl2::video::Window;
 use sdl2::{pixels::Color, rect::Rect};
 
 const TILE_SIZE: u32 = 64;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
 
-pub fn tilemap(
-	canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-	world_manager: &world::Manager,
-) {
+pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager) {
 	canvas.set_draw_color(Color::WHITE);
 	for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
 		for (y, tile) in col.enumerate() {
@@ -30,7 +30,7 @@ pub fn tilemap(
 pub fn cursor(
 	input_mode: &input::Mode,
 	resources: &ResourceManager<'_>,
-	canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
+	canvas: &mut Canvas<Window>,
 ) {
 	if let input::Mode::Cursor {
 		x,
@@ -91,8 +91,8 @@ pub fn cursor(
 
 pub fn characters(
 	world_manager: &world::Manager,
-	canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-	sleep_texture: &sdl2::render::Texture<'_>,
+	canvas: &mut Canvas<Window>,
+	sleep_texture: &Texture<'_>,
 ) {
 	for character in world_manager.characters.iter().map(|x| x.read()) {
 		canvas
@@ -144,13 +144,7 @@ impl CloudState {
 		}
 	}
 
-	pub fn draw(
-		&self,
-		canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-		rect: Rect,
-		radius: i16,
-		color: Color,
-	) {
+	pub fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
 		let bx = rect.x as i16;
 		let by = rect.y as i16;
 		let width = rect.width() as i16;
@@ -227,43 +221,77 @@ impl CloudState {
 #[derive(Clone, Copy, Debug)]
 pub struct CloudTrail {
 	timer: f64,
-	seed: u32,
 }
 
 impl Default for CloudTrail {
 	fn default() -> Self {
-		let mut rng = rand::thread_rng();
-		Self {
-			timer: 0.0,
-			seed: rng.gen(),
-		}
+		Self { timer: 0.0 }
 	}
 }
 
 impl CloudTrail {
 	pub fn tick(&mut self, delta: f64) {
 		self.timer += delta;
+		self.timer %= 1.0;
 	}
 
 	pub fn draw(
 		&self,
-		canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
-		x1: i32,
-		y1: i32,
-		x2: i32,
-		y2: i32,
-		radius: f64,
+		canvas: &mut Canvas<Window>,
 		density: u32,
+		from: Point,
+		to: Point,
+		radius: f64,
 		color: Color,
 	) {
 		for i in 0..density {
 			let weight = (self.timer + (i as f64) / density as f64) % 1.0;
 			let scale = (weight * std::f64::consts::PI).sin();
-			let x = (x1 as f64 * (1.0 - weight) + x2 as f64 * weight) as i16;
-			let y = (y1 as f64 * (1.0 - weight) + y2 as f64 * weight) as i16;
+			let x = (from.x as f64 * (1.0 - weight) + to.x as f64 * weight) as i16;
+			let y = (from.y as f64 * (1.0 - weight) + to.y as f64 * weight) as i16;
 			canvas
 				.filled_circle(x, y, (radius * scale) as i16, color)
 				.unwrap();
+		}
+	}
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CloudyWave {
+	timer: f64,
+}
+
+impl CloudyWave {
+	pub fn tick(&mut self, delta: f64) {
+		self.timer += delta;
+		self.timer %= std::f64::consts::TAU;
+	}
+
+	pub fn draw(
+		&self,
+		pamphlet: &mut gui::Context<'_>,
+		top: i32,
+		bottom: i32,
+		x: f64,
+		radius: i16,
+		color: Color,
+	) {
+		for (i, y) in (top..=bottom).step_by(30).enumerate() {
+			let wave = (i as f64 - self.timer / 1.0).sin();
+			let superwave = (i as f64 / 8.0 + self.timer).sin();
+			let x = x + wave * 20.0 - superwave * radius as f64;
+			pamphlet
+				.canvas
+				.filled_circle(x as i16, y as i16, radius, color)
+				.unwrap();
+			pamphlet.canvas.set_draw_color(color);
+			let rect = Rect::new(
+				x as i32,
+				y - radius as i32,
+				(pamphlet.rect.right() - x as i32) as u32,
+				radius as u32 * 2,
+			);
+			pamphlet.canvas.fill_rect(rect).unwrap();
 		}
 	}
 }

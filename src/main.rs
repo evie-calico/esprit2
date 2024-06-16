@@ -1,5 +1,6 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
+use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::fs;
 use std::process::exit;
@@ -90,6 +91,7 @@ pub fn main() {
 		.unwrap();
 
 	let mut soul_jar = gui::widget::SoulJar::new(&resources);
+	let mut cloudy_wave = draw::CloudyWave::default();
 
 	let mut input_mode = input::Mode::Normal;
 	let mut action_request = None;
@@ -118,6 +120,7 @@ pub fn main() {
 			action_request = world_manager.update(action_request, &mut input_mode);
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
+			cloudy_wave.tick(delta);
 			if let input::Mode::Cursor { state, .. } = &mut input_mode {
 				state.float.increment(delta);
 			}
@@ -130,12 +133,7 @@ pub fn main() {
 
 		// Configure world viewport.
 		let window_size = canvas.window().size();
-		canvas.set_viewport(Rect::new(
-			0,
-			0,
-			window_size.0 - options.ui.pamphlet_width,
-			window_size.1 - options.ui.console_height,
-		));
+		canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
 		canvas.set_draw_color(Color::BLACK);
 		canvas
 			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
@@ -169,6 +167,20 @@ pub fn main() {
 				window_size.1,
 			),
 		);
+
+		let top = pamphlet.rect.top();
+		let bottom = pamphlet.rect.bottom();
+		let x = pamphlet.rect.left() as f64;
+
+		cloudy_wave.draw(
+			&mut pamphlet,
+			top,
+			bottom,
+			x,
+			20,
+			Color::RGB(0x08, 0x0f, 0x25),
+		);
+
 		gui::widget::pamphlet(
 			&mut pamphlet,
 			&font,
