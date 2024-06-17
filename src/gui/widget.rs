@@ -1,9 +1,8 @@
 use crate::prelude::*;
-use sdl2::{
-	pixels::Color,
-	rect::{Point, Rect},
-	render::Texture,
-};
+use sdl2::pixels::Color;
+use sdl2::rect::{Point, Rect};
+use sdl2::render::Texture;
+use sdl2::ttf::Font;
 
 pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
@@ -38,7 +37,7 @@ impl<'texture> SoulJar<'texture> {
 pub fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
-	font: &sdl2::ttf::Font<'_, '_>,
+	font: &Font<'_, '_>,
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 ) {
@@ -89,12 +88,11 @@ pub fn menu(
 
 pub fn pamphlet(
 	pamphlet: &mut gui::Context,
-	font: &sdl2::ttf::Font<'_, '_>,
+	font: &Font<'_, '_>,
 	world_manager: &world::Manager,
 	resources: &ResourceManager<'_>,
 	soul_jar: &mut SoulJar<'_>,
 ) {
-	pamphlet.advance(0, 32);
 	struct MemberPosition {
 		x: i32,
 		y: i32,
@@ -112,6 +110,9 @@ pub fn pamphlet(
 			flipped: true,
 		},
 	];
+
+	pamphlet.advance(0, 32);
+
 	// Draw party stats
 	for (character_chunk, layout_chunk) in
 		world_manager.party.chunks(2).zip(member_layout.chunks(2))
@@ -295,7 +296,7 @@ fn character_info(
 	player_window: &mut gui::Context<'_>,
 	piece: &character::Piece,
 	color: Color,
-	font: &sdl2::ttf::Font<'_, '_>,
+	font: &Font<'_, '_>,
 ) {
 	let character::Piece {
 		sheet:

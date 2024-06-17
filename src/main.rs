@@ -1,6 +1,5 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
-use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
 use std::fs;
 use std::process::exit;
@@ -134,7 +133,8 @@ pub fn main() {
 		// Configure world viewport.
 		let window_size = canvas.window().size();
 		canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
-		canvas.set_draw_color(Color::BLACK);
+		canvas.set_draw_color(Color::RGB(20, 20, 20));
+
 		canvas
 			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
 			.unwrap();

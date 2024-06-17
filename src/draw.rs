@@ -1,5 +1,3 @@
-use std::f64::consts::{PI, TAU};
-
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -7,8 +5,7 @@ use sdl2::rect::Point;
 use sdl2::render::{Canvas, Texture};
 use sdl2::video::Window;
 use sdl2::{pixels::Color, rect::Rect};
-
-use self::gui::widget::pamphlet;
+use std::f64::consts::{PI, TAU};
 
 const TILE_SIZE: u32 = 64;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
@@ -167,10 +164,8 @@ impl CloudState {
 			.chain((1..cloud_height).map(|y| (cloud_width, y)))
 		{
 			let bias = 0.2;
-			let x_middle_weight =
-				(x as f64 / cloud_width as f64 * std::f64::consts::PI).sin() * (1.0 - bias) + bias;
-			let y_middle_weight =
-				(y as f64 / cloud_height as f64 * std::f64::consts::PI).sin() * (1.0 - bias) + bias;
+			let x_middle_weight = (x as f64 / cloud_width as f64 * PI).sin() * (1.0 - bias) + bias;
+			let y_middle_weight = (y as f64 / cloud_height as f64 * PI).sin() * (1.0 - bias) + bias;
 			let weight = x_middle_weight.max(y_middle_weight);
 
 			let is_active = |rand| rand & 1 == 0;
@@ -250,7 +245,7 @@ impl CloudTrail {
 	) {
 		for i in 0..density {
 			let weight = (self.timer + (i as f64) / density as f64) % 1.0;
-			let scale = (weight * std::f64::consts::PI).sin();
+			let scale = (weight * PI).sin();
 			let x = (from.x as f64 * (1.0 - weight) + to.x as f64 * weight) as i16;
 			let y = (from.y as f64 * (1.0 - weight) + to.y as f64 * weight) as i16;
 			canvas
@@ -268,7 +263,7 @@ pub struct CloudyWave {
 impl CloudyWave {
 	pub fn tick(&mut self, delta: f64) {
 		self.timer += delta;
-		self.timer %= std::f64::consts::TAU;
+		self.timer %= TAU;
 	}
 
 	pub fn draw(
