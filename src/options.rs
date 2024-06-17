@@ -1,11 +1,7 @@
-use sdl2::keyboard::Keycode;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
-/// SDL2 Keycodes do not implement serde traits,
-/// but they can be converted to and from i32s.
-pub type KeycodeIndex = i32;
-pub type Triggers = Vec<KeycodeIndex>;
+use sdl2::keyboard::Keycode;
 
 lazy_static::lazy_static! {
 	pub static ref USER_DIRECTORY: PathBuf = get_user_directory();
@@ -77,6 +73,64 @@ impl Default for UserInterface {
 	}
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Key(Keycode);
+
+impl serde::Serialize for Key {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		serializer.serialize_str(&self.0.name())
+	}
+}
+
+struct KeyVisitor;
+
+impl<'de> serde::de::Visitor<'de> for KeyVisitor {
+	type Value = String;
+
+	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		formatter.write_str("a string containing an expression")
+	}
+
+	fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+	where
+		E: serde::de::Error,
+	{
+		Ok(value)
+	}
+
+	fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+	where
+		E: serde::de::Error,
+	{
+		Ok(value.to_string())
+	}
+}
+
+impl<'de> serde::Deserialize<'de> for Key {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		use serde::de::Error;
+		Ok(Key(Keycode::from_name(
+			&deserializer.deserialize_string(KeyVisitor)?,
+		)
+		.ok_or(D::Error::custom("unknown key name"))?))
+	}
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Triggers(Vec<Key>);
+
+impl Triggers {
+	pub fn contains(&self, keycode: Keycode) -> bool {
+		self.0.iter().any(|x| x.0 == keycode)
+	}
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Controls {
@@ -99,21 +153,22 @@ pub struct Controls {
 impl Default for Controls {
 	fn default() -> Self {
 		use Keycode as K;
+
 		Self {
-			left: vec![K::H as i32, K::Left as i32, K::Kp4 as i32],
-			right: vec![K::L as i32, K::Right as i32, K::Kp6 as i32],
-			up: vec![K::K as i32, K::Up as i32, K::Kp8 as i32],
-			down: vec![K::J as i32, K::Down as i32, K::Kp2 as i32],
-			up_left: vec![K::Y as i32, K::Kp7 as i32],
-			up_right: vec![K::U as i32, K::Kp9 as i32],
-			down_left: vec![K::B as i32, K::Kp1 as i32],
-			down_right: vec![K::N as i32, K::Kp3 as i32],
+			left: Triggers(vec![Key(K::H), Key(K::Left), Key(K::Kp4)]),
+			right: Triggers(vec![Key(K::L), Key(K::Right), Key(K::Kp6)]),
+			up: Triggers(vec![Key(K::Up), Key(K::Kp8)]),
+			down: Triggers(vec![Key(K::J), Key(K::Down), Key(K::Kp2)]),
+			up_left: Triggers(vec![Key(K::Y), Key(K::Kp7)]),
+			up_right: Triggers(vec![Key(K::U), Key(K::Kp9)]),
+			down_left: Triggers(vec![Key(K::B), Key(K::Kp1)]),
+			down_right: Triggers(vec![Key(K::N), Key(K::Kp3)]),
 
-			talk: vec![K::T as i32],
-			cast: vec![K::Z as i32],
+			talk: Triggers(vec![Key(K::T)]),
+			cast: Triggers(vec![Key(K::Z)]),
 
-			confirm: vec![K::Return as i32],
-			escape: vec![K::Escape as i32],
+			confirm: Triggers(vec![Key(K::Return)]),
+			escape: Triggers(vec![Key(K::Escape)]),
 		}
 	}
 }
@@ -135,12 +190,11 @@ impl TryFrom<usize> for Shortcut {
 		let Ok::<i32, _>(index) = index.try_into() else {
 			return Err(());
 		};
-		// clever, huh?
 		let Some(symbol) = char::from_digit(10 + (index as u32), 36) else {
 			return Err(());
 		};
 		// This unwrap is safe because the above succeeded.
-		let keycode = Keycode::from_i32(Keycode::A as i32 + index).unwrap();
+		let keycode = Keycode::from_i32(Keycode::A.into_i32() + index).unwrap();
 		Ok(Self { symbol, keycode })
 	}
 }

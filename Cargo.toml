@@ -14,7 +14,7 @@ paste = "1.0.14"
 pest = "2.7.10"
 pest_derive = "2.7.10"
 rand = "0.8.5"
-sdl2 = { version = "0.36.0", features = ["image", "ttf", "gfx"] }
+sdl2 = { version = "0.37.0", features = ["image", "ttf", "gfx"] }
 serde = { version = "1.0.196", features = ["derive", "rc"] }
 thiserror = "1.0.57"
 toml = "0.8.10"

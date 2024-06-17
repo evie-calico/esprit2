@@ -60,7 +60,7 @@ pub fn world(
 					match mode {
 						Mode::Normal => {
 							// Eventually this will be a more involved binding.
-							if options.controls.escape.contains(&(keycode as i32)) {
+							if options.controls.escape.contains(keycode) {
 								return Result { exit: true };
 							}
 							let directions = [
@@ -74,18 +74,18 @@ pub fn world(
 								(&options.controls.down_right, character::OrdDir::DownRight),
 							];
 							for (triggers, direction) in directions {
-								if triggers.contains(&(keycode as i32)) {
+								if triggers.contains(keycode) {
 									next_character.next_action =
 										Some(character::Action::Move(direction));
 								}
 							}
 							drop(next_character);
 
-							if options.controls.cast.contains(&(keycode as i32)) {
+							if options.controls.cast.contains(keycode) {
 								*mode = Mode::Cast;
 							}
 
-							if options.controls.talk.contains(&(keycode as i32)) {
+							if options.controls.talk.contains(keycode) {
 								world_manager.console.say("Luvui".into(), "Meow!".into());
 								world_manager
 									.console
@@ -93,11 +93,12 @@ pub fn world(
 							}
 						}
 						Mode::Cast => {
-							if options.controls.escape.contains(&(keycode as i32)) {
+							if options.controls.escape.contains(keycode) {
 								*mode = Mode::Normal;
 							}
 
-							let selected_index = (keycode as i32) - (Keycode::A as i32);
+							// TODO: just make an array of keys in the options file or something.
+							let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 							if (0..=26).contains(&selected_index)
 								&& (selected_index as usize) < next_character.spells.len()
 							{
@@ -128,15 +129,15 @@ pub fn world(
 								(1, 1, &options.controls.down_right),
 							];
 							for (x_off, y_off, triggers) in directions {
-								if triggers.contains(&(keycode as i32)) {
+								if triggers.contains(keycode) {
 									*x += x_off;
 									*y += y_off;
 								}
 							}
 
-							if options.controls.escape.contains(&(keycode as i32)) {
+							if options.controls.escape.contains(keycode) {
 								*mode = Mode::Normal;
-							} else if options.controls.confirm.contains(&(keycode as i32)) {
+							} else if options.controls.confirm.contains(keycode) {
 								*submitted = true;
 							}
 						}
