@@ -8,13 +8,21 @@ name = "Luvui"
 proper_name = true
 pronouns = "Female"
 
-[stats]
+[bases]
 heart = 30
 soul = 15
 power = 3
 defense = 6
 magic = 6
 resistance = 3
+
+[stats]
+heart = 100
+soul = 100
+power = 40
+defense = 50
+magic = 80
+resistance = 40
 
 [skillset]
 major = "Chaos"

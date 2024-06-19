@@ -299,44 +299,32 @@ fn character_info(
 	font: &Font<'_, '_>,
 ) {
 	let character::Piece {
-		sheet:
-			character::Sheet {
-				nouns,
-				level,
-				stats:
-					character::Stats {
-						heart,
-						soul,
-						power,
-						defense,
-						magic,
-						resistance,
-					},
-				..
-			},
+		sheet: character::Sheet { nouns, level, .. },
 		hp,
 		sp,
 		..
 	} = piece;
 	let name = &nouns.name;
+	let character::Stats {
+		heart,
+		soul,
+		power,
+		defense,
+		magic,
+		resistance,
+	} = piece.sheet.stats();
 
 	player_window.opposing_labels(name, &format!("Level {level}"), color, font);
 	player_window.label_color(&format!("HP: {hp}/{heart}"), color, font);
 	player_window.progress_bar(
-		(*hp as f32) / (*heart as f32),
+		(*hp as f32) / (heart as f32),
 		Color::GREEN,
 		Color::RED,
 		10,
 		5,
 	);
 	player_window.label_color(&format!("SP: {sp}/{soul}"), color, font);
-	player_window.progress_bar(
-		(*sp as f32) / (*soul as f32),
-		Color::BLUE,
-		Color::RED,
-		10,
-		5,
-	);
+	player_window.progress_bar((*sp as f32) / (soul as f32), Color::BLUE, Color::RED, 10, 5);
 	let physical_stat_info = [("Pwr", power), ("Def", defense)];
 	let mut physical_stats = [None, None];
 	for ((stat_name, stat), stat_half) in physical_stat_info

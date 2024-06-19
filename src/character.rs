@@ -54,8 +54,9 @@ impl expression::Variables for Piece {
 
 impl Piece {
 	pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
-		let hp = sheet.stats.heart as i32;
-		let sp = sheet.stats.soul as i32;
+		let stats = sheet.stats();
+		let hp = stats.heart as i32;
+		let sp = stats.soul as i32;
 		let attacks = sheet
 			.attacks
 			.iter()
@@ -127,7 +128,12 @@ pub enum Alliance {
 	Enemy,
 }
 
+fn stats(_lua: &mlua::Lua, this: &mut Sheet, _: ()) -> mlua::Result<Stats> {
+	Ok(this.stats())
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[alua(method = stats)]
 pub struct Sheet {
 	/// Note that this includes the character's name.
 	#[alua(get)]
@@ -136,7 +142,13 @@ pub struct Sheet {
 	#[alua(get)]
 	pub level: u32,
 	#[alua(get)]
-	pub stats: Stats,
+	pub experience: u32,
+
+	#[alua(get)]
+	pub bases: Stats,
+	#[alua(get)]
+	pub growths: Stats,
+
 	pub skillset: spell::Skillset,
 	#[alua(get)]
 	pub speed: Aut,
@@ -147,6 +159,12 @@ pub struct Sheet {
 	pub spells: Vec<String>,
 }
 
+impl Sheet {
+	pub fn stats(&self) -> Stats {
+		self.bases + self.growths * self.level
+	}
+}
+
 impl expression::Variables for Sheet {
 	fn get<'expression>(
 		&self,
@@ -155,12 +173,12 @@ impl expression::Variables for Sheet {
 		match s {
 			"level" => Ok(self.level as expression::Integer),
 			"speed" => Ok(self.speed as expression::Integer),
-			_ => self.stats.get(s),
+			_ => self.stats().get(s),
 		}
 	}
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[alua(get)]
@@ -181,6 +199,36 @@ pub struct Stats {
 	/// Also makes harmful spells more likely to fail.
 	#[alua(get)]
 	pub resistance: u32,
+}
+
+impl std::ops::Add for Stats {
+	type Output = Stats;
+
+	fn add(self, rhs: Self) -> Self {
+		Stats {
+			heart: self.heart + rhs.heart,
+			soul: self.soul + rhs.soul,
+			power: self.power + rhs.power,
+			defense: self.defense + rhs.defense,
+			magic: self.magic + rhs.magic,
+			resistance: self.resistance + rhs.resistance,
+		}
+	}
+}
+
+impl std::ops::Mul<u32> for Stats {
+	type Output = Stats;
+
+	fn mul(self, rhs: u32) -> Self {
+		Stats {
+			heart: self.heart * rhs,
+			soul: self.soul * rhs,
+			power: self.power * rhs,
+			defense: self.defense * rhs,
+			magic: self.magic * rhs,
+			resistance: self.resistance * rhs,
+		}
+	}
 }
 
 impl expression::Variables for Stats {

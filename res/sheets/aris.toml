@@ -8,13 +8,21 @@ name = "Aris"
 proper_name = true
 pronouns = "Male"
 
-[stats]
+[bases]
 heart = 30
 soul = 10
 power = 6
 defense = 5
 magic = 1
 resistance = 7
+
+[growths]
+heart = 100
+soul = 80
+power = 80
+defense = 75
+magic = 60
+resistance = 50
 
 [skillset]
 major = "Negative"

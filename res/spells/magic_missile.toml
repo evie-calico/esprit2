@@ -10,7 +10,7 @@ magnitude = "magic + 2d4"
 [on_cast]
 type = "Inline"
 source = '''
-local damage = math.max(magnitude - target.sheet.stats.resistance, 0)
+local damage = math.max(magnitude - target.sheet.stats().resistance, 0)
 target.hp -= damage
 caster.sp -= level
 
