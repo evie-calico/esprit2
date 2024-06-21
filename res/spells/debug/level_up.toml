@@ -1,0 +1,14 @@
+name = "(DEBUG) Level Up"
+icon = "dummy"
+
+energy = "Positive"
+harmony = "Order"
+
+level = 0
+
+[on_cast]
+type = "Inline"
+source = '''
+target:force_level();
+Console:print(target:replace_nouns("{Address}'s level increased to "..target.sheet.level))
+'''

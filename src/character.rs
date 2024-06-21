@@ -5,6 +5,10 @@ use uuid::Uuid;
 
 use self::nouns::StrExt;
 
+fn replace_nouns(_lua: &mlua::Lua, this: &mut Piece, string: String) -> mlua::Result<String> {
+	Ok(string.replace_nouns(&this.sheet.nouns))
+}
+
 fn replace_prefixed_nouns(
 	_lua: &mlua::Lua,
 	this: &mut Piece,
@@ -13,8 +17,18 @@ fn replace_prefixed_nouns(
 	Ok(string.replace_prefixed_nouns(&this.sheet.nouns, &prefix))
 }
 
+/// Used for debugging.
+///
+/// While fields of `Piece` are settable from Lua,
+/// fields of `Sheet` and `Stats` are not.
+/// This method circumvents that.
+fn force_level(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<()> {
+	this.sheet.level = this.sheet.level.saturating_add(1);
+	Ok(())
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
-#[alua(method = replace_prefixed_nouns)]
+#[alua(method = replace_nouns, method = replace_prefixed_nouns, method = force_level)]
 pub struct Piece {
 	// These are nice and serializable :)
 	#[alua(as_lua = "string", get)]
@@ -142,6 +156,7 @@ pub struct Sheet {
 	#[alua(get)]
 	pub level: u32,
 	#[alua(get)]
+	#[serde(default)] // There's no reason for most sheets to care about this.
 	pub experience: u32,
 
 	#[alua(get)]
@@ -161,7 +176,7 @@ pub struct Sheet {
 
 impl Sheet {
 	pub fn stats(&self) -> Stats {
-		self.bases + self.growths * self.level
+		self.bases + self.growths * self.level / 100
 	}
 }
 
@@ -227,6 +242,21 @@ impl std::ops::Mul<u32> for Stats {
 			defense: self.defense * rhs,
 			magic: self.magic * rhs,
 			resistance: self.resistance * rhs,
+		}
+	}
+}
+
+impl std::ops::Div<u32> for Stats {
+	type Output = Stats;
+
+	fn div(self, rhs: u32) -> Self {
+		Stats {
+			heart: self.heart / rhs,
+			soul: self.soul / rhs,
+			power: self.power / rhs,
+			defense: self.defense / rhs,
+			magic: self.magic / rhs,
+			resistance: self.resistance / rhs,
 		}
 	}
 }

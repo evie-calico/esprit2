@@ -1,6 +1,6 @@
 level = 1
 attacks = ["scratch", "bite"]
-spells = ["magic_missile"]
+spells = ["magic_missile", "debug/level_up"]
 speed = 12
 
 [nouns]
@@ -16,7 +16,7 @@ defense = 6
 magic = 6
 resistance = 3
 
-[stats]
+[growths]
 heart = 100
 soul = 100
 power = 40

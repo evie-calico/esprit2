@@ -11,8 +11,7 @@ const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}"
 pub type CharacterRef = Arc<RwLock<character::Piece>>;
 
 /// This struct contains all information that is relevant during gameplay.
-#[derive(Debug)]
-pub struct Manager {
+pub struct Manager<'resources, 'textures> {
 	// I know I'm going to have to change this in the future to add multiple worlds.
 	/// Where in the world the characters are.
 	pub location: Location,
@@ -27,10 +26,11 @@ pub struct Manager {
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
 	pub console: Console,
-
 	/// Lua runtime for scripts operating on the world.
 	/// Configured to have access to most fields within this struct.
 	pub lua: mlua::Lua,
+
+	pub resource_manager: &'resources ResourceManager<'textures>,
 }
 
 /// Contains information about what should generate on each floor.
@@ -96,10 +96,10 @@ pub struct Location {
 	pub floor: usize,
 }
 
-impl Manager {
+impl<'resources, 'textures> Manager<'resources, 'textures> {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
-		resources: &ResourceManager,
+		resources: &'resources ResourceManager<'textures>,
 	) -> Self {
 		let mut party = Vec::new();
 		let mut characters = Vec::new();
@@ -168,7 +168,43 @@ impl Manager {
 			],
 
 			lua,
+
+			resource_manager: resources,
 		}
+	}
+
+	pub fn new_floor(&mut self) {
+		self.location.floor += 1;
+		self.current_floor = Floor::default();
+		let party_pieces: Vec<_> = self
+			.party
+			.iter()
+			.filter_map(|x| self.get_character(x.piece))
+			.cloned()
+			.collect();
+		self.characters.clear();
+		for i in &party_pieces {
+			let mut i = i.write();
+			// Reset positions
+			i.x = 0;
+			i.y = 0;
+			i.sheet.experience += 40;
+			while i.sheet.experience >= 100 {
+				i.sheet.experience -= 100;
+				i.sheet.level = i.sheet.level.saturating_add(1);
+				self.console.print_special(
+					format!("{{Address}}'s level increased to {}!", i.sheet.level)
+						.replace_nouns(&i.sheet.nouns),
+				);
+			}
+		}
+		self.characters = party_pieces;
+		let mut rng = rand::thread_rng();
+		self.apply_vault(
+			rng.gen_range(1..8),
+			rng.gen_range(1..8),
+			self.resource_manager.get_vault("example").unwrap(),
+		);
 	}
 
 	pub fn update(
@@ -241,13 +277,16 @@ impl Manager {
 		})
 	}
 
-	pub fn apply_vault(&mut self, x: i32, y: i32, vault: &Vault, resources: &ResourceManager) {
+	pub fn apply_vault(&mut self, x: i32, y: i32, vault: &Vault) {
 		self.current_floor.blit_vault(x as usize, y as usize, vault);
 		for (xoff, yoff, sheet_name) in &vault.characters {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new(resources.get_sheet(sheet_name).unwrap().clone(), resources)
+				..character::Piece::new(
+					self.resource_manager.get_sheet(sheet_name).unwrap().clone(),
+					self.resource_manager,
+				)
 			};
 			self.characters.push(Arc::new(RwLock::new(piece)));
 		}
@@ -272,7 +311,16 @@ pub enum MovementError {
 
 #[derive(Clone, Debug)]
 pub enum AttackResult {
-	Hit { message: String, weak: bool },
+	Hit {
+		message: String,
+		weak: bool,
+		log: CombatLog,
+	},
+}
+
+#[derive(Clone, Debug)]
+pub enum CombatLog {
+	Hit { magnitude: u32, damage: u32 },
 }
 
 #[derive(thiserror::Error, Clone, Debug)]
@@ -295,14 +343,14 @@ pub enum ActionRequest {
 	},
 }
 
-impl Manager {
+impl Manager<'_, '_> {
 	pub fn pop_action(&mut self) -> Option<ActionRequest> {
 		let next_character = self.next_character();
 
 		let action = next_character.write().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
-				Ok(MovementResult::Attack(AttackResult::Hit { message, weak })) => {
+				Ok(MovementResult::Attack(AttackResult::Hit { message, weak, log })) => {
 					let colors = &self.console.colors;
 					let color = if weak {
 						colors.unimportant
@@ -310,6 +358,7 @@ impl Manager {
 						colors.normal
 					};
 					self.console.print_colored(message, color);
+					self.console.print(format!("{log:?}"));
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
@@ -386,66 +435,69 @@ impl Manager {
 		character_ref: &CharacterRef,
 		target_ref: &CharacterRef,
 	) -> Result<AttackResult, AttackError> {
-		let (damage, message, weak) = {
-			let character = character_ref.read();
-			let target = target_ref.read();
+		let character = character_ref.read();
+		let target = target_ref.read();
 
-			if target.alliance == character.alliance {
-				return Err(AttackError::Ally);
+		if target.alliance == character.alliance {
+			return Err(AttackError::Ally);
+		}
+
+		let mut rng = thread_rng();
+
+		let mut attack = character.attacks.first().ok_or(AttackError::NoAttacks)?;
+		let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
+
+		let mut point = rng.gen_range(0..max_attack_weight);
+		for i in &character.attacks {
+			if point < i.weight {
+				attack = i;
+				break;
 			}
+			point -= i.weight;
+		}
 
-			let mut rng = thread_rng();
+		// Calculate damage
+		let target_stats = target.sheet.stats();
+		let magnitude = u32::evalv(&attack.damage, &*character);
+		let damage = magnitude.saturating_sub(target_stats.defense);
+		let is_weak_attack = damage <= 1;
 
-			let mut attack = character.attacks.first().ok_or(AttackError::NoAttacks)?;
-			let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
-
-			let mut point = rng.gen_range(0..max_attack_weight);
-			for i in &character.attacks {
-				if point < i.weight {
-					attack = i;
-					break;
-				}
-				point -= i.weight;
-			}
-
-			// Calculate damage
-			let target_stats = target.sheet.stats();
-			let damage =
-				u32::evalv(&attack.damage, &*character).saturating_sub(target_stats.defense);
-			let is_weak_attack = damage <= 1;
-
-			// TODO: Change this depending on the proportional amount of damage dealt.
-			let damage_punctuation = match damage {
-				20.. => "!!!",
-				10.. => "!!",
-				5.. => "!",
-				_ => ".",
-			};
-			let message_pool = attack
-				.messages
-				.low
-				.as_ref()
-				.filter(|_| is_weak_attack)
-				.unwrap_or(&attack.messages.high);
-			let message = message_pool.choose(&mut rng);
-
-			let mut message = message
-				.map(|s| s.as_str())
-				.unwrap_or(DEFAULT_ATTACK_MESSAGE)
-				.replace_prefixed_nouns(&character.sheet.nouns, "self_")
-				.replace_prefixed_nouns(&target.sheet.nouns, "target_");
-			message.push_str(damage_punctuation);
-			message.push_str(&format!(" (-{damage} HP)"));
-
-			(damage, message, is_weak_attack)
+		// TODO: Change this depending on the proportional amount of damage dealt.
+		let damage_punctuation = match damage {
+			20.. => "!!!",
+			10.. => "!!",
+			5.. => "!",
+			_ => ".",
 		};
+		let message_pool = attack
+			.messages
+			.low
+			.as_ref()
+			.filter(|_| is_weak_attack)
+			.unwrap_or(&attack.messages.high);
+		let message = message_pool.choose(&mut rng);
+
+		let mut message = message
+			.map(|s| s.as_str())
+			.unwrap_or(DEFAULT_ATTACK_MESSAGE)
+			.replace_prefixed_nouns(&character.sheet.nouns, "self_")
+			.replace_prefixed_nouns(&target.sheet.nouns, "target_");
+		message.push_str(damage_punctuation);
+		message.push_str(&format!(" (-{damage} HP)"));
+
+		drop(target);
+		drop(character);
 
 		// This is where the damage is actually dealt
 		target_ref.write().hp -= damage as i32;
 
 		// `self` is not mutable, so the message needs to be passed up to the manager,
 		// where printing can occur.
-		Ok(AttackResult::Hit { message, weak })
+		Ok(AttackResult::Hit {
+			message,
+			weak: is_weak_attack,
+			log: CombatLog::Hit { magnitude, damage },
+		})
 	}
 
 	/// # Errors
@@ -474,7 +526,7 @@ impl Manager {
 
 		let tile = self.current_floor.map.get(y, x);
 		match tile {
-			Some(Tile::Floor) => {
+			Some(Tile::Floor) | Some(Tile::Exit) => {
 				let mut character = character_ref.write();
 				character.x = x;
 				character.y = y;

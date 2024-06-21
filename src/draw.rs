@@ -14,15 +14,24 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager) {
 	canvas.set_draw_color(Color::WHITE);
 	for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
 		for (y, tile) in col.enumerate() {
-			if *tile == floor::Tile::Wall {
-				canvas
+			match tile {
+				floor::Tile::Floor => (),
+				floor::Tile::Wall => canvas
 					.fill_rect(Rect::new(
 						(x as i32) * ITILE_SIZE,
 						(y as i32) * ITILE_SIZE,
 						TILE_SIZE,
 						TILE_SIZE,
 					))
-					.unwrap();
+					.unwrap(),
+				floor::Tile::Exit => canvas
+					.draw_rect(Rect::new(
+						(x as i32) * ITILE_SIZE + 4,
+						(y as i32) * ITILE_SIZE + 4,
+						TILE_SIZE - 8,
+						TILE_SIZE - 8,
+					))
+					.unwrap(),
 			}
 		}
 	}
@@ -302,8 +311,8 @@ impl CloudyWave {
 				continue;
 			}
 			let x = pamphlet.rect.x
-				+ radius as i32 + (pamphlet.rect.width() as f64 * (seed & 0xFFFF) as f64
-				/ u16::MAX as f64) as i32;
+				+ radius as i32
+				+ (pamphlet.rect.width() as f64 * (seed & 0xFFFF) as f64 / u16::MAX as f64) as i32;
 			let y = pamphlet.rect.y
 				+ (pamphlet.rect.height() as f64 * (seed >> 16) as f64 / u16::MAX as f64) as i32;
 			let color = match y % 3 {

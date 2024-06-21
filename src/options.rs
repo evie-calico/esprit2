@@ -145,6 +145,7 @@ pub struct Controls {
 
 	pub talk: Triggers,
 	pub cast: Triggers,
+	pub underfoot: Triggers,
 
 	pub confirm: Triggers,
 	pub escape: Triggers,
@@ -157,7 +158,7 @@ impl Default for Controls {
 		Self {
 			left: Triggers(vec![Key(K::H), Key(K::Left), Key(K::Kp4)]),
 			right: Triggers(vec![Key(K::L), Key(K::Right), Key(K::Kp6)]),
-			up: Triggers(vec![Key(K::Up), Key(K::Kp8)]),
+			up: Triggers(vec![Key(K::K), Key(K::Up), Key(K::Kp8)]),
 			down: Triggers(vec![Key(K::J), Key(K::Down), Key(K::Kp2)]),
 			up_left: Triggers(vec![Key(K::Y), Key(K::Kp7)]),
 			up_right: Triggers(vec![Key(K::U), Key(K::Kp9)]),
@@ -166,6 +167,7 @@ impl Default for Controls {
 
 			talk: Triggers(vec![Key(K::T)]),
 			cast: Triggers(vec![Key(K::Z)]),
+			underfoot: Triggers(vec![Key(K::Period)]),
 
 			confirm: Triggers(vec![Key(K::Return)]),
 			escape: Triggers(vec![Key(K::Escape)]),

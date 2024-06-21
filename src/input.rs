@@ -79,10 +79,31 @@ pub fn world(
 										Some(character::Action::Move(direction));
 								}
 							}
-							drop(next_character);
 
 							if options.controls.cast.contains(keycode) {
 								*mode = Mode::Cast;
+							}
+
+							let (x, y) = (next_character.x, next_character.y);
+							drop(next_character);
+
+							if options.controls.underfoot.contains(keycode) {
+								match world_manager.current_floor.map.get(y, x) {
+									Some(floor::Tile::Floor) => {
+										world_manager.console.print_unimportant(
+											"There's nothing on the ground here.".into(),
+										);
+									}
+									Some(floor::Tile::Exit) => {
+										world_manager.new_floor();
+									}
+									None => {
+										world_manager
+											.console
+											.print_unimportant("That's the void.".into());
+									}
+									Some(floor::Tile::Wall) => (),
+								}
 							}
 
 							if options.controls.talk.contains(keycode) {

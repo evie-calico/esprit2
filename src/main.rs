@@ -79,7 +79,8 @@ pub fn main() {
 		},
 	];
 	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &resources);
-	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
+
+	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let font = ttf_context
 		.load_font_from_rwops(

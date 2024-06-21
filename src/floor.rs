@@ -9,6 +9,7 @@ pub enum Tile {
 	Floor,
 	#[default]
 	Wall,
+	Exit,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -31,12 +32,12 @@ impl Floor {
 		for row in vault.tiles.chunks(vault.width) {
 			for tile in row {
 				if let Some(tile) = tile {
-					*self.map.get_mut(x, y).unwrap() = *tile;
+					*self.map.get_mut(y, x).unwrap() = *tile;
 				}
-				y += 1;
+				x += 1;
 			}
-			y -= vault.width;
-			x += 1;
+			x -= vault.width;
+			y += 1;
 		}
 	}
 }

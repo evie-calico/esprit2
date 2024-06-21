@@ -69,6 +69,7 @@ impl Vault {
 						' ' => None,
 						'.' => Some(Tile::Floor),
 						'x' => Some(Tile::Wall),
+						'>' => Some(Tile::Exit),
 						_ => return Err(Error::UnexpectedSymbol(c)),
 					});
 				}
