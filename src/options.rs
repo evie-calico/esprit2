@@ -49,22 +49,20 @@ impl Options {
 #[serde(default, deny_unknown_fields)]
 pub struct UserInterface {
 	pub colors: Colors,
+	pub typography: typography::Options,
 
 	pub pamphlet_width: u32,
 	pub console_height: u32,
-
-	pub font_size: u16,
 }
 
 impl Default for UserInterface {
 	fn default() -> Self {
 		Self {
 			colors: Colors::default(),
+			typography: typography::Options::default(),
 
 			pamphlet_width: 400,
 			console_height: 200,
-
-			font_size: 18,
 		}
 	}
 }

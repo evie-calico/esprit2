@@ -4,7 +4,7 @@ use sdl2::ttf::Font;
 pub fn draw(gui: &mut gui::Context, character: &character::Piece, font: &Font) {
 	for (spell, letter) in character.spells.iter().zip('a'..='z') {
 		let color = if spell.castable_by(character) {
-			(255, 255, 255, 255)
+			gui.typography.color
 		} else {
 			(255, 0, 0, 255)
 		};

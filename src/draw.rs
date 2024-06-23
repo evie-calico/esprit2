@@ -277,7 +277,7 @@ impl CloudyWave {
 
 	pub fn draw(
 		&self,
-		pamphlet: &mut gui::Context<'_>,
+		pamphlet: &mut gui::Context<'_, '_, '_>,
 		top: i32,
 		bottom: i32,
 		x: f64,

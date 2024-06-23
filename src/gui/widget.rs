@@ -2,7 +2,6 @@ use crate::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
-use sdl2::ttf::Font;
 
 pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
@@ -31,16 +30,16 @@ impl<'texture> SoulJar<'texture> {
 pub fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
-	font: &Font<'_, '_>,
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 ) {
-	for (i, color) in
-		(0..3).zip([(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)].into_iter())
+	for (i, color) in [(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)]
+		.into_iter()
+		.enumerate()
 	{
 		menu.canvas.set_draw_color(color);
 		menu.canvas
-			.fill_rect(menu.rect.top_shifted(i * -10))
+			.fill_rect(menu.rect.top_shifted(i as i32 * -10))
 			.unwrap();
 	}
 	menu.advance(0, 30);
@@ -55,19 +54,22 @@ pub fn menu(
 			.fill_rect(Rect::new(menu.x, y, menu.rect.width(), 2))
 			.unwrap();
 	}
+
+	let font = &menu.typography.title;
+	let mode_font = &menu.typography.annotation;
 	match input_mode {
 		input::Mode::Normal => {
-			menu.label_color("Normal", options.ui.colors.normal_mode, font);
+			menu.label_color("Normal", options.ui.colors.normal_mode, mode_font);
 			world_manager.console.draw(menu, font);
 		}
 		input::Mode::Cast => {
-			menu.label_color("Cast", options.ui.colors.cast_mode, font);
+			menu.label_color("Cast", options.ui.colors.cast_mode, mode_font);
 			spell_menu::draw(menu, &world_manager.next_character().read(), font);
 		}
 		input::Mode::Cursor { x, y, .. } => {
-			menu.label_color("Cursor", options.ui.colors.cursor_mode, font);
+			menu.label_color("Cursor", options.ui.colors.cursor_mode, mode_font);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
-				character_info(menu, &selected_character.read(), (255, 255, 255, 255), font);
+				character_info(menu, &selected_character.read());
 			} else {
 				world_manager.console.draw(menu, font);
 			}
@@ -77,7 +79,6 @@ pub fn menu(
 
 pub fn pamphlet(
 	pamphlet: &mut gui::Context,
-	font: &Font<'_, '_>,
 	world_manager: &world::Manager,
 	resources: &ResourceManager<'_>,
 	soul_jar: &mut SoulJar<'_>,
@@ -129,7 +130,7 @@ pub fn pamphlet(
 						texture,
 						layout.flipped,
 						|player_window| {
-							character_info(player_window, &piece, (255, 255, 255, 255), font);
+							character_info(player_window, &piece);
 						},
 					);
 				} else {
@@ -137,7 +138,7 @@ pub fn pamphlet(
 					// a name could be displayed here.
 					// I don't actually know if this is desirable;
 					// this should probably never happen anyways.
-					player_window.label("???", font);
+					player_window.label("???", &player_window.typography.normal);
 				}
 			});
 		}
@@ -146,7 +147,7 @@ pub fn pamphlet(
 	pamphlet.advance(0, 10);
 
 	let mut inventory_fn = |pamphlet: &mut gui::Context| {
-		pamphlet.label("Inventory", font);
+		pamphlet.label("Inventory", &pamphlet.typography.normal);
 		let mut items = world_manager.inventory.iter().peekable();
 		while items.peek().is_some() {
 			let textures_per_row = pamphlet.rect.width() / (32 + 8);
@@ -163,7 +164,7 @@ pub fn pamphlet(
 	};
 	let mut souls_fn = |pamphlet: &mut gui::Context| {
 		const SOUL_SIZE: u32 = 50;
-		pamphlet.label("Souls", font);
+		pamphlet.label("Souls", &pamphlet.typography.normal);
 
 		let bx = pamphlet.x as f32;
 		let by = pamphlet.y as f32;
@@ -195,7 +196,7 @@ pub fn pamphlet(
 
 fn character_thinking(
 	character_id: &world::PartyReference,
-	player_window: &mut gui::Context<'_>,
+	player_window: &mut gui::Context<'_, '_, '_>,
 	texture: &Texture,
 	flipped: bool,
 	f: impl FnOnce(&mut gui::Context),
@@ -240,7 +241,7 @@ pub fn on_cloud(
 	cloud: &draw::CloudState,
 	radius: u32,
 	color: Color,
-	gui: &mut gui::Context<'_>,
+	gui: &mut gui::Context<'_, '_, '_>,
 	f: impl FnOnce(&mut gui::Context),
 ) {
 	let width = gui.rect.width();
@@ -258,6 +259,7 @@ pub fn on_cloud(
 			canvas.clear();
 			let mut gui = gui::Context::new(
 				canvas,
+				gui.typography,
 				Rect::new(0, 0, width - radius * 2, height - radius * 2),
 			);
 			f(&mut gui);
@@ -281,12 +283,7 @@ pub fn on_cloud(
 	gui.advance(width, height_used + radius * 2);
 }
 
-fn character_info(
-	player_window: &mut gui::Context<'_>,
-	piece: &character::Piece,
-	color: Color,
-	font: &Font<'_, '_>,
-) {
+fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &character::Piece) {
 	let character::Piece {
 		sheet: character::Sheet { nouns, level, .. },
 		hp,
@@ -303,8 +300,15 @@ fn character_info(
 		resistance,
 	} = piece.sheet.stats();
 
-	player_window.opposing_labels(name, &format!("Level {level}"), color, font);
-	player_window.label_color(&format!("HP: {hp}/{heart}"), color, font);
+	let font = &player_window.typography.normal;
+
+	player_window.opposing_labels(
+		name,
+		&format!("Level {level}"),
+		player_window.typography.color,
+		font,
+	);
+	player_window.label(&format!("HP: {hp}/{heart}"), font);
 	player_window.progress_bar(
 		(*hp as f32) / (heart as f32),
 		(0, 255, 0, 255),
@@ -312,7 +316,7 @@ fn character_info(
 		10,
 		5,
 	);
-	player_window.label_color(&format!("SP: {sp}/{soul}"), color, font);
+	player_window.label(&format!("SP: {sp}/{soul}"), font);
 	player_window.progress_bar(
 		(*sp as f32) / (soul as f32),
 		(0, 0, 255, 255),
@@ -327,7 +331,7 @@ fn character_info(
 		.zip(physical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label_color(&format!("{stat_name}: {stat}"), color, font)
+			stat_half.label(&format!("{stat_name}: {stat}"), font)
 		});
 	}
 	player_window.hsplit(&mut physical_stats);
@@ -337,7 +341,7 @@ fn character_info(
 		magical_stat_info.into_iter().zip(magical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label_color(&format!("{stat_name}: {stat}"), color, font)
+			stat_half.label(&format!("{stat_name}: {stat}"), font)
 		});
 	}
 	player_window.hsplit(&mut magical_stats);

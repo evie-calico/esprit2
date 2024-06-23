@@ -1,6 +1,7 @@
 use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
-use sdl2::{pixels::Color, rect::Rect, rwops::RWops};
+use sdl2::pixels::Color;
+use sdl2::rect::Rect;
 use std::fs;
 use std::process::exit;
 use tracing::*;
@@ -88,15 +89,7 @@ pub fn main() {
 
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
 	let sleep_texture = resources.get_texture("luvui_sleep");
-	let font = ttf_context
-		.load_font_from_rwops(
-			RWops::from_bytes(include_bytes!(
-				"res/FantasqueSansMNerdFontPropo-Regular.ttf"
-			))
-			.unwrap(),
-			options.ui.font_size,
-		)
-		.unwrap();
+	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
 	let mut soul_jar = gui::widget::SoulJar::new(&resources);
 	let mut cloudy_wave = draw::CloudyWave::default();
@@ -157,6 +150,7 @@ pub fn main() {
 
 		let mut menu = gui::Context::new(
 			&mut canvas,
+			&typography,
 			Rect::new(
 				0,
 				(window_size.1 - options.ui.console_height) as i32,
@@ -164,11 +158,12 @@ pub fn main() {
 				options.ui.console_height,
 			),
 		);
-		gui::widget::menu(&mut menu, &options, &font, &input_mode, &world_manager);
+		gui::widget::menu(&mut menu, &options, &input_mode, &world_manager);
 
 		// Draw pamphlet
 		let mut pamphlet = gui::Context::new(
 			&mut canvas,
+			&typography,
 			Rect::new(
 				(window_size.0 - options.ui.pamphlet_width) as i32,
 				0,
@@ -190,13 +185,7 @@ pub fn main() {
 			Color::RGB(0x08, 0x0f, 0x25),
 		);
 
-		gui::widget::pamphlet(
-			&mut pamphlet,
-			&font,
-			&world_manager,
-			&resources,
-			&mut soul_jar,
-		);
+		gui::widget::pamphlet(&mut pamphlet, &world_manager, &resources, &mut soul_jar);
 
 		canvas.present();
 	}

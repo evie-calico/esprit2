@@ -318,7 +318,9 @@ impl Console {
 						.unwrap();
 					let last_width = width as i32;
 					let info = log.to_string();
-					let texture = font
+					let texture = gui
+						.typography
+						.annotation
 						.render(&info)
 						.blended(self.colors.unimportant)
 						.unwrap()

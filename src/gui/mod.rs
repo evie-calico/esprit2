@@ -7,8 +7,9 @@ use std::ops::Range;
 
 pub mod widget;
 
-pub struct Context<'canvas> {
+pub struct Context<'canvas, 'ttf_module, 'rwops> {
 	pub canvas: &'canvas mut Canvas<Window>,
+	pub typography: &'ttf_module Typography<'ttf_module, 'rwops>,
 	/// Used by draw_text to store textures of fonts before drawing them.
 	font_texture_creator: TextureCreator<WindowContext>,
 	pub rect: Rect,
@@ -24,11 +25,16 @@ enum Orientation {
 	Horizontal { height: i32 },
 }
 
-impl<'canvas> Context<'canvas> {
-	pub fn new(canvas: &'canvas mut Canvas<Window>, rect: Rect) -> Self {
+impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
+	pub fn new(
+		canvas: &'canvas mut Canvas<Window>,
+		typography: &'ttf_module Typography<'ttf_module, 'rwops>,
+		rect: Rect,
+	) -> Self {
 		let font_texture_creator = canvas.texture_creator();
 		Self {
 			canvas,
+			typography,
 			font_texture_creator,
 			rect,
 			y: rect.y,
@@ -80,6 +86,7 @@ impl<'canvas> Context<'canvas> {
 		{
 			let mut child = Context::new(
 				self.canvas,
+				self.typography,
 				Rect::new(
 					self.x + (self.rect.width() as i32) / (view_count as i32) * i as i32,
 					self.y,
@@ -124,7 +131,7 @@ impl<'canvas> Context<'canvas> {
 	}
 
 	pub fn label(&mut self, s: &str, font: &Font) {
-		self.label_color(s, (255, 255, 255, 255), font)
+		self.label_color(s, self.typography.color, font)
 	}
 
 	pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {

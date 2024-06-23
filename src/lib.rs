@@ -22,6 +22,7 @@ pub mod resource_manager;
 pub mod soul;
 pub mod spell;
 pub mod spell_menu;
+pub mod typography;
 pub mod vault;
 pub mod world;
 
@@ -51,6 +52,7 @@ pub mod prelude {
 	pub use resource_manager::ResourceManager;
 	pub use soul::Soul;
 	pub use spell::Spell;
+	pub use typography::Typography;
 	pub use vault::Vault;
 
 	// Export common traits
