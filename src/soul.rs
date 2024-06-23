@@ -1,5 +1,4 @@
-use rand::{thread_rng, Rng};
-use sdl2::pixels::Color;
+use crate::prelude::*;
 
 pub struct Soul {
 	pub color: Color,
@@ -21,7 +20,7 @@ pub struct Soul {
 
 impl Soul {
 	pub fn new(color: Color) -> Self {
-		let mut rng = thread_rng();
+		let mut rng = rand::thread_rng();
 		let mut new = Self {
 			color,
 			x: rng.gen(),
@@ -40,7 +39,7 @@ impl Soul {
 	}
 
 	pub fn speed_timer_timeout(&mut self) {
-		let mut rng = thread_rng();
+		let mut rng = rand::thread_rng();
 		self.speed = rng.gen_range(0.5..1.0);
 		self.x_offset = rng.gen();
 		self.y_offset = rng.gen();

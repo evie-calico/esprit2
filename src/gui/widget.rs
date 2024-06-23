@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use sdl2::pixels::Color;
+use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 use sdl2::ttf::Font;
@@ -11,18 +11,12 @@ pub struct SoulJar<'texture> {
 
 impl<'texture> SoulJar<'texture> {
 	pub fn new(resources: &'texture ResourceManager<'_>) -> Self {
+		let mut rng = rand::thread_rng();
+		let souls = (0..=9)
+			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
+			.collect();
 		Self {
-			souls: vec![
-				Soul::new(Color::RED),
-				Soul::new(Color::YELLOW),
-				Soul::new(Color::BLUE),
-				Soul::new(Color::GREEN),
-				Soul::new(Color::CYAN),
-				Soul::new(Color::RGB(255, 128, 0)),
-				Soul::new(Color::WHITE),
-				Soul::new(Color::RGB(255, 0, 255)),
-				Soul::new(Color::RGB(255, 128, 128)),
-			],
+			souls,
 			light_texture: resources.get_owned_texture("light").unwrap(),
 		}
 	}
@@ -41,14 +35,9 @@ pub fn menu(
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 ) {
-	for (i, color) in (0..3).zip(
-		[
-			Color::RGB(0x14, 0x17, 0x14),
-			Color::RGB(0xE3, 0xBD, 0xEF),
-			Color::RGB(0x14, 0x17, 0x14),
-		]
-		.into_iter(),
-	) {
+	for (i, color) in
+		(0..3).zip([(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)].into_iter())
+	{
 		menu.canvas.set_draw_color(color);
 		menu.canvas
 			.fill_rect(menu.rect.top_shifted(i * -10))
@@ -58,9 +47,9 @@ pub fn menu(
 	// Paint scanlines on the rest of the terminal
 	for (i, y) in ((menu.y + 5)..menu.rect.bottom()).step_by(25).enumerate() {
 		menu.canvas.set_draw_color(if i % 3 == 2 {
-			Color::RGB(0x20, 0x37, 0x21)
+			(0x20, 0x37, 0x21)
 		} else {
-			Color::RGB(0x18, 0x23, 0x18)
+			(0x18, 0x23, 0x18)
 		});
 		menu.canvas
 			.fill_rect(Rect::new(menu.x, y, menu.rect.width(), 2))
@@ -68,17 +57,17 @@ pub fn menu(
 	}
 	match input_mode {
 		input::Mode::Normal => {
-			menu.label_color("Normal", options.ui.normal_mode_color.into(), font);
+			menu.label_color("Normal", options.ui.colors.normal_mode, font);
 			world_manager.console.draw(menu, font);
 		}
 		input::Mode::Cast => {
-			menu.label_color("Cast", options.ui.cast_mode_color.into(), font);
+			menu.label_color("Cast", options.ui.colors.cast_mode, font);
 			spell_menu::draw(menu, &world_manager.next_character().read(), font);
 		}
 		input::Mode::Cursor { x, y, .. } => {
-			menu.label_color("Cursor", options.ui.cursor_mode_color.into(), font);
+			menu.label_color("Cursor", options.ui.colors.cursor_mode, font);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
-				character_info(menu, &selected_character.read(), Color::WHITE, font);
+				character_info(menu, &selected_character.read(), (255, 255, 255, 255), font);
 			} else {
 				world_manager.console.draw(menu, font);
 			}
@@ -140,7 +129,7 @@ pub fn pamphlet(
 						texture,
 						layout.flipped,
 						|player_window| {
-							character_info(player_window, &piece, Color::WHITE, font);
+							character_info(player_window, &piece, (255, 255, 255, 255), font);
 						},
 					);
 				} else {
@@ -186,7 +175,7 @@ pub fn pamphlet(
 			let oy = soul.y * display_size;
 			soul_jar
 				.light_texture
-				.set_color_mod(soul.color.r, soul.color.g, soul.color.b);
+				.set_color_mod(soul.color.0, soul.color.1, soul.color.2);
 			pamphlet
 				.canvas
 				.copy(
@@ -214,7 +203,7 @@ fn character_thinking(
 	on_cloud(
 		&character_id.draw_state.cloud,
 		20,
-		character_id.accent_color.into(),
+		character_id.accent_color,
 		player_window,
 		f,
 	);
@@ -281,7 +270,7 @@ pub fn on_cloud(
 		width - radius * 2,
 		height_used,
 	);
-	cloud.draw(gui.canvas, target, radius as i16, color);
+	cloud.draw(gui.canvas, target, radius as i16, color.into());
 	gui.canvas
 		.copy(
 			&player_texture,
@@ -318,13 +307,19 @@ fn character_info(
 	player_window.label_color(&format!("HP: {hp}/{heart}"), color, font);
 	player_window.progress_bar(
 		(*hp as f32) / (heart as f32),
-		Color::GREEN,
-		Color::RED,
+		(0, 255, 0, 255),
+		(255, 0, 0, 255),
 		10,
 		5,
 	);
 	player_window.label_color(&format!("SP: {sp}/{soul}"), color, font);
-	player_window.progress_bar((*sp as f32) / (soul as f32), Color::BLUE, Color::RED, 10, 5);
+	player_window.progress_bar(
+		(*sp as f32) / (soul as f32),
+		(0, 0, 255, 255),
+		(255, 0, 0, 255),
+		10,
+		5,
+	);
 	let physical_stat_info = [("Pwr", power), ("Def", defense)];
 	let mut physical_stats = [None, None];
 	for ((stat_name, stat), stat_half) in physical_stat_info

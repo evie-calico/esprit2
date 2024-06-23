@@ -1,13 +1,12 @@
+use crate::prelude::*;
+use mlua::LuaSerdeExt;
 use paste::paste;
 use sdl2::gfx::primitives::DrawRenderer;
-use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::TextureQuery;
 use sdl2::ttf::Font;
 use std::collections::VecDeque;
 use std::sync::{mpsc, Arc};
-
-use crate::gui;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
@@ -28,14 +27,14 @@ pub struct Handle {
 
 #[derive(Clone, Debug)]
 pub enum MessagePrinter {
-	Console,
+	Console(Color),
 	Dialogue { speaker: Arc<str>, progress: f64 },
+	Combat(combat::Log),
 }
 
 #[derive(Clone, Debug)]
 pub struct Message {
 	text: String,
-	color: Color,
 	printer: MessagePrinter,
 }
 
@@ -44,8 +43,7 @@ macro_rules! console_colored_print {
 		pub fn print(&mut self, text: String) {
 			self.history.push(Message {
 				text,
-				color: self.colors.normal,
-				printer: MessagePrinter::Console,
+				printer: MessagePrinter::Console(self.colors.normal),
 			});
 		}
 	};
@@ -55,8 +53,7 @@ macro_rules! console_colored_print {
 			pub fn [<print_ $which>](&mut self, text: String) {
 				self.history.push(Message {
 					text,
-					color: self.colors.$which,
-					printer: MessagePrinter::Console,
+					printer: MessagePrinter::Console(self.colors.$which),
 				});
 			}
 		}
@@ -69,8 +66,7 @@ macro_rules! handle_colored_print {
 			this.message_sender
 				.send(Message {
 					text: value,
-					color: this.colors.normal,
-					printer: MessagePrinter::Console,
+					printer: MessagePrinter::Console(this.colors.normal),
 				})
 				.map_err(mlua::Error::external)
 		});
@@ -82,8 +78,7 @@ macro_rules! handle_colored_print {
 				this.message_sender
 					.send(Message {
 						text: value,
-						color: this.colors.$which,
-						printer: MessagePrinter::Console,
+						printer: MessagePrinter::Console(this.colors.$which),
 					})
 					.map_err(mlua::Error::external)
 			});
@@ -93,9 +88,10 @@ macro_rules! handle_colored_print {
 
 macro_rules! impl_console {
 	($($colors:ident: $value:expr),+$(,)?) => {
-		#[derive(Clone, Debug)]
+		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		pub struct Colors {
-			$(pub $colors: Color,)*
+			$(pub $colors: Color
+			,)*
 		}
 
 		impl Default for Colors {
@@ -112,19 +108,26 @@ macro_rules! impl_console {
 			pub fn print_colored(&mut self, text: String, color: Color) {
 				self.history.push(Message {
 					text,
-					color,
-					printer: MessagePrinter::Console,
+					printer: MessagePrinter::Console(color),
 				});
 			}
 
 			pub fn say(&mut self, speaker: Arc<str>, text: String) {
 				self.history.push(Message {
 					text,
-					color: self.colors.normal,
 					printer: MessagePrinter::Dialogue {
 						speaker,
 						progress: 0.0,
 					},
+				});
+
+				self.in_progress.push_back(self.history.len() - 1);
+			}
+
+			pub fn combat_log(&mut self, text: String, log: combat::Log) {
+				self.history.push(Message {
+					text,
+					printer: MessagePrinter::Combat(log),
 				});
 
 				self.in_progress.push_back(self.history.len() - 1);
@@ -134,19 +137,29 @@ macro_rules! impl_console {
 		impl mlua::UserData for Handle {
 			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 				$(handle_colored_print! { $colors, methods } )*
+				methods.add_method_mut("combat_log", |lua, this, (text, log): (String, mlua::Value)| {
+					let log = lua.from_value(log)?;
+					this.message_sender
+						.send(Message {
+							text,
+							printer: MessagePrinter::Combat(log),
+						})
+						.map_err(mlua::Error::external)
+				});
+
 			}
 		}
 	};
 }
 
 impl_console! {
-	normal: Color::WHITE,
-	system: Color::GREY,
-	unimportant: Color::GREY,
-	defeat: Color::RGB(255, 128, 128),
-	danger: Color::RED,
-	important: Color::YELLOW,
-	special: Color::GREEN,
+	normal: (255, 255, 255, 255),
+	system: (100, 100, 100, 255),
+	unimportant: (100, 100, 100, 255),
+	defeat: (255, 128, 128, 255),
+	danger: (255, 0, 0, 255),
+	important: (255, 255, 0, 255),
+	special: (0, 255, 0, 255),
 }
 
 impl Default for Console {
@@ -163,6 +176,12 @@ impl Default for Console {
 }
 
 impl Console {
+	pub fn new(colors: console::Colors) -> Self {
+		Self {
+			colors,
+			..Default::default()
+		}
+	}
 	pub fn handle(&self) -> Handle {
 		Handle {
 			message_sender: self.message_sender.clone(),
@@ -226,16 +245,20 @@ impl Console {
 
 		let mut cursor = rect.y + (rect.height() as i32);
 
+		let text = |message, color: Color| {
+			let texture = font
+				.render(message)
+				.blended(color)
+				.unwrap()
+				.as_texture(&font_texture_creator)
+				.unwrap();
+			let TextureQuery { width, height, .. } = texture.query();
+			(texture, width, height)
+		};
 		for message in self.history.iter().rev() {
 			match &message.printer {
-				MessagePrinter::Console => {
-					let font_texture = font
-						.render(&message.text)
-						.blended(message.color)
-						.unwrap()
-						.as_texture(&font_texture_creator)
-						.unwrap();
-					let TextureQuery { width, height, .. } = font_texture.query();
+				MessagePrinter::Console(color) => {
+					let (font_texture, width, height) = text(&message.text, *color);
 					cursor -= height as i32;
 					canvas
 						.copy(
@@ -246,18 +269,7 @@ impl Console {
 						.unwrap();
 				}
 				MessagePrinter::Dialogue { speaker, progress } => {
-					let font_texture = font
-						.render(speaker)
-						.blended(Color::BLACK)
-						.unwrap()
-						.as_texture(&font_texture_creator)
-						.unwrap();
-
-					let TextureQuery {
-						width: text_width,
-						height,
-						..
-					} = font_texture.query();
+					let (font_texture, text_width, height) = text(speaker, (0, 0, 0, 255));
 					let width = text_width.max(MINIMUM_NAMEPLATE_WIDTH);
 					let margin = ((width - text_width) / 2) as i32;
 					canvas
@@ -267,7 +279,7 @@ impl Console {
 							(rect.x + (width as i32)) as i16,
 							(cursor - (height as i32) + 2) as i16,
 							5,
-							message.color,
+							self.colors.normal,
 						)
 						.unwrap();
 					cursor -= height as i32;
@@ -283,16 +295,39 @@ impl Console {
 					let last_width = width as i32;
 
 					let shown_characters = message.text.len().min((*progress as usize) + 1);
-					let font_texture = font
-						.render(&message.text[0..shown_characters])
-						.blended(message.color)
-						.unwrap()
-						.as_texture(&font_texture_creator)
-						.unwrap();
-					let TextureQuery { width, height, .. } = font_texture.query();
+					let (font_texture, width, height) =
+						text(&message.text[0..shown_characters], self.colors.normal);
 					canvas
 						.copy(
 							&font_texture,
+							None,
+							Rect::new(rect.x + last_width + 10, cursor, width, height),
+						)
+						.unwrap();
+				}
+				MessagePrinter::Combat(log) => {
+					let color = if log.is_weak() {
+						self.colors.unimportant
+					} else {
+						self.colors.normal
+					};
+					let (texture, width, height) = text(&message.text, color);
+					cursor -= height as i32;
+					canvas
+						.copy(&texture, None, Rect::new(rect.x, cursor, width, height))
+						.unwrap();
+					let last_width = width as i32;
+					let info = log.to_string();
+					let texture = font
+						.render(&info)
+						.blended(self.colors.unimportant)
+						.unwrap()
+						.as_texture(&font_texture_creator)
+						.unwrap();
+					let TextureQuery { width, height, .. } = texture.query();
+					canvas
+						.copy(
+							&texture,
 							None,
 							Rect::new(rect.x + last_width + 10, cursor, width, height),
 						)

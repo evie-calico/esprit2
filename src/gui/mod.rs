@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
 use sdl2::ttf::Font;
@@ -125,7 +124,7 @@ impl<'canvas> Context<'canvas> {
 	}
 
 	pub fn label(&mut self, s: &str, font: &Font) {
-		self.label_color(s, Color::WHITE, font)
+		self.label_color(s, (255, 255, 255, 255), font)
 	}
 
 	pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {
@@ -228,7 +227,7 @@ impl<'canvas> Context<'canvas> {
 			let colored_range = span.start..span.end;
 			if !colored_range.is_empty() {
 				let var = &expression.source[colored_range];
-				let color = Colors::get(var).unwrap_or(Color::RED);
+				let color = Colors::get(var).unwrap_or((255, 0, 0, 255));
 				self.label_color(var, color, font);
 			}
 			last_char = span.end;

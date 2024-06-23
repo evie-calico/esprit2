@@ -64,13 +64,13 @@ pub struct PartyReference {
 	/// Used for saving data.
 	pub member: Uuid,
 	/// Displayed on the pamphlet.
-	pub accent_color: (u8, u8, u8),
+	pub accent_color: Color,
 	#[serde(skip)]
 	pub draw_state: PartyReferenceDrawState,
 }
 
 impl PartyReference {
-	pub fn new(piece: Uuid, member: Uuid, accent_color: (u8, u8, u8)) -> Self {
+	pub fn new(piece: Uuid, member: Uuid, accent_color: Color) -> Self {
 		Self {
 			piece,
 			member,
@@ -83,7 +83,7 @@ impl PartyReference {
 // this is probably uneccessary and just makes main.rs look nicer
 pub struct PartyReferenceBase {
 	pub sheet: &'static str,
-	pub accent_color: (u8, u8, u8),
+	pub accent_color: Color,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -99,6 +99,7 @@ pub struct Location {
 impl<'resources, 'textures> Manager<'resources, 'textures> {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
+		options: &Options,
 		resources: &'resources ResourceManager<'textures>,
 	) -> Self {
 		let mut party = Vec::new();
@@ -126,7 +127,7 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 			player_controlled = false;
 		}
 
-		let console = Console::default();
+		let console = Console::new(options.ui.colors.console.clone());
 
 		let lua = mlua::Lua::new();
 		lua.globals().set("Console", console.handle()).unwrap();
@@ -310,17 +311,11 @@ pub enum MovementError {
 }
 
 #[derive(Clone, Debug)]
-pub enum AttackResult {
-	Hit {
-		message: String,
-		weak: bool,
-		log: CombatLog,
-	},
-}
-
-#[derive(Clone, Debug)]
-pub enum CombatLog {
-	Hit { magnitude: u32, damage: u32 },
+pub struct AttackResult {
+	/// Flavor text to explain the attack.
+	message: String,
+	/// Hard info about the attack, like damage.
+	log: combat::Log,
 }
 
 #[derive(thiserror::Error, Clone, Debug)]
@@ -350,15 +345,8 @@ impl Manager<'_, '_> {
 		let action = next_character.write().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
-				Ok(MovementResult::Attack(AttackResult::Hit { message, weak, log })) => {
-					let colors = &self.console.colors;
-					let color = if weak {
-						colors.unimportant
-					} else {
-						colors.normal
-					};
-					self.console.print_colored(message, color);
-					self.console.print(format!("{log:?}"));
+				Ok(MovementResult::Attack(AttackResult { message, log })) => {
+					self.console.combat_log(message, log);
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
@@ -483,20 +471,17 @@ impl Manager<'_, '_> {
 			.replace_prefixed_nouns(&character.sheet.nouns, "self_")
 			.replace_prefixed_nouns(&target.sheet.nouns, "target_");
 		message.push_str(damage_punctuation);
-		message.push_str(&format!(" (-{damage} HP)"));
 
 		drop(target);
-		drop(character);
 
 		// This is where the damage is actually dealt
 		target_ref.write().hp -= damage as i32;
 
 		// `self` is not mutable, so the message needs to be passed up to the manager,
 		// where printing can occur.
-		Ok(AttackResult::Hit {
+		Ok(AttackResult {
 			message,
-			weak: is_weak_attack,
-			log: CombatLog::Hit { magnitude, damage },
+			log: combat::Log::Hit { magnitude, damage },
 		})
 	}
 

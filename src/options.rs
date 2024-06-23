@@ -1,7 +1,7 @@
+use crate::prelude::*;
+use sdl2::keyboard::Keycode;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
-
-use sdl2::keyboard::Keycode;
 
 lazy_static::lazy_static! {
 	pub static ref USER_DIRECTORY: PathBuf = get_user_directory();
@@ -48,12 +48,10 @@ impl Options {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct UserInterface {
+	pub colors: Colors,
+
 	pub pamphlet_width: u32,
 	pub console_height: u32,
-
-	pub normal_mode_color: (u8, u8, u8),
-	pub cast_mode_color: (u8, u8, u8),
-	pub cursor_mode_color: (u8, u8, u8),
 
 	pub font_size: u16,
 }
@@ -61,14 +59,33 @@ pub struct UserInterface {
 impl Default for UserInterface {
 	fn default() -> Self {
 		Self {
+			colors: Colors::default(),
+
 			pamphlet_width: 400,
 			console_height: 200,
 
-			normal_mode_color: (0x77, 0xE7, 0xA2),
-			cast_mode_color: (0xA2, 0x77, 0xE7),
-			cursor_mode_color: (0xE7, 0xA2, 0x77),
-
 			font_size: 18,
+		}
+	}
+}
+
+/// User interfact colors
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Colors {
+	pub normal_mode: Color,
+	pub cast_mode: Color,
+	pub cursor_mode: Color,
+	pub console: console::Colors,
+}
+
+impl Default for Colors {
+	fn default() -> Self {
+		Self {
+			normal_mode: (0x77, 0xE7, 0xA2, 0xFF),
+			cast_mode: (0xA2, 0x77, 0xE7, 0xFF),
+			cursor_mode: (0xE7, 0xA2, 0x77, 0xFF),
+			console: console::Colors::default(),
 		}
 	}
 }

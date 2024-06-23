@@ -56,13 +56,19 @@ pub fn main() {
 			exit(1);
 		}
 	};
-	let options = Options::open(USER_DIRECTORY.join("options.toml")).unwrap_or_else(|msg| {
-		info!("failed to open options.toml ({msg}), initializing instead");
+	let options_path = USER_DIRECTORY.join("options.toml");
+	let options = Options::open(&options_path).unwrap_or_else(|msg| {
+		// This is `info` because it's actually very expected for first-time players.
+		info!("failed to open options.toml ({msg})");
+		info!("initializing options.toml instead");
+		// Attempt to save the old file, in case it exists.
+		if let Err(msg) = fs::rename(&options_path, options_path.with_extension("toml.old")) {
+			info!("failed to backup existing options.toml: {msg}");
+		} else {
+			info!("exiting options.toml was backed up to options.toml.old");
+		}
 		let options = Options::default();
-		if let Err(msg) = fs::write(
-			USER_DIRECTORY.join("options.toml"),
-			toml::to_string(&options).unwrap(),
-		) {
+		if let Err(msg) = fs::write(&options_path, toml::to_string(&options).unwrap()) {
 			error!("failed to initialize options.toml: {msg}");
 		}
 		options
@@ -71,14 +77,14 @@ pub fn main() {
 	let party_blueprint = [
 		world::PartyReferenceBase {
 			sheet: "luvui",
-			accent_color: (0xDA, 0x2D, 0x5C),
+			accent_color: (0xDA, 0x2D, 0x5C, 0xFF),
 		},
 		world::PartyReferenceBase {
 			sheet: "aris",
-			accent_color: (0x0C, 0x94, 0xFF),
+			accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 		},
 	];
-	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &resources);
+	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &options, &resources);
 
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
 	let sleep_texture = resources.get_texture("luvui_sleep");

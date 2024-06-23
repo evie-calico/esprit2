@@ -8,6 +8,7 @@
 
 pub mod attack;
 pub mod character;
+pub mod combat;
 pub mod console;
 pub mod draw;
 pub mod expression;
@@ -34,11 +35,15 @@ type Aut = u32;
 #[allow(unused)] // I'm not using this anywhere yet, but it's useful to have written down.
 const TURN: Aut = 12;
 
+type Color = (u8, u8, u8, u8);
+
 pub mod prelude {
 	pub use super::*;
+
+	// Import redundant module::Struct names.
 	pub use attack::Attack;
 	pub use console::Console;
-	pub use expression::{Evaluate, Expression};
+	pub use expression::Expression;
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
@@ -47,4 +52,8 @@ pub mod prelude {
 	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use vault::Vault;
+
+	// Export common traits
+	pub use expression::Evaluate;
+	pub use rand::Rng;
 }
