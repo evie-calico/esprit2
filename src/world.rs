@@ -12,11 +12,32 @@ pub type CharacterRef = Arc<RwLock<character::Piece>>;
 
 /// This struct contains all information that is relevant during gameplay.
 pub struct Manager<'resources, 'textures> {
-	// I know I'm going to have to change this in the future to add multiple worlds.
+	pub world: World,
+	pub console: Console,
+	/// Lua runtime for scripts operating on the world.
+	/// Configured to have access to most fields within this struct.
+	pub lua: mlua::Lua,
+	pub resource_manager: &'resources ResourceManager<'textures>,
+}
+
+impl std::ops::Deref for Manager<'_, '_> {
+	type Target = World;
+
+	fn deref(&self) -> &Self::Target {
+		&self.world
+	}
+}
+
+impl std::ops::DerefMut for Manager<'_, '_> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.world
+	}
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct World {
 	/// Where in the world the characters are.
 	pub location: Location,
-	/// This is the level pointed to by `location.level`.
-	pub current_level: Level,
 	pub current_floor: Floor,
 	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
 	pub characters: Vec<CharacterRef>,
@@ -25,12 +46,6 @@ pub struct Manager<'resources, 'textures> {
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
-	pub console: Console,
-	/// Lua runtime for scripts operating on the world.
-	/// Configured to have access to most fields within this struct.
-	pub lua: mlua::Lua,
-
-	pub resource_manager: &'resources ResourceManager<'textures>,
 }
 
 /// Contains information about what should generate on each floor.
@@ -89,9 +104,6 @@ pub struct PartyReferenceBase {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Location {
 	/// Which level is currently loaded.
-	///
-	/// This is usually implicit (see Manager.current_level),
-	/// But storing it is important for serialization.
 	pub level: String,
 	pub floor: usize,
 }
@@ -100,7 +112,7 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
 		options: &Options,
-		resources: &'resources ResourceManager<'textures>,
+		resource_manager: &'resources ResourceManager<'textures>,
 	) -> Self {
 		let mut party = Vec::new();
 		let mut characters = Vec::new();
@@ -112,11 +124,11 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 			accent_color,
 		} in party_blueprint
 		{
-			let sheet = resources.get_sheet(sheet).unwrap();
+			let sheet = resource_manager.get_sheet(sheet).unwrap();
 			let character = character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
-				..character::Piece::new(sheet.clone(), resources)
+				..character::Piece::new(sheet.clone(), resource_manager)
 			};
 			party.push(world::PartyReference::new(
 				character.id,
@@ -132,45 +144,45 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 		let lua = mlua::Lua::new();
 		lua.globals().set("Console", console.handle()).unwrap();
 
-		world::Manager {
-			location: world::Location {
-				level: String::from("New Level"),
-				floor: 0,
-			},
-			console,
-			current_level: Level::default(),
-			current_floor: Floor::default(),
-			characters,
-			items: Vec::new(),
+		Manager {
+			world: World {
+				location: world::Location {
+					level: String::from("New Level"),
+					floor: 0,
+				},
+				current_floor: Floor::default(),
+				characters,
+				items: Vec::new(),
 
-			party,
-			inventory: vec![
-				"items/aloe".into(),
-				"items/apple".into(),
-				"items/blinkfruit".into(),
-				"items/fabric_shred".into(),
-				"items/grapes".into(),
-				"items/ice_cream".into(),
-				"items/lily".into(),
-				"items/pear_on_a_stick".into(),
-				"items/pear".into(),
-				"items/pepper".into(),
-				"items/purefruit".into(),
-				"items/raspberry".into(),
-				"items/reviver_seed".into(),
-				"items/ring_alt".into(),
-				"items/ring".into(),
-				"items/scarf".into(),
-				"items/slimy_apple".into(),
-				"items/super_pepper".into(),
-				"items/twig".into(),
-				"items/water_chestnut".into(),
-				"items/watermelon".into(),
-			],
+				party,
+				inventory: vec![
+					"items/aloe".into(),
+					"items/apple".into(),
+					"items/blinkfruit".into(),
+					"items/fabric_shred".into(),
+					"items/grapes".into(),
+					"items/ice_cream".into(),
+					"items/lily".into(),
+					"items/pear_on_a_stick".into(),
+					"items/pear".into(),
+					"items/pepper".into(),
+					"items/purefruit".into(),
+					"items/raspberry".into(),
+					"items/reviver_seed".into(),
+					"items/ring_alt".into(),
+					"items/ring".into(),
+					"items/scarf".into(),
+					"items/slimy_apple".into(),
+					"items/super_pepper".into(),
+					"items/twig".into(),
+					"items/water_chestnut".into(),
+					"items/watermelon".into(),
+				],
+			},
 
 			lua,
-
-			resource_manager: resources,
+			console,
+			resource_manager,
 		}
 	}
 

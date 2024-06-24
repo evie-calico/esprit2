@@ -1,0 +1,208 @@
+items = []
+inventory = ["items/aloe", "items/apple", "items/blinkfruit", "items/fabric_shred", "items/grapes", "items/ice_cream", "items/lily", "items/pear_on_a_stick", "items/pear", "items/pepper", "items/purefruit", "items/raspberry", "items/reviver_seed", "items/ring_alt", "items/ring", "items/scarf", "items/slimy_apple", "items/super_pepper", "items/twig", "items/water_chestnut", "items/watermelon"]
+
+[location]
+level = "New Level"
+floor = 0
+
+[current_floor.map]
+cols = 32
+data = ["Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Wall", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Wall", "Floor", "Wall", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Exit", "Wall", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Wall", "Floor", "Wall", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Wall", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor", "Floor"]
+order = "RowMajor"
+
+[[characters]]
+id = "10c3e4e1-5cd8-428f-8fe4-c77da5376693"
+hp = 31
+sp = 16
+x = 0
+y = 0
+player_controlled = true
+alliance = "Friendly"
+
+[characters.sheet]
+level = 1
+experience = 0
+speed = 12
+attacks = ["scratch", "bite"]
+spells = ["magic_missile", "debug/level_up"]
+
+[characters.sheet.nouns]
+name = "Luvui"
+proper_name = true
+pronouns = "Female"
+
+[characters.sheet.bases]
+heart = 30
+soul = 15
+power = 3
+defense = 6
+magic = 6
+resistance = 3
+
+[characters.sheet.growths]
+heart = 100
+soul = 100
+power = 40
+defense = 50
+magic = 80
+resistance = 40
+
+[characters.sheet.skillset]
+major = "Chaos"
+minor = "Positive"
+
+[[characters.attacks]]
+name = "Scratch"
+weight = 100
+damage = "power + 2d4"
+
+[characters.attacks.messages]
+low = ["{self_Address}'s claws barely missed {target_address}", "{target_Address} was tickled by {self_address}'s claws", "{self_Address}'s claws lightly slid across {target_address}"]
+high = ["{self_Address}'s claws rake against {target_address}", "{target_Address} is struck by {self_address}'s claws", "{self_Address} grazes {target_address} with {self_their} claws", "{self_Address} strikes {target_address} with {self_their} claws", "{self_Address} digs {self_their} claws into {target_address}"]
+
+[[characters.attacks]]
+name = "Bite"
+weight = 20
+damage = "power + 2d6"
+
+[characters.attacks.messages]
+low = ["{target_Address} narrowly dodged {self_address}'s teeth", "{self_Address} weakly nibbled {target_address}", "{self_Address} tried to bite {target_address} but missed"]
+high = ["{self_Address} bites {target_address}", "{self_Address} bites into {target_address}", "{self_Address} bites {target_address}", "{self_Address} sinks {self_their} teeth into {target_address}"]
+
+[[characters.spells]]
+name = "Magic Missile"
+icon = "magic_missile"
+energy = "Positive"
+harmony = "Order"
+level = 1
+magnitude = "magic + 2d4"
+
+[characters.spells.on_cast]
+type = "Path"
+source = "scripts/spells/magic_missile.lua"
+
+[[characters.spells]]
+name = "(DEBUG) Level Up"
+icon = "dummy"
+energy = "Positive"
+harmony = "Order"
+level = 0
+
+[characters.spells.on_cast]
+type = "Inline"
+source = '''
+target:force_level();
+Console:print(target:replace_nouns("{Address}'s level increased to "..target.sheet.level))
+'''
+
+[[characters]]
+id = "34f0cac1-895b-472d-8bca-88a658674ef4"
+hp = 31
+sp = 10
+spells = []
+x = 0
+y = 0
+player_controlled = false
+alliance = "Friendly"
+
+[characters.sheet]
+level = 1
+experience = 0
+speed = 12
+attacks = ["scratch"]
+spells = []
+
+[characters.sheet.nouns]
+name = "Aris"
+proper_name = true
+pronouns = "Male"
+
+[characters.sheet.bases]
+heart = 30
+soul = 10
+power = 6
+defense = 5
+magic = 1
+resistance = 7
+
+[characters.sheet.growths]
+heart = 100
+soul = 80
+power = 80
+defense = 75
+magic = 60
+resistance = 50
+
+[characters.sheet.skillset]
+major = "Negative"
+minor = "Chaos"
+
+[[characters.attacks]]
+name = "Scratch"
+weight = 100
+damage = "power + 2d4"
+
+[characters.attacks.messages]
+low = ["{self_Address}'s claws barely missed {target_address}", "{target_Address} was tickled by {self_address}'s claws", "{self_Address}'s claws lightly slid across {target_address}"]
+high = ["{self_Address}'s claws rake against {target_address}", "{target_Address} is struck by {self_address}'s claws", "{self_Address} grazes {target_address} with {self_their} claws", "{self_Address} strikes {target_address} with {self_their} claws", "{self_Address} digs {self_their} claws into {target_address}"]
+
+[[characters]]
+id = "6f29e9c0-8651-4445-8663-b594672c72df"
+hp = 31
+sp = 10
+spells = []
+x = 3
+y = 3
+player_controlled = false
+alliance = "Enemy"
+
+[characters.sheet]
+level = 1
+experience = 0
+speed = 12
+attacks = ["scratch"]
+spells = []
+
+[characters.sheet.nouns]
+name = "Aris"
+proper_name = true
+pronouns = "Male"
+
+[characters.sheet.bases]
+heart = 30
+soul = 10
+power = 6
+defense = 5
+magic = 1
+resistance = 7
+
+[characters.sheet.growths]
+heart = 100
+soul = 80
+power = 80
+defense = 75
+magic = 60
+resistance = 50
+
+[characters.sheet.skillset]
+major = "Negative"
+minor = "Chaos"
+
+[[characters.attacks]]
+name = "Scratch"
+weight = 100
+damage = "power + 2d4"
+
+[characters.attacks.messages]
+low = ["{self_Address}'s claws barely missed {target_address}", "{target_Address} was tickled by {self_address}'s claws", "{self_Address}'s claws lightly slid across {target_address}"]
+high = ["{self_Address}'s claws rake against {target_address}", "{target_Address} is struck by {self_address}'s claws", "{self_Address} grazes {target_address} with {self_their} claws", "{self_Address} strikes {target_address} with {self_their} claws", "{self_Address} digs {self_their} claws into {target_address}"]
+
+[[party]]
+piece = "10c3e4e1-5cd8-428f-8fe4-c77da5376693"
+member = "ca0b0023-695e-4afe-ab81-ee4b7f3222ec"
+accent_color = [218, 45, 92, 255]
+
+[[party]]
+piece = "34f0cac1-895b-472d-8bca-88a658674ef4"
+member = "37fde926-7afa-411d-9b96-271c26f9acee"
+accent_color = [12, 148, 255, 255]

@@ -38,8 +38,10 @@ pub enum Mode {
 	},
 }
 
-pub struct Result {
-	pub exit: bool,
+pub enum Result {
+	Exit,
+	Fullscreen,
+	Debug,
 }
 
 pub fn world(
@@ -47,10 +49,10 @@ pub fn world(
 	world_manager: &mut world::Manager,
 	mode: &mut Mode,
 	options: &Options,
-) -> Result {
+) -> Option<Result> {
 	for event in event_pump.poll_iter() {
 		match event {
-			Event::Quit { .. } => return Result { exit: true },
+			Event::Quit { .. } => return Some(Result::Exit),
 			Event::KeyDown {
 				keycode: Some(keycode),
 				..
@@ -61,7 +63,13 @@ pub fn world(
 						Mode::Normal => {
 							// Eventually this will be a more involved binding.
 							if options.controls.escape.contains(keycode) {
-								return Result { exit: true };
+								return Some(Result::Exit);
+							}
+							if options.controls.debug.contains(keycode) {
+								return Some(Result::Debug);
+							}
+							if options.controls.fullscreen.contains(keycode) {
+								return Some(Result::Fullscreen);
 							}
 							let directions = [
 								(&options.controls.left, character::OrdDir::Left),
@@ -169,5 +177,5 @@ pub fn world(
 		}
 	}
 
-	Result { exit: false }
+	None
 }

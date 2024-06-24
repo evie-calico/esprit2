@@ -86,39 +86,64 @@ pub fn main() {
 		},
 	];
 	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &options, &resources);
-
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
+
 	let sleep_texture = resources.get_texture("luvui_sleep");
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
 	let mut soul_jar = gui::widget::SoulJar::new(&resources);
+	// This disperses the souls enough to cause them to fly in from the sides
+	// the same effect can be seen if a computer is put to sleep and then woken up.
+	soul_jar.tick(5.0);
 	let mut cloudy_wave = draw::CloudyWave::default();
 
 	let mut input_mode = input::Mode::Normal;
 	let mut action_request = None;
+	let mut fps = 60.0;
+	let mut fps_timer = 0.0;
+	let mut debug = false;
 	loop {
 		// Input processing
-		if input::world(
+		match input::world(
 			&mut event_pump,
 			&mut world_manager,
 			&mut input_mode,
 			&options,
-		)
-		.exit
-		{
-			break;
-		};
-
+		) {
+			Some(input::Result::Exit) => break,
+			Some(input::Result::Fullscreen) => {
+				use sdl2::video::FullscreenType;
+				match canvas.window().fullscreen_state() {
+					sdl2::video::FullscreenType::Off => {
+						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Desktop);
+					}
+					sdl2::video::FullscreenType::True | sdl2::video::FullscreenType::Desktop => {
+						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
+					}
+				}
+			}
+			Some(input::Result::Debug) => debug ^= true,
+			None => (),
+		}
 		// Logic
-		// This is the only place where delta time should be used.
 		{
+			// This is the only place where delta time should be used.
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
+
+			fps_timer += delta;
+			if fps_timer > 0.3 {
+				fps_timer = 0.0;
+				fps = (fps + 1.0 / delta) / 2.0;
+			}
 
 			for i in &mut world_manager.party {
 				i.draw_state.cloud.tick(delta);
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
 			action_request = world_manager.update(action_request, &mut input_mode);
+			world_manager
+				.characters
+				.retain(|character| character.read().hp > 0);
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
 			cloudy_wave.tick(delta);
@@ -128,65 +153,73 @@ pub fn main() {
 		}
 
 		// Rendering
-		// Clear the screen.
-		canvas.set_draw_color(Color::RGB(20, 20, 20));
-		canvas.clear();
+		{
+			// Clear the screen.
+			canvas.set_draw_color(Color::RGB(20, 20, 20));
+			canvas.clear();
 
-		// Configure world viewport.
-		let window_size = canvas.window().size();
-		canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
-		canvas.set_draw_color(Color::RGB(20, 20, 20));
+			// Configure world viewport.
+			let window_size = canvas.window().size();
+			canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
+			canvas.set_draw_color(Color::RGB(20, 20, 20));
 
-		canvas
-			.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
-			.unwrap();
+			canvas
+				.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
+				.unwrap();
 
-		draw::tilemap(&mut canvas, &world_manager);
-		draw::characters(&world_manager, &mut canvas, sleep_texture);
-		draw::cursor(&input_mode, &resources, &mut canvas);
+			draw::tilemap(&mut canvas, &world_manager);
+			draw::characters(&world_manager, &mut canvas, sleep_texture);
+			draw::cursor(&input_mode, &resources, &mut canvas);
 
-		// Render User Interface
-		canvas.set_viewport(None);
+			// Render User Interface
+			canvas.set_viewport(None);
 
-		let mut menu = gui::Context::new(
-			&mut canvas,
-			&typography,
-			Rect::new(
-				0,
-				(window_size.1 - options.ui.console_height) as i32,
-				window_size.0 - options.ui.pamphlet_width,
-				options.ui.console_height,
-			),
-		);
-		gui::widget::menu(&mut menu, &options, &input_mode, &world_manager);
+			if debug {
+				let mut debug =
+					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
+				debug.label(&format!("FPS: {fps:.0}"));
+			}
 
-		// Draw pamphlet
-		let mut pamphlet = gui::Context::new(
-			&mut canvas,
-			&typography,
-			Rect::new(
-				(window_size.0 - options.ui.pamphlet_width) as i32,
-				0,
-				options.ui.pamphlet_width,
-				window_size.1,
-			),
-		);
+			let mut menu = gui::Context::new(
+				&mut canvas,
+				&typography,
+				Rect::new(
+					0,
+					(window_size.1 - options.ui.console_height) as i32,
+					window_size.0 - options.ui.pamphlet_width,
+					options.ui.console_height,
+				),
+			);
+			gui::widget::menu(&mut menu, &options, &input_mode, &world_manager);
 
-		let top = pamphlet.rect.top();
-		let bottom = pamphlet.rect.bottom();
-		let x = pamphlet.rect.left() as f64;
+			// Draw pamphlet
+			let mut pamphlet = gui::Context::new(
+				&mut canvas,
+				&typography,
+				Rect::new(
+					(window_size.0 - options.ui.pamphlet_width) as i32,
+					0,
+					options.ui.pamphlet_width,
+					window_size.1,
+				),
+			);
 
-		cloudy_wave.draw(
-			&mut pamphlet,
-			top,
-			bottom,
-			x,
-			20,
-			Color::RGB(0x08, 0x0f, 0x25),
-		);
+			let top = pamphlet.rect.top();
+			let bottom = pamphlet.rect.bottom();
+			let x = pamphlet.rect.left() as f64;
 
-		gui::widget::pamphlet(&mut pamphlet, &world_manager, &resources, &mut soul_jar);
+			cloudy_wave.draw(
+				&mut pamphlet,
+				top,
+				bottom,
+				x,
+				20,
+				Color::RGB(0x08, 0x0f, 0x25),
+			);
 
-		canvas.present();
+			gui::widget::pamphlet(&mut pamphlet, &world_manager, &resources, &mut soul_jar);
+
+			canvas.present();
+		}
 	}
 }

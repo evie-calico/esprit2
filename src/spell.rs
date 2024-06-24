@@ -1,6 +1,5 @@
-use std::fs;
-
 use crate::prelude::*;
+use std::fs;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Energy {
@@ -51,7 +50,7 @@ impl Affinity {
 	pub fn magnitude(self, magnitude: u32) -> u32 {
 		match self {
 			Affinity::Uncastable => 0,
-			Affinity::Weak => magnitude / 4,
+			Affinity::Weak => magnitude / 2,
 			Affinity::Average => magnitude * 3 / 4,
 			Affinity::Strong => magnitude,
 		}

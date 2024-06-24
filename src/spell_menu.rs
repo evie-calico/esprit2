@@ -8,7 +8,7 @@ pub fn draw(gui: &mut gui::Context, character: &character::Piece, font: &Font) {
 		} else {
 			(255, 0, 0, 255)
 		};
-		gui.label_color(
+		gui.label_styled(
 			&format!("({letter}) {} - {} SP", spell.name, spell.level),
 			color,
 			font,

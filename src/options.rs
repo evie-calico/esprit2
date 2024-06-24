@@ -164,6 +164,8 @@ pub struct Controls {
 
 	pub confirm: Triggers,
 	pub escape: Triggers,
+	pub fullscreen: Triggers,
+	pub debug: Triggers,
 }
 
 impl Default for Controls {
@@ -186,6 +188,8 @@ impl Default for Controls {
 
 			confirm: Triggers(vec![Key(K::Return)]),
 			escape: Triggers(vec![Key(K::Escape)]),
+			fullscreen: Triggers(vec![Key(K::F11)]),
+			debug: Triggers(vec![Key(K::F1)]),
 		}
 	}
 }

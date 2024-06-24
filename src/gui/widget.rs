@@ -56,18 +56,29 @@ pub fn menu(
 	}
 
 	let font = &menu.typography.title;
-	let mode_font = &menu.typography.annotation;
 	match input_mode {
 		input::Mode::Normal => {
-			menu.label_color("Normal", options.ui.colors.normal_mode, mode_font);
+			menu.label_styled(
+				"Normal",
+				options.ui.colors.normal_mode,
+				&menu.typography.annotation,
+			);
 			world_manager.console.draw(menu, font);
 		}
 		input::Mode::Cast => {
-			menu.label_color("Cast", options.ui.colors.cast_mode, mode_font);
+			menu.label_styled(
+				"Cast",
+				options.ui.colors.cast_mode,
+				&menu.typography.annotation,
+			);
 			spell_menu::draw(menu, &world_manager.next_character().read(), font);
 		}
 		input::Mode::Cursor { x, y, .. } => {
-			menu.label_color("Cursor", options.ui.colors.cursor_mode, mode_font);
+			menu.label_styled(
+				"Cursor",
+				options.ui.colors.cursor_mode,
+				&menu.typography.annotation,
+			);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
 				character_info(menu, &selected_character.read());
 			} else {
@@ -133,12 +144,6 @@ pub fn pamphlet(
 							character_info(player_window, &piece);
 						},
 					);
-				} else {
-					// If the party array also had a reference to the character's last known character sheet,
-					// a name could be displayed here.
-					// I don't actually know if this is desirable;
-					// this should probably never happen anyways.
-					player_window.label("???", &player_window.typography.normal);
 				}
 			});
 		}
@@ -147,7 +152,7 @@ pub fn pamphlet(
 	pamphlet.advance(0, 10);
 
 	let mut inventory_fn = |pamphlet: &mut gui::Context| {
-		pamphlet.label("Inventory", &pamphlet.typography.normal);
+		pamphlet.label("Inventory");
 		let mut items = world_manager.inventory.iter().peekable();
 		while items.peek().is_some() {
 			let textures_per_row = pamphlet.rect.width() / (32 + 8);
@@ -164,7 +169,7 @@ pub fn pamphlet(
 	};
 	let mut souls_fn = |pamphlet: &mut gui::Context| {
 		const SOUL_SIZE: u32 = 50;
-		pamphlet.label("Souls", &pamphlet.typography.normal);
+		pamphlet.label("Souls");
 
 		let bx = pamphlet.x as f32;
 		let by = pamphlet.y as f32;
@@ -308,7 +313,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		player_window.typography.color,
 		font,
 	);
-	player_window.label(&format!("HP: {hp}/{heart}"), font);
+	player_window.label(&format!("HP: {hp}/{heart}"));
 	player_window.progress_bar(
 		(*hp as f32) / (heart as f32),
 		(0, 255, 0, 255),
@@ -316,7 +321,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		10,
 		5,
 	);
-	player_window.label(&format!("SP: {sp}/{soul}"), font);
+	player_window.label(&format!("SP: {sp}/{soul}"));
 	player_window.progress_bar(
 		(*sp as f32) / (soul as f32),
 		(0, 0, 255, 255),
@@ -331,7 +336,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		.zip(physical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"), font)
+			stat_half.label(&format!("{stat_name}: {stat}"))
 		});
 	}
 	player_window.hsplit(&mut physical_stats);
@@ -341,7 +346,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		magical_stat_info.into_iter().zip(magical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"), font)
+			stat_half.label(&format!("{stat_name}: {stat}"))
 		});
 	}
 	player_window.hsplit(&mut magical_stats);

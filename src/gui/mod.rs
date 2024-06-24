@@ -130,11 +130,15 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(self.rect.width(), height);
 	}
 
-	pub fn label(&mut self, s: &str, font: &Font) {
-		self.label_color(s, self.typography.color, font)
+	pub fn label(&mut self, s: &str) {
+		self.label_color(s, self.typography.color)
 	}
 
-	pub fn label_color(&mut self, s: &str, color: Color, font: &Font) {
+	pub fn label_color(&mut self, s: &str, color: Color) {
+		self.label_styled(s, color, &self.typography.normal);
+	}
+
+	pub fn label_styled(&mut self, s: &str, color: Color, font: &Font) {
 		let font_texture = font
 			.render(s)
 			.blended(color)
@@ -229,19 +233,23 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		for span in &variable_spans {
 			let uncolored_range = last_char..span.start;
 			if !uncolored_range.is_empty() {
-				self.label(&expression.source[uncolored_range], font);
+				self.label_styled(
+					&expression.source[uncolored_range],
+					self.typography.color,
+					font,
+				);
 			}
 			let colored_range = span.start..span.end;
 			if !colored_range.is_empty() {
 				let var = &expression.source[colored_range];
 				let color = Colors::get(var).unwrap_or((255, 0, 0, 255));
-				self.label_color(var, color, font);
+				self.label_styled(var, color, font);
 			}
 			last_char = span.end;
 		}
 
 		if last_char != expression.source.len() {
-			self.label(&expression.source[last_char..], font);
+			self.label_styled(&expression.source[last_char..], self.typography.color, font);
 		}
 
 		if was_horizontal {
