@@ -188,7 +188,10 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 
 	pub fn new_floor(&mut self) {
 		self.location.floor += 1;
+		self.console
+			.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
+
 		let party_pieces: Vec<_> = self
 			.party
 			.iter()
@@ -196,11 +199,19 @@ impl<'resources, 'textures> Manager<'resources, 'textures> {
 			.cloned()
 			.collect();
 		self.characters.clear();
+
+		self.console
+			.print_unimportant("You take some time to rest...".into());
 		for i in &party_pieces {
 			let mut i = i.write();
 			// Reset positions
 			i.x = 0;
 			i.y = 0;
+			// Rest
+			let stats = i.sheet.stats();
+			i.hp = stats.heart.min(i.hp as u32 + stats.heart / 2) as i32;
+			i.sp = stats.soul.min(i.sp as u32 + stats.soul / 2) as i32;
+			// Award experience
 			i.sheet.experience += 40;
 			while i.sheet.experience >= 100 {
 				i.sheet.experience -= 100;
@@ -404,6 +415,11 @@ impl Manager<'_, '_> {
 							world.lua.globals().set("target", target.clone()).unwrap();
 							// Maybe these should be members of the spell?
 							world.lua.globals().set("magnitude", magnitude).unwrap();
+							world
+								.lua
+								.globals()
+								.set("pierce_threshold", spell.pierce_threshold)
+								.unwrap();
 							world.lua.globals().set("level", spell.level).unwrap();
 							world.lua.globals().set("affinity", affinity).unwrap();
 

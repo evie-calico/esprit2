@@ -77,15 +77,23 @@ pub struct Spell {
 	/// Whether the spell is ordered or chaotic.
 	pub harmony: Harmony,
 
-	/// Script to execute upon casting the spell.
-	pub on_cast: ScriptOrInline,
-
 	/// This is also the cost of the spell.
 	pub level: u8,
 	/// Optional field for magnitude calculation.
 	/// This could easily be part of a script,
 	/// but expressions allow the magnitude formula to be displayed.
 	pub magnitude: Option<Expression>,
+	/// Amount by which defense must be beaten for damage to be dealt.
+	/// Positive values filter out small spell magnitudes,
+	/// wheras negative values counteract the target's resistance.
+	///
+	/// For example, a pierce threshold of 4 means that at least 4 damage
+	/// must be dealt (after resistance) for an attack to land.
+	/// A pierce threshold of -2 reduces the enemy's resistance by 2.
+	#[serde(default)]
+	pub pierce_threshold: i32,
+	/// Script to execute upon casting the spell.
+	pub on_cast: ScriptOrInline,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

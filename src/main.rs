@@ -88,7 +88,6 @@ pub fn main() {
 	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &options, &resources);
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
 
-	let sleep_texture = resources.get_texture("luvui_sleep");
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
 	let mut soul_jar = gui::widget::SoulJar::new(&resources);
@@ -114,10 +113,10 @@ pub fn main() {
 			Some(input::Result::Fullscreen) => {
 				use sdl2::video::FullscreenType;
 				match canvas.window().fullscreen_state() {
-					sdl2::video::FullscreenType::Off => {
+					FullscreenType::Off => {
 						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Desktop);
 					}
-					sdl2::video::FullscreenType::True | sdl2::video::FullscreenType::Desktop => {
+					FullscreenType::True | FullscreenType::Desktop => {
 						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
 					}
 				}
@@ -168,7 +167,7 @@ pub fn main() {
 				.unwrap();
 
 			draw::tilemap(&mut canvas, &world_manager);
-			draw::characters(&world_manager, &mut canvas, sleep_texture);
+			draw::characters(&world_manager, &mut canvas, &resources);
 			draw::cursor(&input_mode, &resources, &mut canvas);
 
 			// Render User Interface
@@ -178,6 +177,23 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
+				let player_id = world_manager.party[0].piece;
+				let bonuses = world_manager
+					.get_character(player_id)
+					.unwrap()
+					.read()
+					.sheet
+					.growth_bonuses;
+				debug.label("Potential");
+				debug.label(&format!("Heart: {0:*<1$}", "", bonuses.heart as usize));
+				debug.label(&format!("Soul: {0:*<1$}", "", bonuses.soul as usize));
+				debug.label(&format!("Power: {0:*<1$}", "", bonuses.power as usize));
+				debug.label(&format!("Defense: {0:*<1$}", "", bonuses.defense as usize));
+				debug.label(&format!("Magic: {0:*<1$}", "", bonuses.magic as usize));
+				debug.label(&format!(
+					"Resistance: {0:*<1$}",
+					"", bonuses.resistance as usize
+				));
 			}
 
 			let mut menu = gui::Context::new(

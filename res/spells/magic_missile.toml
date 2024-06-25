@@ -2,10 +2,11 @@ name = "Magic Missile"
 icon = "magic_missile"
 
 energy = "Positive"
-harmony = "Order"
+harmony = "Chaos"
 
 level = 1
-magnitude = "magic + 2d4"
+magnitude = "magic + 4"
+pierce_threshold = 2
 
 [on_cast]
 type = "Path"

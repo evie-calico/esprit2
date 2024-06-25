@@ -2,7 +2,7 @@ use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::rect::Point;
-use sdl2::render::{Canvas, Texture};
+use sdl2::render::Canvas;
 use sdl2::video::Window;
 use sdl2::{pixels::Color, rect::Rect};
 use std::f64::consts::{PI, TAU};
@@ -102,13 +102,13 @@ pub fn cursor(
 pub fn characters(
 	world_manager: &world::Manager,
 	canvas: &mut Canvas<Window>,
-	sleep_texture: &Texture<'_>,
+	resources: &ResourceManager<'_>,
 ) {
 	for character in world_manager.characters.iter().map(|x| x.read()) {
 		canvas
 			.copy(
-				sleep_texture,
-				None,
+				resources.get_texture(&character.sheet.icon),
+				Some(Rect::new(0, 0, 16, 16)),
 				Some(Rect::new(
 					character.x * ITILE_SIZE,
 					character.y * ITILE_SIZE,

@@ -145,9 +145,38 @@ fn stats(_lua: &mlua::Lua, this: &mut Sheet, _: ()) -> mlua::Result<Stats> {
 	Ok(this.stats())
 }
 
+fn growth_bonuses() -> Stats {
+	use rand::seq::SliceRandom;
+	const BONUS_COUNT: usize = 10;
+
+	let mut bonuses = Stats::default();
+	let mut stats = [
+		&mut bonuses.heart,
+		&mut bonuses.soul,
+		&mut bonuses.power,
+		&mut bonuses.defense,
+		&mut bonuses.magic,
+		&mut bonuses.resistance,
+	];
+	let mut rng = rand::thread_rng();
+
+	for _ in 0..BONUS_COUNT {
+		let stat = stats.choose_mut(&mut rng).unwrap();
+		// Prefer skipping stats that are already 0
+		if **stat == 0 {
+			**stats.choose_mut(&mut rng).unwrap() += 1;
+		} else {
+			**stat += 1;
+		}
+	}
+
+	bonuses
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 #[alua(method = stats)]
 pub struct Sheet {
+	pub icon: String,
 	/// Note that this includes the character's name.
 	#[alua(get)]
 	pub nouns: Nouns,
@@ -162,6 +191,8 @@ pub struct Sheet {
 	pub bases: Stats,
 	#[alua(get)]
 	pub growths: Stats,
+	#[serde(default = "growth_bonuses")]
+	pub growth_bonuses: Stats,
 
 	pub skillset: spell::Skillset,
 	#[alua(get)]
@@ -175,7 +206,16 @@ pub struct Sheet {
 
 impl Sheet {
 	pub fn stats(&self) -> Stats {
-		self.bases + self.growths * self.level / 100
+		const BONUS_WEIGHTS: Stats = Stats {
+			heart: 20,
+			soul: 20,
+			power: 10,
+			defense: 10,
+			magic: 10,
+			resistance: 10,
+		};
+
+		self.bases + (self.growths + self.growth_bonuses * BONUS_WEIGHTS) * self.level / 100
 	}
 }
 
@@ -241,6 +281,21 @@ impl std::ops::Mul<u32> for Stats {
 			defense: self.defense * rhs,
 			magic: self.magic * rhs,
 			resistance: self.resistance * rhs,
+		}
+	}
+}
+
+impl std::ops::Mul for Stats {
+	type Output = Stats;
+
+	fn mul(self, rhs: Self) -> Self {
+		Stats {
+			heart: self.heart * rhs.heart,
+			soul: self.soul * rhs.soul,
+			power: self.power * rhs.power,
+			defense: self.defense * rhs.defense,
+			magic: self.magic * rhs.magic,
+			resistance: self.resistance * rhs.resistance,
 		}
 	}
 }

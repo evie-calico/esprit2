@@ -2,6 +2,7 @@ level = 1
 attacks = ["scratch"]
 spells = []
 speed = 12
+icon = "aris"
 
 [nouns]
 name = "Aris"
