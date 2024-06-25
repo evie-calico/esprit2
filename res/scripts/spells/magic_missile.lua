@@ -1,6 +1,6 @@
 local damage = math.max(magnitude - target.sheet:stats().resistance + math.min(pierce_threshold, 0), 0)
 local pierce_failed = false
-if damage <= pierce_threshold then
+if damage > 0 and damage <= pierce_threshold then
 	pierce_failed = true
 	damage = 0
 end
@@ -44,19 +44,19 @@ function pick(table)
 	)
 end
 
-local log = { Hit = {
-	magnitude = magnitude,
-	damage = damage,
-}}
-
 -- Avoid showing unskilled messages too often;
 -- poorly made missiles are also likely to miss or be resisted.
-if damage == 0 and affinity:weak() and math.random(0, 1) == 1 then
-	Console:combat_log(pick(unskilled_messages), log)
-elseif pierce_failed then
+if pierce_failed then
+	local log = { type = "Glance" }
 	Console:combat_log(pick(glancing_messages), log)
-elseif damage <= 0 then
-	Console:combat_log(pick(failure_messages), log)
+elseif damage == 0 then
+	local log = { type = "Miss" }
+	if affinity:weak() and math.random(0, 1) == 1 then
+		Console:combat_log(pick(unskilled_messages), log)
+	else
+		Console:combat_log(pick(failure_messages), log)
+	end
 else
+	local log = { type = "Hit", damage = damage }
 	Console:combat_log(pick(damage_messages), log)
 end

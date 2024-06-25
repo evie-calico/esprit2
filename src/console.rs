@@ -87,23 +87,27 @@ macro_rules! handle_colored_print {
 }
 
 macro_rules! impl_console {
-	($($colors:ident: $value:expr),+$(,)?) => {
+	(
+		$(impl $impl_colors:ident: $impl_value:expr,)+
+		$(let $colors:ident: $value:expr,)+
+	) => {
 		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		pub struct Colors {
-			$(pub $colors: Color
-			,)*
+			$(pub $colors: Color,)*
+			$(pub $impl_colors: Color,)*
 		}
 
 		impl Default for Colors {
 			fn default() -> Self {
 				Self {
+					$($impl_colors: $impl_value,)*
 					$($colors: $value,)*
 				}
 			}
 		}
 
 		impl Console {
-			$(console_colored_print! { $colors } )*
+			$(console_colored_print! { $impl_colors } )*
 
 			pub fn print_colored(&mut self, text: String, color: Color) {
 				self.history.push(Message {
@@ -136,7 +140,7 @@ macro_rules! impl_console {
 
 		impl mlua::UserData for Handle {
 			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-				$(handle_colored_print! { $colors, methods } )*
+				$(handle_colored_print! { $impl_colors, methods } )*
 				methods.add_method_mut("combat_log", |lua, this, (text, log): (String, mlua::Value)| {
 					let log = lua.from_value(log)?;
 					this.message_sender
@@ -153,13 +157,14 @@ macro_rules! impl_console {
 }
 
 impl_console! {
-	normal: (255, 255, 255, 255),
-	system: (100, 100, 100, 255),
-	unimportant: (100, 100, 100, 255),
-	defeat: (255, 128, 128, 255),
-	danger: (255, 0, 0, 255),
-	important: (255, 255, 0, 255),
-	special: (0, 255, 0, 255),
+	impl normal: (255, 255, 255, 255),
+	impl system: (100, 100, 100, 255),
+	impl unimportant: (100, 100, 100, 255),
+	impl defeat: (255, 128, 128, 255),
+	impl danger: (255, 0, 0, 255),
+	impl important: (255, 255, 0, 255),
+	impl special: (0, 255, 0, 255),
+	let combat: (255, 255, 128, 255),
 }
 
 impl Default for Console {
@@ -317,12 +322,12 @@ impl Console {
 						.copy(&texture, None, Rect::new(rect.x, cursor, width, height))
 						.unwrap();
 					let last_width = width as i32;
-					let info = log.to_string();
+					let info = format!("({log})");
 					let texture = gui
 						.typography
 						.annotation
 						.render(&info)
-						.blended(self.colors.unimportant)
+						.blended(self.colors.combat)
 						.unwrap()
 						.as_texture(&font_texture_creator)
 						.unwrap();

@@ -476,7 +476,7 @@ impl Manager<'_, '_> {
 		let target_stats = target.sheet.stats();
 		let magnitude = u32::evalv(&attack.damage, &*character);
 		let damage = magnitude.saturating_sub(target_stats.defense);
-		let is_weak_attack = damage <= 1;
+		let is_miss = damage == 0;
 
 		// TODO: Change this depending on the proportional amount of damage dealt.
 		let damage_punctuation = match damage {
@@ -489,7 +489,7 @@ impl Manager<'_, '_> {
 			.messages
 			.low
 			.as_ref()
-			.filter(|_| is_weak_attack)
+			.filter(|_| is_miss)
 			.unwrap_or(&attack.messages.high);
 		let message = message_pool.choose(&mut rng);
 
@@ -505,12 +505,15 @@ impl Manager<'_, '_> {
 		// This is where the damage is actually dealt
 		target_ref.write().hp -= damage as i32;
 
+		let log = if is_miss {
+			combat::Log::Miss
+		} else {
+			combat::Log::Hit { damage }
+		};
+
 		// `self` is not mutable, so the message needs to be passed up to the manager,
 		// where printing can occur.
-		Ok(AttackResult {
-			message,
-			log: combat::Log::Hit { magnitude, damage },
-		})
+		Ok(AttackResult { message, log })
 	}
 
 	/// # Errors
