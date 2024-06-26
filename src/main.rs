@@ -1,4 +1,3 @@
-use esprit2::options::{RESOURCE_DIRECTORY, USER_DIRECTORY};
 use esprit2::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -50,14 +49,14 @@ pub fn main() {
 	tracing_subscriber::fmt::init();
 
 	// Game initialization.
-	let resources = match ResourceManager::open(&*RESOURCE_DIRECTORY, &texture_creator) {
+	let resources = match ResourceManager::open(options::resource_directory(), &texture_creator) {
 		Ok(resources) => resources,
 		Err(msg) => {
 			error!("Failed to open resource directory: {msg}");
 			exit(1);
 		}
 	};
-	let options_path = USER_DIRECTORY.join("options.toml");
+	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {
 		// This is `info` because it's actually very expected for first-time players.
 		info!("failed to open options.toml ({msg})");

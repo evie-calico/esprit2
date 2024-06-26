@@ -167,7 +167,7 @@ impl<'de> serde::Deserialize<'de> for Script {
 	{
 		use serde::de::Error;
 		let path = deserializer.deserialize_string(ScriptVisitor)?;
-		let contents = fs::read_to_string(options::RESOURCE_DIRECTORY.join(&path))
+		let contents = fs::read_to_string(options::resource_directory().join(&path))
 			.map_err(D::Error::custom)?;
 		Ok(Script { path, contents })
 	}

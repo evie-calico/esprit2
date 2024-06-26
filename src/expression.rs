@@ -112,7 +112,7 @@ impl TryFrom<String> for Expression {
 		};
 
 		let root =
-			PRATT_PARSER
+			pratt_parser()
 				.map_primary(|primary| match primary.as_rule() {
 					Rule::integer => Operation::Integer(primary.as_str().parse().unwrap()),
 					Rule::identifier => {
@@ -261,15 +261,17 @@ impl<'de> serde::Deserialize<'de> for Expression {
 #[grammar = "expression.pest"]
 struct OperationParser;
 
-lazy_static::lazy_static! {
-	static ref PRATT_PARSER: PrattParser<Rule> = {
-		use pest::pratt_parser::{Assoc::*, Op};
-		use Rule::*;
+fn pratt_parser() -> &'static PrattParser<Rule> {
+	use pest::pratt_parser::{Assoc::*, Op};
+	use std::sync::OnceLock;
+	use Rule::*;
 
+	static PRATT_PARSER: OnceLock<PrattParser<Rule>> = OnceLock::new();
+	PRATT_PARSER.get_or_init(|| {
 		// Precedence is defined lowest to highest
 		PrattParser::new()
 			// Addition and subtract have equal precedence
 			.op(Op::infix(add, Left) | Op::infix(sub, Left))
 			.op(Op::infix(mul, Left) | Op::infix(div, Left))
-	};
+	})
 }

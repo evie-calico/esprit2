@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use options::RESOURCE_DIRECTORY;
+use options::resource_directory;
 use sdl2::{rwops::RWops, ttf::Font};
 use std::path::PathBuf;
 use tracing::error;
@@ -25,7 +25,7 @@ impl<'ttf_module, 'rwops> Typography<'ttf_module, 'rwops> {
 		let open_font = |path: Option<&PathBuf>, size| {
 			path.and_then(|path| {
 				ttf_context
-					.load_font(RESOURCE_DIRECTORY.join(path), size)
+					.load_font(resource_directory().join(path), size)
 					.map_err(|msg| error!("failed to open font {}: {msg}", path.display()))
 					.ok()
 			})

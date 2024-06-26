@@ -1,21 +1,30 @@
 use crate::prelude::*;
 use sdl2::keyboard::Keycode;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::{fs, io};
 
-lazy_static::lazy_static! {
-	pub static ref USER_DIRECTORY: PathBuf = get_user_directory();
-	pub static ref RESOURCE_DIRECTORY: PathBuf = get_resource_directory();
+pub fn user_directory() -> &'static PathBuf {
+	static USER_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+	USER_DIRECTORY.get_or_init(find_user_directory)
+}
+
+pub fn resource_directory() -> &'static PathBuf {
+	static RESOURCE_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+	RESOURCE_DIRECTORY.get_or_init(find_resource_directory)
 }
 
 // In the future, this should be a little smarter.
-// Honestly I'm not sure if lazy_static is even the right choice because it precludes the use of clap.
-// I guess I could create another clap parser that ignores everything except --user?
-fn get_user_directory() -> PathBuf {
+// Things to check:
+// - ~/.local/share/esprit2 (XDG_DATA_HOME)
+fn find_user_directory() -> PathBuf {
 	PathBuf::from("user/")
 }
 
-fn get_resource_directory() -> PathBuf {
+// I think `local/share` is still the answer here,
+// but we need to check /usr/local/share/esprit2 if this program is installed system-wide.
+// This isn't the case for `find_user_directory` since /usr/local/share might not be writable.
+fn find_resource_directory() -> PathBuf {
 	PathBuf::from("res/")
 }
 
