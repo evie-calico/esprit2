@@ -12,11 +12,18 @@ const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
 #[derive(Debug)]
 pub struct Console {
+	pub handle: Handle,
 	message_reciever: mpsc::Receiver<Message>,
-	message_sender: mpsc::Sender<Message>,
 	history: Vec<Message>,
 	in_progress: VecDeque<usize>,
-	pub colors: Colors,
+}
+
+impl std::ops::Deref for Console {
+	type Target = Handle;
+
+	fn deref(&self) -> &Self::Target {
+		&self.handle
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -40,8 +47,8 @@ pub struct Message {
 
 macro_rules! console_colored_print {
 	(normal) => {
-		pub fn print(&mut self, text: String) {
-			self.history.push(Message {
+		pub fn print(&self, text: String) {
+			let _ = self.message_sender.send(Message {
 				text,
 				printer: MessagePrinter::Console(self.colors.normal),
 			});
@@ -50,8 +57,8 @@ macro_rules! console_colored_print {
 
 	($which:ident) => {
 		paste! {
-			pub fn [<print_ $which>](&mut self, text: String) {
-				self.history.push(Message {
+			pub fn [<print_ $which>](&self, text: String) {
+				let _ = self.message_sender.send(Message {
 					text,
 					printer: MessagePrinter::Console(self.colors.$which),
 				});
@@ -106,35 +113,31 @@ macro_rules! impl_console {
 			}
 		}
 
-		impl Console {
+		impl Handle {
 			$(console_colored_print! { $impl_colors } )*
 
-			pub fn print_colored(&mut self, text: String, color: Color) {
-				self.history.push(Message {
+			pub fn print_colored(&self, text: String, color: Color) {
+				let _ = self.message_sender.send(Message {
 					text,
 					printer: MessagePrinter::Console(color),
 				});
 			}
 
-			pub fn say(&mut self, speaker: Arc<str>, text: String) {
-				self.history.push(Message {
+			pub fn say(&self, speaker: Arc<str>, text: String) {
+				let _ = self.message_sender.send(Message {
 					text,
 					printer: MessagePrinter::Dialogue {
 						speaker,
 						progress: 0.0,
 					},
 				});
-
-				self.in_progress.push_back(self.history.len() - 1);
 			}
 
-			pub fn combat_log(&mut self, text: String, log: combat::Log) {
-				self.history.push(Message {
+			pub fn combat_log(&self, text: String, log: combat::Log) {
+				let  _ = self.message_sender.send(Message {
 					text,
 					printer: MessagePrinter::Combat(log),
 				});
-
-				self.in_progress.push_back(self.history.len() - 1);
 			}
 		}
 
@@ -172,26 +175,21 @@ impl Default for Console {
 		let (message_sender, message_reciever) = mpsc::channel();
 		Self {
 			message_reciever,
-			message_sender,
 			history: Vec::new(),
 			in_progress: VecDeque::new(),
-			colors: Colors::default(),
+			handle: Handle {
+				message_sender,
+				colors: Colors::default(),
+			},
 		}
 	}
 }
 
 impl Console {
 	pub fn new(colors: console::Colors) -> Self {
-		Self {
-			colors,
-			..Default::default()
-		}
-	}
-	pub fn handle(&self) -> Handle {
-		Handle {
-			message_sender: self.message_sender.clone(),
-			colors: self.colors.clone(),
-		}
+		let mut result = Self::default();
+		result.handle.colors = colors;
+		result
 	}
 }
 

@@ -1,10 +1,13 @@
 use crate::prelude::*;
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+/// Unlike spells, `Attack` is only for melee "bump attacks",
+/// so their usage can be a lot simpler.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Attack {
 	pub name: String,
-	pub weight: u8,
-	pub damage: Expression,
+	pub description: String,
+	pub magnitude: Expression,
+	pub on_use: script::MaybeInline,
 	pub messages: Messages,
 }
 

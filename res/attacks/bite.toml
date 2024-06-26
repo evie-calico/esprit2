@@ -1,6 +1,10 @@
 name = "Bite"
-damage = "power + 2d6"
-weight = 20
+description = "Lowers your defense until your next turn."
+magnitude = "power + 2d6"
+
+[on_use]
+type = "Inline"
+source = ""
 
 [messages]
 high = [

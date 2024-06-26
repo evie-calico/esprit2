@@ -1,6 +1,10 @@
 name = "Scratch"
-damage = "power + 2d4"
-weight = 100
+description = "Causes a small amount of bleeding damage, which reduces defense."
+magnitude = "power + 4"
+
+[on_use]
+type = "Path"
+source = "scripts/attacks/scratch.lua"
 
 [messages]
 high = [

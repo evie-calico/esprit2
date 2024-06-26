@@ -19,6 +19,7 @@ pub mod item;
 pub mod nouns;
 pub mod options;
 pub mod resource_manager;
+pub mod script;
 pub mod soul;
 pub mod spell;
 pub mod spell_menu;
@@ -50,6 +51,7 @@ pub mod prelude {
 	pub use nouns::Nouns;
 	pub use options::Options;
 	pub use resource_manager::ResourceManager;
+	pub use script::Script;
 	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use typography::Typography;

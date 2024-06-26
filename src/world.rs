@@ -2,12 +2,9 @@ use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use rand::seq::SliceRandom;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::error;
-
-const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}";
 
 pub type CharacterRef = Rc<RefCell<character::Piece>>;
 
@@ -114,7 +111,9 @@ impl Manager {
 
 		let console = Console::new(options.ui.colors.console.clone());
 
-		lua.globals().set("Console", console.handle()).unwrap();
+		lua.globals()
+			.set("Console", console.handle.clone())
+			.unwrap();
 
 		Manager {
 			location: world::Location {
@@ -280,38 +279,6 @@ impl Manager {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub enum MovementResult {
-	Move,
-	Attack(AttackResult),
-}
-
-#[derive(thiserror::Error, Clone, Debug)]
-pub enum MovementError {
-	#[error("hit a wall")]
-	HitWall,
-	#[error("hit the void")]
-	HitVoid,
-	#[error(transparent)]
-	Attack(#[from] AttackError),
-}
-
-#[derive(Clone, Debug)]
-pub struct AttackResult {
-	/// Flavor text to explain the attack.
-	message: String,
-	/// Hard info about the attack, like damage.
-	log: combat::Log,
-}
-
-#[derive(thiserror::Error, Clone, Debug)]
-pub enum AttackError {
-	#[error("attempted to attack an ally")]
-	Ally,
-	#[error("attacker has no attacks defined")]
-	NoAttacks,
-}
-
 /// Used to "escape" the world and request extra information, such as inputs.
 pub enum ActionRequest<'lua> {
 	/// This callback will be called in place of `pop_action` once a position is selected.
@@ -351,27 +318,7 @@ impl Manager {
 
 		let action = next_character.borrow_mut().next_action.take()?;
 		match action {
-			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
-				Ok(MovementResult::Attack(AttackResult { message, log })) => {
-					self.console.combat_log(message, log);
-				}
-				Ok(_) => (),
-				Err(MovementError::HitWall) => {
-					let name = next_character.borrow().sheet.nouns.name.clone();
-					self.console.say(name, "Ouch!".into());
-				}
-				Err(MovementError::HitVoid) => {
-					self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
-				}
-				Err(MovementError::Attack(AttackError::Ally)) => {
-					self.console
-						.print_system("You can't attack your allies!".into());
-				}
-				Err(MovementError::Attack(AttackError::NoAttacks)) => {
-					self.console
-						.print_system("You cannot perform any melee attacks right now.".into());
-				}
-			},
+			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
 			character::Action::Cast(spell) => {
 				if spell.castable_by(&next_character.borrow()) {
 					let spell = spell.clone();
@@ -390,13 +337,12 @@ impl Manager {
 
 							let chunk = lua.load(spell.on_cast.contents());
 							let name = match &spell.on_cast {
-								spell::ScriptOrInline::Inline(_) => {
+								script::MaybeInline::Inline(_) => {
 									format!("{} (inline)", spell.name)
 								}
-								spell::ScriptOrInline::Path(spell::Script {
-									path,
-									contents: _,
-								}) => path.clone(),
+								script::MaybeInline::Path(script::Script { path, contents: _ }) => {
+									path.clone()
+								}
 							};
 							let globals = lua.globals();
 
@@ -415,10 +361,14 @@ impl Manager {
 
 							match value {
 								mlua::Value::Thread(thread) => {
-									return ActionRequest::poll(lua, thread, ()).unwrap();
+									ActionRequest::poll(lua, thread, ()).unwrap()
 								}
-								mlua::Value::Nil => (),
-								_ => error!("unexpected return value"),
+
+								mlua::Value::Nil => None,
+								_ => {
+									error!("unexpected return value");
+									None
+								}
 							}
 						}
 					}
@@ -427,120 +377,101 @@ impl Manager {
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 							.replace_nouns(&next_character.borrow().sheet.nouns);
 					self.console.print_system(message);
+					None
 				}
 			}
+		}
+	}
+
+	/// # Errors
+	///
+	/// Returns an error if the target is an ally, or if the user has no attacks.
+	pub fn attack_piece<'lua>(
+		&self,
+		lua: &'lua mlua::Lua,
+		user: &CharacterRef,
+		target: &CharacterRef,
+	) -> Option<ActionRequest<'lua>> {
+		// TODO: Allow the default/favorited attack to be changed.
+		let Some(attack) = user.borrow().attacks.first().cloned() else {
+			self.console
+				.print("You cannot perform any melee attacks right now".into());
+			return None;
 		};
+
+		// Calculate damage
+		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
+
+		let chunk = lua.load(attack.on_use.contents());
+		let name = match &attack.on_use {
+			script::MaybeInline::Inline(_) => {
+				format!("{} (inline)", attack.name)
+			}
+			script::MaybeInline::Path(script::Script { path, contents: _ }) => path.clone(),
+		};
+		let globals = lua.globals();
+
+		globals.set("user", user.clone()).unwrap();
+		globals.set("target", target.clone()).unwrap();
+		globals.set("magnitude", magnitude).unwrap();
+
+		let value: mlua::Value = chunk
+			.set_name(name)
+			.set_environment(globals)
+			.eval()
+			.unwrap();
+
+		match value {
+			mlua::Value::Thread(thread) => {
+				return ActionRequest::poll(lua, thread, ()).unwrap();
+			}
+			mlua::Value::Nil => (),
+			_ => error!("unexpected return value"),
+		}
 
 		None
 	}
 
 	/// # Errors
 	///
-	/// Returns an error if the target is an ally, or if the user has no attacks.
-	pub fn attack_piece(
-		&self,
-		character_ref: &CharacterRef,
-		target_ref: &CharacterRef,
-	) -> Result<AttackResult, AttackError> {
-		let character = character_ref.borrow();
-		let target = target_ref.borrow();
-
-		if target.alliance == character.alliance {
-			return Err(AttackError::Ally);
-		}
-
-		let mut rng = rand::thread_rng();
-
-		let mut attack = character.attacks.first().ok_or(AttackError::NoAttacks)?;
-		let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
-
-		let mut point = rng.gen_range(0..max_attack_weight);
-		for i in &character.attacks {
-			if point < i.weight {
-				attack = i;
-				break;
-			}
-			point -= i.weight;
-		}
-
-		// Calculate damage
-		let target_stats = target.sheet.stats();
-		let magnitude = u32::evalv(&attack.damage, &*character);
-		let damage = magnitude.saturating_sub(target_stats.defense);
-		let is_miss = damage == 0;
-
-		// TODO: Change this depending on the proportional amount of damage dealt.
-		let damage_punctuation = match damage {
-			20.. => "!!!",
-			10.. => "!!",
-			5.. => "!",
-			_ => ".",
-		};
-		let message_pool = attack
-			.messages
-			.low
-			.as_ref()
-			.filter(|_| is_miss)
-			.unwrap_or(&attack.messages.high);
-		let message = message_pool.choose(&mut rng);
-
-		let mut message = message
-			.map(|s| s.as_str())
-			.unwrap_or(DEFAULT_ATTACK_MESSAGE)
-			.replace_prefixed_nouns(&character.sheet.nouns, "self_")
-			.replace_prefixed_nouns(&target.sheet.nouns, "target_");
-		message.push_str(damage_punctuation);
-
-		drop(target);
-
-		// This is where the damage is actually dealt
-		target_ref.borrow_mut().hp -= damage as i32;
-
-		let log = if is_miss {
-			combat::Log::Miss
-		} else {
-			combat::Log::Hit { damage }
-		};
-
-		// `self` is not mutable, so the message needs to be passed up to the manager,
-		// where printing can occur.
-		Ok(AttackResult { message, log })
-	}
-
-	/// # Errors
-	///
 	/// Fails if a wall or void is in the way, or if an implicit attack failed.
-	pub fn move_piece(
+	pub fn move_piece<'lua>(
 		&self,
-		character_ref: &CharacterRef,
+		lua: &'lua mlua::Lua,
+		character: &CharacterRef,
 		dir: OrdDir,
-	) -> Result<MovementResult, MovementError> {
+	) -> Option<ActionRequest<'lua>> {
 		use crate::floor::Tile;
 
 		let (x, y) = {
+			let character = character.borrow();
 			let (x, y) = dir.as_offset();
-			let character = character_ref.borrow();
 			(character.x + x, character.y + y)
 		};
 
 		// There's a really annoying phenomenon in Pokémon Mystery Dungeon where you can't hit ghosts that are inside of walls.
 		// I think that this is super lame, so the attack check comes before any movement.
 		if let Some(target_ref) = self.get_character_at(x, y) {
-			return Ok(MovementResult::Attack(
-				self.attack_piece(character_ref, target_ref)?,
-			));
+			return self.attack_piece(lua, character, target_ref);
 		}
 
 		let tile = self.current_floor.map.get(y, x);
 		match tile {
 			Some(Tile::Floor) | Some(Tile::Exit) => {
-				let mut character = character_ref.borrow_mut();
+				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				Ok(MovementResult::Move)
+				None
 			}
-			Some(Tile::Wall) => Err(MovementError::HitWall),
-			None => Err(MovementError::HitVoid),
+			Some(Tile::Wall) => {
+				self.console
+					.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
+				None
+			}
+			None => {
+				self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
+				None
+			}
 		}
 	}
 }
