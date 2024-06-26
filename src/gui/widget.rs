@@ -71,7 +71,7 @@ pub fn menu(
 				options.ui.colors.cast_mode,
 				&menu.typography.annotation,
 			);
-			spell_menu::draw(menu, &world_manager.next_character().read(), font);
+			spell_menu::draw(menu, &world_manager.next_character().borrow(), font);
 		}
 		input::Mode::Cursor { x, y, .. } => {
 			menu.label_styled(
@@ -80,7 +80,7 @@ pub fn menu(
 				&menu.typography.annotation,
 			);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
-				character_info(menu, &selected_character.read());
+				character_info(menu, &selected_character.borrow());
 			} else {
 				world_manager.console.draw(menu, font);
 			}
@@ -132,19 +132,17 @@ pub fn pamphlet(
 					rect.width(),
 					rect.height(),
 				));
-				if let Some(piece) = world_manager.get_character(character_id.piece) {
-					let piece = piece.read();
-					let texture = resources.get_texture("luvui_sleep");
-					character_thinking(
-						character_id,
-						player_window,
-						texture,
-						layout.flipped,
-						|player_window| {
-							character_info(player_window, &piece);
-						},
-					);
-				}
+				let piece = character_id.piece.borrow();
+				let texture = resources.get_texture("luvui_sleep");
+				character_thinking(
+					character_id,
+					player_window,
+					texture,
+					layout.flipped,
+					|player_window| {
+						character_info(player_window, &piece);
+					},
+				);
 			});
 		}
 		pamphlet.hsplit(&mut character_windows);

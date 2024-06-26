@@ -58,7 +58,7 @@ pub fn world(
 				keycode: Some(keycode),
 				..
 			} => {
-				let mut next_character = world_manager.next_character().write();
+				let mut next_character = world_manager.next_character().borrow_mut();
 				if next_character.player_controlled {
 					match mode {
 						Mode::Normal => {

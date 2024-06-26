@@ -145,7 +145,7 @@ pub fn main() {
 			action_request = world_manager.update(action_request, &lua, &mut input_mode);
 			world_manager
 				.characters
-				.retain(|character| character.read().hp > 0);
+				.retain(|character| character.borrow().hp > 0);
 			world_manager.console.update(delta);
 			soul_jar.tick(delta as f32);
 			cloudy_wave.tick(delta);
@@ -180,13 +180,7 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
-				let player_id = world_manager.party[0].piece;
-				let bonuses = world_manager
-					.get_character(player_id)
-					.unwrap()
-					.read()
-					.sheet
-					.growth_bonuses;
+				let bonuses = world_manager.party[0].piece.borrow().sheet.growth_bonuses;
 				debug.label("Potential");
 				debug.label(&format!("Heart: {0:*<1$}", "", bonuses.heart as usize));
 				debug.label(&format!("Soul: {0:*<1$}", "", bonuses.soul as usize));

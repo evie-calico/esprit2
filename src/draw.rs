@@ -104,7 +104,7 @@ pub fn characters(
 	canvas: &mut Canvas<Window>,
 	resources: &ResourceManager<'_>,
 ) {
-	for character in world_manager.characters.iter().map(|x| x.read()) {
+	for character in world_manager.characters.iter().map(|x| x.borrow()) {
 		canvas
 			.copy(
 				resources.get_texture(&character.sheet.icon),

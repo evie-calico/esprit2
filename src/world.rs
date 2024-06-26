@@ -2,15 +2,15 @@ use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use parking_lot::RwLock;
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::sync::Arc;
+use rand::seq::SliceRandom;
+use std::cell::RefCell;
+use std::rc::Rc;
 use tracing::error;
 use uuid::Uuid;
 
 const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}";
 
-pub type CharacterRef = Arc<RwLock<character::Piece>>;
+pub type CharacterRef = Rc<RefCell<character::Piece>>;
 
 /// This struct contains all information that is relevant during gameplay.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -55,7 +55,7 @@ pub struct PartyReferenceDrawState {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
-	pub piece: Uuid,
+	pub piece: CharacterRef,
 	/// This party member's ID within the party.
 	/// Used for saving data.
 	pub member: Uuid,
@@ -66,7 +66,7 @@ pub struct PartyReference {
 }
 
 impl PartyReference {
-	pub fn new(piece: Uuid, member: Uuid, accent_color: Color) -> Self {
+	pub fn new(piece: CharacterRef, member: Uuid, accent_color: Color) -> Self {
 		Self {
 			piece,
 			member,
@@ -107,17 +107,17 @@ impl Manager {
 		} in party_blueprint
 		{
 			let sheet = resource_manager.get_sheet(sheet).unwrap();
-			let character = character::Piece {
+			let character = Rc::new(RefCell::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
 				..character::Piece::new(sheet.clone(), resource_manager)
-			};
+			}));
 			party.push(world::PartyReference::new(
-				character.id,
+				character.clone(),
 				Uuid::new_v4(),
 				accent_color,
 			));
-			characters.push(Arc::new(RwLock::new(character)));
+			characters.push(character);
 			player_controlled = false;
 		}
 
@@ -169,18 +169,13 @@ impl Manager {
 			.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
 
-		let party_pieces: Vec<_> = self
-			.party
-			.iter()
-			.filter_map(|x| self.get_character(x.piece))
-			.cloned()
-			.collect();
+		let party_pieces: Vec<_> = self.party.iter().map(|x| x.piece.clone()).collect();
 		self.characters.clear();
 
 		self.console
 			.print_unimportant("You take some time to rest...".into());
 		for i in &party_pieces {
-			let mut i = i.write();
+			let mut i = i.borrow_mut();
 			// Reset positions
 			i.x = 0;
 			i.y = 0;
@@ -270,20 +265,13 @@ impl Manager {
 		action_request
 	}
 
-	// Returns none if no entity with the given uuid is currently loaded.
-	// This either mean they no longer exist, or they're on a different floor;
-	// either way they cannot be referenced.
-	pub fn get_character(&self, id: Uuid) -> Option<&CharacterRef> {
-		self.characters.iter().find(|x| x.read().id == id)
-	}
-
 	pub fn next_character(&self) -> &CharacterRef {
 		&self.characters[0]
 	}
 
 	pub fn get_character_at(&self, x: i32, y: i32) -> Option<&CharacterRef> {
 		self.characters.iter().find(|p| {
-			let p = p.read();
+			let p = p.borrow();
 			p.x == x && p.y == y
 		})
 	}
@@ -296,7 +284,7 @@ impl Manager {
 				y: y + yoff,
 				..character::Piece::new(resources.get_sheet(sheet_name).unwrap().clone(), resources)
 			};
-			self.characters.push(Arc::new(RwLock::new(piece)));
+			self.characters.push(Rc::new(RefCell::new(piece)));
 		}
 	}
 }
@@ -370,7 +358,7 @@ impl Manager {
 	pub fn pop_action<'lua>(&mut self, lua: &'lua mlua::Lua) -> Option<ActionRequest<'lua>> {
 		let next_character = self.next_character();
 
-		let action = next_character.write().next_action.take()?;
+		let action = next_character.borrow_mut().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => match self.move_piece(next_character, dir) {
 				Ok(MovementResult::Attack(AttackResult { message, log })) => {
@@ -378,7 +366,7 @@ impl Manager {
 				}
 				Ok(_) => (),
 				Err(MovementError::HitWall) => {
-					let name = next_character.read().sheet.nouns.name.clone();
+					let name = next_character.borrow().sheet.nouns.name.clone();
 					self.console.say(name, "Ouch!".into());
 				}
 				Err(MovementError::HitVoid) => {
@@ -394,7 +382,7 @@ impl Manager {
 				}
 			},
 			character::Action::Cast(spell) => {
-				if spell.castable_by(&next_character.read()) {
+				if spell.castable_by(&next_character.borrow()) {
 					let spell = spell.clone();
 					// TODO: this is awful. just move targeting into scripts.
 					match spell.parameters.clone() {
@@ -404,10 +392,10 @@ impl Manager {
 						} => {
 							// Create a reference for the callback to use.
 							let caster = next_character.clone();
-							let affinity = spell.affinity(&caster.read());
+							let affinity = spell.affinity(&caster.borrow());
 							let magnitude = magnitude
 								.as_ref()
-								.map(|x| affinity.magnitude(u32::evalv(x, &*caster.read())));
+								.map(|x| affinity.magnitude(u32::evalv(x, &*caster.borrow())));
 
 							let chunk = lua.load(spell.on_cast.contents());
 							let name = match &spell.on_cast {
@@ -446,7 +434,7 @@ impl Manager {
 				} else {
 					let message =
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-							.replace_nouns(&next_character.read().sheet.nouns);
+							.replace_nouns(&next_character.borrow().sheet.nouns);
 					self.console.print_system(message);
 				}
 			}
@@ -463,14 +451,14 @@ impl Manager {
 		character_ref: &CharacterRef,
 		target_ref: &CharacterRef,
 	) -> Result<AttackResult, AttackError> {
-		let character = character_ref.read();
-		let target = target_ref.read();
+		let character = character_ref.borrow();
+		let target = target_ref.borrow();
 
 		if target.alliance == character.alliance {
 			return Err(AttackError::Ally);
 		}
 
-		let mut rng = thread_rng();
+		let mut rng = rand::thread_rng();
 
 		let mut attack = character.attacks.first().ok_or(AttackError::NoAttacks)?;
 		let max_attack_weight = character.attacks.iter().fold(0, |a, x| a + x.weight);
@@ -515,7 +503,7 @@ impl Manager {
 		drop(target);
 
 		// This is where the damage is actually dealt
-		target_ref.write().hp -= damage as i32;
+		target_ref.borrow_mut().hp -= damage as i32;
 
 		let log = if is_miss {
 			combat::Log::Miss
@@ -540,7 +528,7 @@ impl Manager {
 
 		let (x, y) = {
 			let (x, y) = dir.as_offset();
-			let character = character_ref.read();
+			let character = character_ref.borrow();
 			(character.x + x, character.y + y)
 		};
 
@@ -555,7 +543,7 @@ impl Manager {
 		let tile = self.current_floor.map.get(y, x);
 		match tile {
 			Some(Tile::Floor) | Some(Tile::Exit) => {
-				let mut character = character_ref.write();
+				let mut character = character_ref.borrow_mut();
 				character.x = x;
 				character.y = y;
 				Ok(MovementResult::Move)
