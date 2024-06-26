@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use std::sync::Arc;
-use uuid::Uuid;
 
 use self::nouns::StrExt;
 
@@ -29,9 +28,6 @@ fn force_level(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<()> {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 #[alua(method = replace_nouns, method = replace_prefixed_nouns, method = force_level)]
 pub struct Piece {
-	// These are nice and serializable :)
-	#[alua(as_lua = "string", get)]
-	pub id: Uuid,
 	#[alua(get)]
 	pub sheet: Sheet,
 
@@ -82,7 +78,6 @@ impl Piece {
 			.collect();
 
 		Self {
-			id: Uuid::new_v4(),
 			sheet,
 			hp,
 			sp,

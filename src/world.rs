@@ -6,7 +6,6 @@ use rand::seq::SliceRandom;
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::error;
-use uuid::Uuid;
 
 const DEFAULT_ATTACK_MESSAGE: &str = "{self_Address} attacked {target_indirect}";
 
@@ -56,9 +55,6 @@ pub struct PartyReferenceDrawState {
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
 	pub piece: CharacterRef,
-	/// This party member's ID within the party.
-	/// Used for saving data.
-	pub member: Uuid,
 	/// Displayed on the pamphlet.
 	pub accent_color: Color,
 	#[serde(skip)]
@@ -66,10 +62,9 @@ pub struct PartyReference {
 }
 
 impl PartyReference {
-	pub fn new(piece: CharacterRef, member: Uuid, accent_color: Color) -> Self {
+	pub fn new(piece: CharacterRef, accent_color: Color) -> Self {
 		Self {
 			piece,
-			member,
 			accent_color,
 			draw_state: PartyReferenceDrawState::default(),
 		}
@@ -112,11 +107,7 @@ impl Manager {
 				alliance: character::Alliance::Friendly,
 				..character::Piece::new(sheet.clone(), resource_manager)
 			}));
-			party.push(world::PartyReference::new(
-				character.clone(),
-				Uuid::new_v4(),
-				accent_color,
-			));
+			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push(character);
 			player_controlled = false;
 		}
