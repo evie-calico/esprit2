@@ -1,10 +1,5 @@
-local pierce_threshold = 2
-local damage = math.max(magnitude - target.sheet:stats().resistance + math.min(pierce_threshold, 0), 0)
-local pierce_failed = false
-if damage > 0 and damage <= pierce_threshold then
-	pierce_failed = true
-	damage = 0
-end
+require("combat")
+local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target.sheet:stats().defense)
 
 damage_messages = {
 	"{self_Address}'s claws rake against {target_address}",
@@ -13,10 +8,14 @@ damage_messages = {
 	"{self_Address} strikes {target_address} with {self_their} claws",
 	"{self_Address} digs {self_their} claws into {target_address}",
 }
-failure_messages = {
-	"{self_Address}'s claws barely missed {target_address}",
+glance_messages = {
 	"{target_Address} was tickled by {self_address}'s claws",
 	"{self_Address}'s claws lightly slid across {target_address}",
+}
+failure_messages = {
+	"{self_Address}'s claws missed {target_address}",
+	"{self_Address} barely missed {target_address} with {self_their} claws",
+	"{target_Address} blocked {self_address}'s attack before {self_they} could strike",
 }
 
 function pick(table)
@@ -31,7 +30,7 @@ end
 
 if pierce_failed then
 	local log = { type = "Glance" }
-	Console:combat_log(pick(failure_messages), log)
+	Console:combat_log(pick(glance_messages), log)
 elseif damage == 0 then
 	local log = { type = "Miss" }
 	Console:combat_log(pick(failure_messages), log)

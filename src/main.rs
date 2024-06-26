@@ -85,6 +85,17 @@ pub fn main() {
 		},
 	];
 	let lua = mlua::Lua::new();
+	lua.globals()
+		.get::<&str, mlua::Table>("package")
+		.unwrap()
+		.set(
+			"path",
+			options::resource_directory()
+				.join("scripts/?.lua")
+				.to_str()
+				.unwrap(),
+		)
+		.unwrap();
 	let mut world_manager =
 		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options);
 	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);

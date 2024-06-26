@@ -1,12 +1,12 @@
+require("combat")
+
 return coroutine.create(function()
 	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y })
 
-	local damage = math.max(magnitude - target.sheet:stats().resistance + math.min(pierce_threshold, 0), 0)
-	local pierce_failed = false
-	if damage > 0 and damage <= pierce_threshold then
-		pierce_failed = true
-		damage = 0
-	end
+	local damage, pierce_failed = apply_damage_with_pierce(
+		pierce_threshold,
+		magnitude - target.sheet:stats().resistance,
+	)
 
 	target.hp = target.hp - damage
 	caster.sp = target.sp - level
