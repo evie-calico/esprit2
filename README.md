@@ -1,4 +1,4 @@
-# Esprit 2: Heart & Soul
+# Esprit 2
 
 This is a sequel to Esprit for the Game Boy.
 
@@ -8,6 +8,6 @@ This is a sequel to Esprit for the Game Boy.
 - Larger/more dungeons.
 - Even more dynamic cutscenes.
 - Persistent worldgen. (dungeons are always the same in each game)
-- Dungeons are all interconnected. (with a worldmap provided for quickly hopping between them)
-- Magic system (No silly "moves"! This isn't Pokemon.)
-- Freeplay/"Crawl mode" where you can make a character and play with no story.
+- Dungeons are all interconnected.
+- Magic system
+- Freeplay roguelike mode where you can make a character and play with no story.

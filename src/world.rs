@@ -170,9 +170,7 @@ impl Manager {
 			i.x = 0;
 			i.y = 0;
 			// Rest
-			let stats = i.sheet.stats();
-			i.hp = stats.heart.min(i.hp as u32 + stats.heart / 2) as i32;
-			i.sp = stats.soul.min(i.sp as u32 + stats.soul / 2) as i32;
+			i.rest();
 			// Award experience
 			i.sheet.experience += 40;
 			while i.sheet.experience >= 100 {
@@ -316,6 +314,8 @@ impl Manager {
 	pub fn pop_action<'lua>(&mut self, lua: &'lua mlua::Lua) -> Option<ActionRequest<'lua>> {
 		let next_character = self.next_character();
 
+		// TODO: Character ordering/timing
+		// TODO: Make effects like bleed decay by the delay
 		let action = next_character.borrow_mut().next_action.take()?;
 		match action {
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
@@ -344,7 +344,7 @@ impl Manager {
 									path.clone()
 								}
 							};
-							let globals = lua.globals();
+							let globals = lua.globals().clone();
 
 							globals.set("caster", caster).unwrap();
 							// Maybe these should be members of the spell?
@@ -409,7 +409,7 @@ impl Manager {
 			}
 			script::MaybeInline::Path(script::Script { path, contents: _ }) => path.clone(),
 		};
-		let globals = lua.globals();
+		let globals = lua.globals().clone();
 
 		globals.set("user", user.clone()).unwrap();
 		globals.set("target", target.clone()).unwrap();

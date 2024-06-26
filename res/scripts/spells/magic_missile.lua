@@ -5,7 +5,7 @@ return coroutine.create(function()
 
 	local damage, pierce_failed = apply_damage_with_pierce(
 		pierce_threshold,
-		magnitude - target.sheet:stats().resistance,
+		magnitude - target:stats().resistance
 	)
 
 	target.hp = target.hp - damage

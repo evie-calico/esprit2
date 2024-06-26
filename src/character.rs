@@ -3,50 +3,69 @@ use std::sync::Arc;
 
 use self::nouns::StrExt;
 
-fn replace_nouns(_lua: &mlua::Lua, this: &mut Piece, string: String) -> mlua::Result<String> {
-	Ok(string.replace_nouns(&this.sheet.nouns))
+mod piece {
+	use super::*;
+
+	fn stats(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<Stats> {
+		Ok(this.stats())
+	}
+
+	fn replace_nouns(_lua: &mlua::Lua, this: &mut Piece, string: String) -> mlua::Result<String> {
+		Ok(string.replace_nouns(&this.sheet.nouns))
+	}
+
+	fn replace_prefixed_nouns(
+		_lua: &mlua::Lua,
+		this: &mut Piece,
+		(prefix, string): (String, String),
+	) -> mlua::Result<String> {
+		Ok(string.replace_prefixed_nouns(&this.sheet.nouns, &prefix))
+	}
+
+	/// Used for debugging.
+	///
+	/// While fields of `Piece` are settable from Lua,
+	/// fields of `Sheet` and `Stats` are not.
+	/// This method circumvents that.
+	fn force_level(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<()> {
+		this.sheet.level = this.sheet.level.saturating_add(1);
+		Ok(())
+	}
+
+	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+	#[alua(
+		method = replace_nouns,
+		method = replace_prefixed_nouns,
+		method = force_level,
+		method = stats,
+	)]
+	pub struct Piece {
+		#[alua(get)]
+		pub sheet: Sheet,
+
+		#[alua(get, set)]
+		pub hp: i32,
+		#[alua(get, set)]
+		pub sp: i32,
+
+		#[alua(get, set)]
+		pub bleed: u32,
+
+		pub attacks: Vec<Arc<Attack>>,
+		pub spells: Vec<Arc<Spell>>,
+
+		#[alua(get, set)]
+		pub x: i32,
+		#[alua(get, set)]
+		pub y: i32,
+		pub next_action: Option<Action>,
+		#[alua(get, set)]
+		pub player_controlled: bool,
+		pub alliance: Alliance,
+	}
 }
 
-fn replace_prefixed_nouns(
-	_lua: &mlua::Lua,
-	this: &mut Piece,
-	(prefix, string): (String, String),
-) -> mlua::Result<String> {
-	Ok(string.replace_prefixed_nouns(&this.sheet.nouns, &prefix))
-}
-
-/// Used for debugging.
-///
-/// While fields of `Piece` are settable from Lua,
-/// fields of `Sheet` and `Stats` are not.
-/// This method circumvents that.
-fn force_level(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<()> {
-	this.sheet.level = this.sheet.level.saturating_add(1);
-	Ok(())
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
-#[alua(method = replace_nouns, method = replace_prefixed_nouns, method = force_level)]
-pub struct Piece {
-	#[alua(get)]
-	pub sheet: Sheet,
-
-	#[alua(get, set)]
-	pub hp: i32,
-	#[alua(get, set)]
-	pub sp: i32,
-	pub attacks: Vec<Arc<Attack>>,
-	pub spells: Vec<Arc<Spell>>,
-
-	#[alua(get, set)]
-	pub x: i32,
-	#[alua(get, set)]
-	pub y: i32,
-	pub next_action: Option<Action>,
-	#[alua(get, set)]
-	pub player_controlled: bool,
-	pub alliance: Alliance,
-}
+pub use piece::Piece;
 
 impl expression::Variables for Piece {
 	fn get<'expression>(
@@ -81,6 +100,7 @@ impl Piece {
 			sheet,
 			hp,
 			sp,
+			bleed: 0,
 			attacks,
 			spells,
 			x: 0,
@@ -89,6 +109,34 @@ impl Piece {
 			player_controlled: false,
 			alliance: Alliance::default(),
 		}
+	}
+
+	pub fn rest(&mut self) {
+		let stats = self.stats();
+		self.restore_hp(stats.heart / 2);
+		self.restore_sp(stats.soul);
+		// Patch up any bleeding between floors.
+		self.bleed = 0;
+	}
+
+	pub fn restore_hp(&mut self, amount: u32) {
+		self.hp = i32::min(self.hp + amount as i32, self.stats().heart as i32);
+	}
+
+	pub fn restore_sp(&mut self, amount: u32) {
+		self.sp = i32::min(self.sp + amount as i32, self.stats().soul as i32);
+	}
+
+	pub fn stats(&self) -> Stats {
+		let mut stats = self.sheet.stats();
+		let mut bleed_debuff = 0;
+		let mut bleed_amount = self.bleed;
+		while bleed_amount > (bleed_debuff + 1) * 10 {
+			bleed_amount -= (bleed_debuff + 1) * 10;
+			bleed_debuff += 1;
+		}
+		stats.defense = stats.defense.saturating_sub(bleed_debuff);
+		stats
 	}
 }
 
@@ -136,68 +184,74 @@ pub enum Alliance {
 	Enemy,
 }
 
-fn stats(_lua: &mlua::Lua, this: &mut Sheet, _: ()) -> mlua::Result<Stats> {
-	Ok(this.stats())
-}
+mod sheet {
+	use super::*;
 
-fn growth_bonuses() -> Stats {
-	use rand::seq::SliceRandom;
-	const BONUS_COUNT: usize = 10;
-
-	let mut bonuses = Stats::default();
-	let mut stats = [
-		&mut bonuses.heart,
-		&mut bonuses.soul,
-		&mut bonuses.power,
-		&mut bonuses.defense,
-		&mut bonuses.magic,
-		&mut bonuses.resistance,
-	];
-	let mut rng = rand::thread_rng();
-
-	for _ in 0..BONUS_COUNT {
-		let stat = stats.choose_mut(&mut rng).unwrap();
-		// Prefer skipping stats that are already 0
-		if **stat == 0 {
-			**stats.choose_mut(&mut rng).unwrap() += 1;
-		} else {
-			**stat += 1;
-		}
+	fn stats(_lua: &mlua::Lua, this: &mut Sheet, _: ()) -> mlua::Result<Stats> {
+		Ok(this.stats())
 	}
 
-	bonuses
+	fn growth_bonuses() -> Stats {
+		use rand::seq::SliceRandom;
+		const BONUS_COUNT: usize = 10;
+
+		let mut bonuses = Stats::default();
+		let mut stats = [
+			&mut bonuses.heart,
+			&mut bonuses.soul,
+			&mut bonuses.power,
+			&mut bonuses.defense,
+			&mut bonuses.magic,
+			&mut bonuses.resistance,
+		];
+		let mut rng = rand::thread_rng();
+
+		for _ in 0..BONUS_COUNT {
+			let stat = stats.choose_mut(&mut rng).unwrap();
+			// Prefer skipping stats that are already 0
+			if **stat == 0 {
+				**stats.choose_mut(&mut rng).unwrap() += 1;
+			} else {
+				**stat += 1;
+			}
+		}
+
+		bonuses
+	}
+
+	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+	#[alua(method = stats)]
+	pub struct Sheet {
+		pub icon: String,
+		/// Note that this includes the character's name.
+		#[alua(get)]
+		pub nouns: Nouns,
+
+		#[alua(get)]
+		pub level: u32,
+		#[alua(get)]
+		#[serde(default)] // There's no reason for most sheets to care about this.
+		pub experience: u32,
+
+		#[alua(get)]
+		pub bases: Stats,
+		#[alua(get)]
+		pub growths: Stats,
+		#[serde(default = "growth_bonuses")]
+		pub growth_bonuses: Stats,
+
+		pub skillset: spell::Skillset,
+		#[alua(get)]
+		pub speed: Aut,
+
+		#[alua(get)]
+		pub attacks: Vec<String>,
+		#[alua(get)]
+		pub spells: Vec<String>,
+	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
-#[alua(method = stats)]
-pub struct Sheet {
-	pub icon: String,
-	/// Note that this includes the character's name.
-	#[alua(get)]
-	pub nouns: Nouns,
-
-	#[alua(get)]
-	pub level: u32,
-	#[alua(get)]
-	#[serde(default)] // There's no reason for most sheets to care about this.
-	pub experience: u32,
-
-	#[alua(get)]
-	pub bases: Stats,
-	#[alua(get)]
-	pub growths: Stats,
-	#[serde(default = "growth_bonuses")]
-	pub growth_bonuses: Stats,
-
-	pub skillset: spell::Skillset,
-	#[alua(get)]
-	pub speed: Aut,
-
-	#[alua(get)]
-	pub attacks: Vec<String>,
-	#[alua(get)]
-	pub spells: Vec<String>,
-}
+pub use sheet::Sheet;
 
 impl Sheet {
 	pub fn stats(&self) -> Stats {
