@@ -47,6 +47,7 @@ pub enum Result {
 pub fn world(
 	event_pump: &mut sdl2::EventPump,
 	world_manager: &mut world::Manager,
+	resources: &ResourceManager,
 	mode: &mut Mode,
 	options: &Options,
 ) -> Option<Result> {
@@ -103,7 +104,7 @@ pub fn world(
 										);
 									}
 									Some(floor::Tile::Exit) => {
-										world_manager.new_floor();
+										world_manager.new_floor(resources);
 									}
 									None => {
 										world_manager

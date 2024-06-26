@@ -8,7 +8,7 @@ aho-corasick = "1.1.2"
 alua = { version = "0.1.3", features = ["userdata"] }
 grid = { version = "0.13.0", features = ["serde"] }
 lazy_static = "1.4.0"
-mlua = { version = "0.9.8", features = ["luau-jit", "parking_lot", "serialize", "vendored"] }
+mlua = { version = "0.9.8", features = ["luajit", "parking_lot", "serialize", "unstable", "vendored"] }
 parking_lot = { version = "0.12.3", features = ["deadlock_detection", "serde"] }
 paste = "1.0.14"
 pest = "2.7.10"

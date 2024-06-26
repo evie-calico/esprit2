@@ -328,16 +328,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
-name = "libloading"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
-dependencies = [
- "cfg-if",
- "windows-targets",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,15 +370,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "luau0-src"
-version = "0.10.1+luau630"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16051c9b79d9118360b211fd638e8ae6923c5e83ed2ce5029e89562a071298cb"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -411,7 +392,6 @@ checksum = "d111deb18a9c9bd33e1541309f4742523bfab01d276bfa9a27519f6de9c11dc7"
 dependencies = [
  "bstr",
  "erased-serde",
- "libloading",
  "mlua-sys",
  "num-traits",
  "once_cell",
@@ -431,7 +411,6 @@ dependencies = [
  "cfg-if",
  "lua-src",
  "luajit-src",
- "luau0-src",
  "pkg-config",
 ]
 

@@ -85,8 +85,10 @@ pub fn main() {
 			accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 		},
 	];
-	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &options, &resources);
-	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap());
+	let lua = mlua::Lua::new();
+	let mut world_manager =
+		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options);
+	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
@@ -106,6 +108,7 @@ pub fn main() {
 		match input::world(
 			&mut event_pump,
 			&mut world_manager,
+			&resources,
 			&mut input_mode,
 			&options,
 		) {
@@ -139,7 +142,7 @@ pub fn main() {
 				i.draw_state.cloud.tick(delta);
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
-			action_request = world_manager.update(action_request, &mut input_mode);
+			action_request = world_manager.update(action_request, &lua, &mut input_mode);
 			world_manager
 				.characters
 				.retain(|character| character.read().hp > 0);

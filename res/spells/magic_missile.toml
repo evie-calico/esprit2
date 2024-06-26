@@ -5,6 +5,9 @@ energy = "Positive"
 harmony = "Chaos"
 
 level = 1
+
+[parameters]
+type = "Target"
 magnitude = "magic + 4"
 pierce_threshold = 2
 

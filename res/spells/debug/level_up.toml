@@ -6,6 +6,9 @@ harmony = "Order"
 
 level = 0
 
+[parameters]
+type = "Target"
+
 [on_cast]
 type = "Inline"
 source = '''
