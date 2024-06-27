@@ -1,10 +1,10 @@
 name = "Bite"
 description = "Lowers your defense until your next turn."
-magnitude = "power + 2d6"
+magnitude = "power + 8"
 
 [on_use]
-type = "Inline"
-source = ""
+type = "Path"
+source = "scripts/attacks/bite.lua"
 
 [messages]
 high = [

@@ -48,8 +48,12 @@ mod piece {
 		#[alua(get, set)]
 		pub sp: i32,
 
+		/// Accumulated defense debuff. Wears off when resting.
 		#[alua(get, set)]
 		pub bleed: u32,
+		/// Confers a defense debuff until this character's next turn.
+		#[alua(get, set)]
+		pub close_combat: bool,
 
 		pub attacks: Vec<Arc<Attack>>,
 		pub spells: Vec<Arc<Spell>>,
@@ -101,6 +105,7 @@ impl Piece {
 			hp,
 			sp,
 			bleed: 0,
+			close_combat: false,
 			attacks,
 			spells,
 			x: 0,
@@ -109,6 +114,11 @@ impl Piece {
 			player_controlled: false,
 			alliance: Alliance::default(),
 		}
+	}
+
+	pub fn new_turn(&mut self) {
+		// Take the opportunity to back out of close range
+		self.close_combat = false;
 	}
 
 	pub fn rest(&mut self) {
@@ -126,17 +136,119 @@ impl Piece {
 	pub fn restore_sp(&mut self, amount: u32) {
 		self.sp = i32::min(self.sp + amount as i32, self.stats().soul as i32);
 	}
+}
 
-	pub fn stats(&self) -> Stats {
-		let mut stats = self.sheet.stats();
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct StatOutcomes {
+	pub stats: Stats,
+	pub buffs: Stats,
+	pub debuffs: Stats,
+}
+
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+pub enum WhichStat {
+	Heart,
+	Soul,
+	Power,
+	Defense,
+	Magic,
+	Resistance,
+}
+
+impl std::fmt::Display for WhichStat {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"{}",
+			match self {
+				WhichStat::Heart => "HP",
+				WhichStat::Soul => "SP",
+				WhichStat::Power => "Pow",
+				WhichStat::Defense => "Def",
+				WhichStat::Magic => "Mag",
+				WhichStat::Resistance => "Res",
+			}
+		)
+	}
+}
+
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Buff {
+	pub stat: WhichStat,
+	pub by: i32,
+	pub name: &'static str,
+}
+
+impl Piece {
+	pub fn buffs(&self) -> impl Iterator<Item = Buff> {
+		[self.bleed_debuff(), self.close_combat_debuff()]
+			.into_iter()
+			.filter(|x| x.by != 0)
+	}
+
+	pub fn bleed_debuff(&self) -> Buff {
 		let mut bleed_debuff = 0;
 		let mut bleed_amount = self.bleed;
 		while bleed_amount > (bleed_debuff + 1) * 10 {
 			bleed_amount -= (bleed_debuff + 1) * 10;
 			bleed_debuff += 1;
 		}
-		stats.defense = stats.defense.saturating_sub(bleed_debuff);
-		stats
+
+		Buff {
+			stat: WhichStat::Defense,
+			by: -(bleed_debuff as i32),
+			name: "Bleeding",
+		}
+	}
+
+	pub fn close_combat_debuff(&self) -> Buff {
+		Buff {
+			stat: WhichStat::Defense,
+			by: if self.close_combat { -4 } else { 0 },
+			name: "Close Combat",
+		}
+	}
+
+	pub fn stats(&self) -> Stats {
+		self.stat_outcomes().stats
+	}
+
+	pub fn stat_outcomes(&self) -> StatOutcomes {
+		let mut buffs = Stats::default();
+		let mut debuffs = Stats::default();
+
+		for buff in self.buffs() {
+			let apply = |buffs: &mut u32, debuffs: &mut u32| {
+				if buff.by > 0 {
+					*buffs += buff.by as u32
+				} else {
+					*debuffs += -buff.by as u32
+				}
+			};
+
+			match buff.stat {
+				WhichStat::Heart => apply(&mut buffs.heart, &mut debuffs.heart),
+				WhichStat::Soul => apply(&mut buffs.soul, &mut debuffs.soul),
+				WhichStat::Power => apply(&mut buffs.power, &mut debuffs.power),
+				WhichStat::Defense => apply(&mut buffs.defense, &mut debuffs.defense),
+				WhichStat::Magic => apply(&mut buffs.magic, &mut debuffs.magic),
+				WhichStat::Resistance => apply(&mut buffs.resistance, &mut debuffs.resistance),
+			}
+		}
+
+		let mut stats = self.sheet.stats();
+		stats.heart = stats.heart.saturating_sub(debuffs.heart) + buffs.heart;
+		stats.soul = stats.soul.saturating_sub(debuffs.soul) + buffs.soul;
+		stats.power = stats.power.saturating_sub(debuffs.power) + buffs.power;
+		stats.defense = stats.defense.saturating_sub(debuffs.defense) + buffs.defense;
+		stats.magic = stats.magic.saturating_sub(debuffs.magic) + buffs.magic;
+		stats.resistance = stats.resistance.saturating_sub(debuffs.resistance) + buffs.resistance;
+
+		StatOutcomes {
+			stats,
+			buffs,
+			debuffs,
+		}
 	}
 }
 
@@ -315,6 +427,21 @@ impl std::ops::Add for Stats {
 			defense: self.defense + rhs.defense,
 			magic: self.magic + rhs.magic,
 			resistance: self.resistance + rhs.resistance,
+		}
+	}
+}
+
+impl std::ops::Sub for Stats {
+	type Output = Stats;
+
+	fn sub(self, rhs: Self) -> Self {
+		Stats {
+			heart: self.heart - rhs.heart,
+			soul: self.soul - rhs.soul,
+			power: self.power - rhs.power,
+			defense: self.defense - rhs.defense,
+			magic: self.magic - rhs.magic,
+			resistance: self.resistance - rhs.resistance,
 		}
 	}
 }

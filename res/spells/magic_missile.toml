@@ -2,7 +2,7 @@ name = "Magic Missile"
 icon = "magic_missile"
 
 energy = "Positive"
-harmony = "Chaos"
+harmony = "Order"
 
 level = 1
 

@@ -6,7 +6,7 @@ if damage > 0 or pierce_failed then
 	-- Apply a small bleeding effect even if damage is 0
 	-- to help weaker characters overcome their glancing blows
 	-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
-	target.bleed = target.bleed + math.max(5, damage)
+	target.bleed = target.bleed + 5 + damage
 end
 
 damage_messages = {

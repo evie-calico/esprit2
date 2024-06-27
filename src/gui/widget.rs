@@ -80,7 +80,16 @@ pub fn menu(
 				&menu.typography.annotation,
 			);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
-				character_info(menu, &selected_character.borrow());
+				let mut character_fn = |menu: &mut gui::Context| {
+					character_info(menu, &selected_character.borrow());
+				};
+				let mut buff_fn = |menu: &mut gui::Context| {
+					character_buffs(menu, &selected_character.borrow());
+				};
+				menu.hsplit(&mut [
+					Some((&mut character_fn) as &mut dyn FnMut(&mut gui::Context)),
+					Some(&mut buff_fn),
+				]);
 			} else {
 				world_manager.console.draw(menu, font);
 			}
@@ -141,6 +150,7 @@ pub fn pamphlet(
 					layout.flipped,
 					|player_window| {
 						character_info(player_window, &piece);
+						character_buffs(player_window, &piece);
 					},
 				);
 			});
@@ -266,6 +276,7 @@ pub fn on_cloud(
 				Rect::new(0, 0, width - radius * 2, height - radius * 2),
 			);
 			f(&mut gui);
+			gui.advance(0, 4);
 			height_used = gui.y as u32;
 		})
 		.unwrap();
@@ -294,16 +305,30 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		..
 	} = piece;
 	let name = &nouns.name;
-	let character::Stats {
-		heart,
-		soul,
-		power,
-		defense,
-		magic,
-		resistance,
-	} = piece.sheet.stats();
+	let character::StatOutcomes {
+		stats:
+			character::Stats {
+				heart,
+				soul,
+				power,
+				defense,
+				magic,
+				resistance,
+			},
+		buffs,
+		debuffs,
+	} = piece.stat_outcomes();
 
 	let font = &player_window.typography.normal;
+	let get_color = |buff, debuff| {
+		if buff > debuff {
+			(0, 0, 255, 255)
+		} else if debuff > 0 {
+			(255, 0, 0, 255)
+		} else {
+			(255, 255, 255, 255)
+		}
+	};
 
 	player_window.opposing_labels(
 		name,
@@ -327,25 +352,53 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		10,
 		5,
 	);
-	let physical_stat_info = [("Pwr", power), ("Def", defense)];
+	let physical_stat_info = [
+		("Pwr", power, buffs.power, debuffs.power),
+		("Def", defense, buffs.defense, debuffs.defense),
+	];
 	let mut physical_stats = [None, None];
-	for ((stat_name, stat), stat_half) in physical_stat_info
+	for ((stat_name, stat, buff, debuff), stat_half) in physical_stat_info
 		.into_iter()
 		.zip(physical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"))
+			let color = get_color(buff, debuff);
+			stat_half.horizontal();
+			stat_half.label_color(&stat.to_string(), color);
+			stat_half.advance(4, 0);
+			stat_half.label_color(stat_name, color);
 		});
 	}
 	player_window.hsplit(&mut physical_stats);
-	let magical_stat_info = [("Mag", magic), ("Res", resistance)];
+	let magical_stat_info = [
+		("Mag", magic, buffs.magic, debuffs.magic),
+		("Res", resistance, buffs.resistance, debuffs.resistance),
+	];
 	let mut magical_stats = [None, None];
-	for ((stat_name, stat), stat_half) in
+	for ((stat_name, stat, buff, debuff), stat_half) in
 		magical_stat_info.into_iter().zip(magical_stats.iter_mut())
 	{
 		*stat_half = Some(move |stat_half: &mut gui::Context| {
-			stat_half.label(&format!("{stat_name}: {stat}"))
+			let color = get_color(buff, debuff);
+			stat_half.horizontal();
+			stat_half.label_color(&stat.to_string(), color);
+			stat_half.advance(4, 0);
+			stat_half.label_color(stat_name, color);
 		});
 	}
 	player_window.hsplit(&mut magical_stats);
+}
+
+fn character_buffs(player_window: &mut gui::Context<'_, '_, '_>, piece: &character::Piece) {
+	for character::Buff { stat, by, name } in piece.buffs() {
+		player_window.label_styled(
+			&format!("{name}: {by} {stat}"),
+			if by > 0 {
+				(0, 0, 255, 255)
+			} else {
+				(255, 0, 0, 255)
+			},
+			&player_window.typography.annotation,
+		);
+	}
 }
