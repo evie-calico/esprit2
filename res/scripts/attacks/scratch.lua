@@ -1,4 +1,5 @@
 require("combat")
+
 local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target:stats().defense)
 
 target.hp = target.hp - damage

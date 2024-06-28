@@ -32,12 +32,17 @@ mod piece {
 		Ok(())
 	}
 
+	pub fn alliance(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<u32> {
+		Ok(this.alliance as u32)
+	}
+
 	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 	#[alua(
 		method = replace_nouns,
 		method = replace_prefixed_nouns,
 		method = force_level,
 		method = stats,
+		method = alliance,
 	)]
 	pub struct Piece {
 		#[alua(get)]
@@ -290,6 +295,7 @@ pub enum Action {
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[repr(u32)]
 pub enum Alliance {
 	Friendly,
 	#[default]

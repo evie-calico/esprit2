@@ -395,9 +395,15 @@ impl Manager {
 		// TODO: Allow the default/favorited attack to be changed.
 		let Some(attack) = user.borrow().attacks.first().cloned() else {
 			self.console
-				.print("You cannot perform any melee attacks right now".into());
+				.print_unimportant("You cannot perform any melee attacks right now.".into());
 			return None;
 		};
+
+		if target.borrow().alliance == user.borrow().alliance {
+			self.console
+				.print_unimportant("You cannot attack your allies.".into());
+			return None;
+		}
 
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
