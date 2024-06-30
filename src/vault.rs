@@ -1,5 +1,5 @@
 use crate::floor::Tile;
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, fs, io, path::Path};
 
 #[derive(Clone, Debug)]
 pub struct Vault {
@@ -20,10 +20,12 @@ pub struct Metadata {
 	symbols: HashMap<char, SymbolMeaning>,
 }
 
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error("vault is missing a layout section")]
 	MissingLayout,
+	#[error(transparent)]
+	Io(#[from] io::Error),
 	#[error("failed to parse metadata: {0}")]
 	Toml(#[from] toml::de::Error),
 	#[error("unexpected symbol: {0}")]
@@ -37,7 +39,7 @@ impl Vault {
 	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
 		let mut width = 0;
 
-		let vault_text = fs::read_to_string(path).unwrap();
+		let vault_text = fs::read_to_string(path)?;
 
 		let (metadata, layout) = vault_text
 			.split_once("# Layout\n")

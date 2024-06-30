@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, reason = "SDL")]
+
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
@@ -9,15 +11,15 @@ pub struct SoulJar<'texture> {
 }
 
 impl<'texture> SoulJar<'texture> {
-	pub fn new(resources: &'texture ResourceManager<'_>) -> Self {
+	pub fn new(resources: &'texture resource::Manager<'_>) -> Result<Self> {
 		let mut rng = rand::thread_rng();
 		let souls = (0..=9)
 			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
 			.collect();
-		Self {
+		Ok(Self {
 			souls,
-			light_texture: resources.get_owned_texture("light").unwrap(),
-		}
+			light_texture: resources.get_owned_texture("light")?,
+		})
 	}
 
 	pub fn tick(&mut self, delta: f32) {
@@ -100,7 +102,7 @@ pub fn menu(
 pub fn pamphlet(
 	pamphlet: &mut gui::Context,
 	world_manager: &world::Manager,
-	resources: &ResourceManager<'_>,
+	resources: &resource::Manager<'_>,
 	soul_jar: &mut SoulJar<'_>,
 ) {
 	struct MemberPosition {

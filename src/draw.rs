@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, reason = "SDL")]
+
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -39,7 +41,7 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager) {
 
 pub fn cursor(
 	input_mode: &input::Mode,
-	resources: &ResourceManager<'_>,
+	resources: &resource::Manager<'_>,
 	canvas: &mut Canvas<Window>,
 ) {
 	if let input::Mode::Cursor {
@@ -102,7 +104,7 @@ pub fn cursor(
 pub fn characters(
 	world_manager: &world::Manager,
 	canvas: &mut Canvas<Window>,
-	resources: &ResourceManager<'_>,
+	resources: &resource::Manager<'_>,
 ) {
 	for character in world_manager.characters.iter().map(|x| x.borrow()) {
 		canvas

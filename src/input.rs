@@ -38,7 +38,7 @@ pub enum Mode {
 	},
 }
 
-pub enum Result {
+pub enum Response {
 	Exit,
 	Fullscreen,
 	Debug,
@@ -47,13 +47,13 @@ pub enum Result {
 pub fn world(
 	event_pump: &mut sdl2::EventPump,
 	world_manager: &mut world::Manager,
-	resources: &ResourceManager,
+	resources: &resource::Manager,
 	mode: &mut Mode,
 	options: &Options,
-) -> Option<Result> {
+) -> Result<Option<Response>> {
 	for event in event_pump.poll_iter() {
 		match event {
-			Event::Quit { .. } => return Some(Result::Exit),
+			Event::Quit { .. } => return Ok(Some(Response::Exit)),
 			Event::KeyDown {
 				keycode: Some(keycode),
 				..
@@ -64,13 +64,13 @@ pub fn world(
 						Mode::Normal => {
 							// Eventually this will be a more involved binding.
 							if options.controls.escape.contains(keycode) {
-								return Some(Result::Exit);
+								return Ok(Some(Response::Exit));
 							}
 							if options.controls.debug.contains(keycode) {
-								return Some(Result::Debug);
+								return Ok(Some(Response::Debug));
 							}
 							if options.controls.fullscreen.contains(keycode) {
-								return Some(Result::Fullscreen);
+								return Ok(Some(Response::Fullscreen));
 							}
 							let directions = [
 								(&options.controls.left, character::OrdDir::Left),
@@ -104,7 +104,7 @@ pub fn world(
 										);
 									}
 									Some(floor::Tile::Exit) => {
-										world_manager.new_floor(resources);
+										world_manager.new_floor(resources)?;
 									}
 									None => {
 										world_manager
@@ -178,5 +178,5 @@ pub fn world(
 		}
 	}
 
-	None
+	Ok(None)
 }

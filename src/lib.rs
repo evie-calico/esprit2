@@ -3,8 +3,10 @@
 	clippy::missing_errors_doc,
 	clippy::module_name_repetitions,
 	clippy::items_after_statements,
-	clippy::inconsistent_struct_constructor
+	clippy::inconsistent_struct_constructor,
+	clippy::unwrap_used
 )]
+#![allow(clippy::missing_errors_doc)]
 
 pub mod attack;
 pub mod character;
@@ -18,7 +20,7 @@ pub mod input;
 pub mod item;
 pub mod nouns;
 pub mod options;
-pub mod resource_manager;
+pub mod resource;
 pub mod script;
 pub mod soul;
 pub mod spell;
@@ -26,6 +28,28 @@ pub mod spell_menu;
 pub mod typography;
 pub mod vault;
 pub mod world;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error(transparent)]
+	Io(#[from] std::io::Error),
+	#[error(transparent)]
+	Toml(#[from] toml::de::Error),
+	#[error(transparent)]
+	Lua(#[from] mlua::Error),
+
+	#[error("{0}")]
+	Sdl(String),
+
+	#[error(transparent)]
+	Vault(#[from] vault::Error),
+	#[error(transparent)]
+	Resource(#[from] resource::Error),
+	#[error(transparent)]
+	Expression(#[from] expression::Error),
+}
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Arbitrary Unit of Time.
 type Aut = u32;
@@ -50,7 +74,6 @@ pub mod prelude {
 	pub use item::Item;
 	pub use nouns::Nouns;
 	pub use options::Options;
-	pub use resource_manager::ResourceManager;
 	pub use script::Script;
 	pub use soul::Soul;
 	pub use spell::Spell;

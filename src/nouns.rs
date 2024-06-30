@@ -42,7 +42,7 @@ impl<T: AsRef<str>> StrExt for T {
 				"{they}", "{them}", "{their}", "{theirs}", "{are}", "{They}", "{Them}", "{Their}",
 				"{Theirs}", "{Are}",
 			])
-			.unwrap()
+			.expect("aho corasick table must be valid")
 		});
 		let replacements = match nouns.pronouns {
 			Pronouns::Female => &[
@@ -87,13 +87,15 @@ impl<T: AsRef<str>> StrExt for T {
 			};
 
 			let mut replacements = replacement.iter().rev();
-			let first = replacements.next().unwrap();
+			let first = replacements.next().expect("replacements must nt be empty");
 			s.replace_range(start..end, first);
 			// Convieniently, the name (longest entry) is first, meaning less copies when we need to fallback.
 			for i in replacements {
 				s.insert_str(start, i);
 			}
-			let new_end = s[start..].find('}').unwrap();
+			let new_end = s[start..]
+				.find('}')
+				.expect("replacements mus contain closing braces");
 			s.remove(start + new_end);
 			i = new_end;
 		}

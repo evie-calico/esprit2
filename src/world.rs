@@ -84,10 +84,10 @@ pub struct Location {
 impl Manager {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
-		resource_manager: &ResourceManager,
+		resource_manager: &resource::Manager,
 		lua: &mlua::Lua,
 		options: &Options,
-	) -> Self {
+	) -> Result<Self> {
 		let mut party = Vec::new();
 		let mut characters = Vec::new();
 
@@ -98,11 +98,11 @@ impl Manager {
 			accent_color,
 		} in party_blueprint
 		{
-			let sheet = resource_manager.get_sheet(sheet).unwrap();
+			let sheet = resource_manager.get_sheet(sheet)?;
 			let character = Rc::new(RefCell::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
-				..character::Piece::new(sheet.clone(), resource_manager)
+				..character::Piece::new(sheet.clone(), resource_manager)?
 			}));
 			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push(character);
@@ -111,11 +111,9 @@ impl Manager {
 
 		let console = Console::new(options.ui.colors.console.clone());
 
-		lua.globals()
-			.set("Console", console.handle.clone())
-			.unwrap();
+		lua.globals().set("Console", console.handle.clone())?;
 
-		Manager {
+		Ok(Manager {
 			location: world::Location {
 				level: String::from("New Level"),
 				floor: 0,
@@ -150,10 +148,10 @@ impl Manager {
 			],
 
 			console,
-		}
+		})
 	}
 
-	pub fn new_floor(&mut self, resources: &ResourceManager) {
+	pub fn new_floor(&mut self, resources: &resource::Manager) -> Result<()> {
 		self.location.floor += 1;
 		self.console
 			.print_important(format!("Entering floor {}", self.location.floor));
@@ -187,9 +185,9 @@ impl Manager {
 		self.apply_vault(
 			rng.gen_range(1..8),
 			rng.gen_range(1..8),
-			resources.get_vault("example").unwrap(),
+			resources.get_vault("example")?,
 			resources,
-		);
+		)
 	}
 
 	pub fn update<'lua>(
@@ -197,7 +195,7 @@ impl Manager {
 		action_request: Option<world::ActionRequest<'lua>>,
 		lua: &'lua mlua::Lua,
 		input_mode: &mut input::Mode,
-	) -> Option<world::ActionRequest<'lua>> {
+	) -> mlua::Result<Option<world::ActionRequest<'lua>>> {
 		let (renew_action, action_request) = match action_request {
 			Some(world::ActionRequest::BeginCursor { x, y, callback }) => {
 				match *input_mode {
@@ -209,10 +207,7 @@ impl Manager {
 					} => {
 						*input_mode = input::Mode::Normal;
 						if let Some(character) = self.get_character_at(x, y) {
-							(
-								true,
-								ActionRequest::poll(lua, callback, character.clone()).unwrap(),
-							)
+							(true, ActionRequest::poll(lua, callback, character.clone())?)
 						} else {
 							(false, None)
 						}
@@ -235,7 +230,7 @@ impl Manager {
 					}
 				}
 			}
-			None => (true, self.pop_action(lua)),
+			None => (true, self.pop_action(lua)?),
 		};
 
 		if renew_action {
@@ -250,7 +245,7 @@ impl Manager {
 			}
 		}
 
-		action_request
+		Ok(action_request)
 	}
 
 	pub fn next_character(&self) -> &CharacterRef {
@@ -264,16 +259,23 @@ impl Manager {
 		})
 	}
 
-	pub fn apply_vault(&mut self, x: i32, y: i32, vault: &Vault, resources: &ResourceManager) {
+	pub fn apply_vault(
+		&mut self,
+		x: i32,
+		y: i32,
+		vault: &Vault,
+		resources: &resource::Manager,
+	) -> Result<()> {
 		self.current_floor.blit_vault(x as usize, y as usize, vault);
 		for (xoff, yoff, sheet_name) in &vault.characters {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new(resources.get_sheet(sheet_name).unwrap().clone(), resources)
+				..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
 			};
 			self.characters.push(Rc::new(RefCell::new(piece)));
 		}
+		Ok(())
 	}
 }
 
@@ -311,12 +313,16 @@ impl<'lua> ActionRequest<'lua> {
 }
 
 impl Manager {
-	pub fn pop_action<'lua>(&mut self, lua: &'lua mlua::Lua) -> Option<ActionRequest<'lua>> {
+	pub fn pop_action<'lua>(
+		&mut self,
+		lua: &'lua mlua::Lua,
+	) -> mlua::Result<Option<ActionRequest<'lua>>> {
 		let next_character = self.next_character();
 
 		// TODO: Character ordering/timing
-		// TODO: Make effects like bleed decay by the delay
-		let action = next_character.borrow_mut().next_action.take()?;
+		let Some(action) = next_character.borrow_mut().next_action.take() else {
+			return Ok(None);
+		};
 		match action {
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
 			character::Action::Cast(spell) => {
@@ -346,28 +352,23 @@ impl Manager {
 							};
 							let globals = lua.globals().clone();
 
-							globals.set("caster", caster).unwrap();
+							globals.set("caster", caster)?;
 							// Maybe these should be members of the spell?
-							globals.set("magnitude", magnitude).unwrap();
-							globals.set("pierce_threshold", pierce_threshold).unwrap();
-							globals.set("level", spell.level).unwrap();
-							globals.set("affinity", affinity).unwrap();
+							globals.set("magnitude", magnitude)?;
+							globals.set("pierce_threshold", pierce_threshold)?;
+							globals.set("level", spell.level)?;
+							globals.set("affinity", affinity)?;
 
-							let value: mlua::Value = chunk
-								.set_name(name)
-								.set_environment(globals)
-								.eval()
-								.unwrap();
+							let value: mlua::Value =
+								chunk.set_name(name).set_environment(globals).eval()?;
 
 							match value {
-								mlua::Value::Thread(thread) => {
-									ActionRequest::poll(lua, thread, ()).unwrap()
-								}
+								mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
 
-								mlua::Value::Nil => None,
+								mlua::Value::Nil => Ok(None),
 								_ => {
 									error!("unexpected return value");
-									None
+									Ok(None)
 								}
 							}
 						}
@@ -377,7 +378,7 @@ impl Manager {
 						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 							.replace_nouns(&next_character.borrow().sheet.nouns);
 					self.console.print_system(message);
-					None
+					Ok(None)
 				}
 			}
 		}
@@ -391,18 +392,18 @@ impl Manager {
 		lua: &'lua mlua::Lua,
 		user: &CharacterRef,
 		target: &CharacterRef,
-	) -> Option<ActionRequest<'lua>> {
+	) -> mlua::Result<Option<ActionRequest<'lua>>> {
 		// TODO: Allow the default/favorited attack to be changed.
 		let Some(attack) = user.borrow().attacks.first().cloned() else {
 			self.console
 				.print_unimportant("You cannot perform any melee attacks right now.".into());
-			return None;
+			return Ok(None);
 		};
 
 		if target.borrow().alliance == user.borrow().alliance {
 			self.console
 				.print_unimportant("You cannot attack your allies.".into());
-			return None;
+			return Ok(None);
 		}
 
 		// Calculate damage
@@ -417,25 +418,22 @@ impl Manager {
 		};
 		let globals = lua.globals().clone();
 
-		globals.set("user", user.clone()).unwrap();
-		globals.set("target", target.clone()).unwrap();
-		globals.set("magnitude", magnitude).unwrap();
+		globals.set("user", user.clone())?;
+		globals.set("target", target.clone())?;
+		globals.set("magnitude", magnitude)?;
 
-		let value: mlua::Value = chunk
-			.set_name(name)
-			.set_environment(globals)
-			.eval()
-			.unwrap();
+		let value: mlua::Value = chunk.set_name(name).set_environment(globals).eval()?;
 
 		match value {
 			mlua::Value::Thread(thread) => {
-				return ActionRequest::poll(lua, thread, ()).unwrap();
+				return ActionRequest::poll(lua, thread, ());
 			}
-			mlua::Value::Nil => (),
-			_ => error!("unexpected return value"),
+			mlua::Value::Nil => Ok(None),
+			_ => {
+				error!("unexpected return value");
+				Ok(None)
+			}
 		}
-
-		None
 	}
 
 	/// # Errors
@@ -446,7 +444,7 @@ impl Manager {
 		lua: &'lua mlua::Lua,
 		character: &CharacterRef,
 		dir: OrdDir,
-	) -> Option<ActionRequest<'lua>> {
+	) -> mlua::Result<Option<ActionRequest<'lua>>> {
 		use crate::floor::Tile;
 
 		let (x, y) = {
@@ -467,16 +465,16 @@ impl Manager {
 				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				None
+				Ok(None)
 			}
 			Some(Tile::Wall) => {
 				self.console
 					.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
-				None
+				Ok(None)
 			}
 			None => {
 				self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
-				None
+				Ok(None)
 			}
 		}
 	}

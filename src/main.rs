@@ -49,10 +49,10 @@ pub fn main() {
 	tracing_subscriber::fmt::init();
 
 	// Game initialization.
-	let resources = match ResourceManager::open(options::resource_directory(), &texture_creator) {
+	let resources = match resource::Manager::open(options::resource_directory(), &texture_creator) {
 		Ok(resources) => resources,
 		Err(msg) => {
-			error!("Failed to open resource directory: {msg}");
+			error!("failed to open resource directory: {msg}");
 			exit(1);
 		}
 	};
@@ -97,12 +97,23 @@ pub fn main() {
 		)
 		.unwrap();
 	let mut world_manager =
-		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options);
-	world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources);
+		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options)
+			.unwrap_or_else(|msg| {
+				error!("failed to initialize world manager: {msg}");
+				exit(1);
+			});
+	if let Err(msg) =
+		world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources)
+	{
+		error!("failed to apply vault \"example\": {msg}");
+	}
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
-	let mut soul_jar = gui::widget::SoulJar::new(&resources);
+	let mut soul_jar = gui::widget::SoulJar::new(&resources).unwrap_or_else(|msg| {
+		error!("failed to initialize soul jar: {msg}");
+		exit(1);
+	});
 	// This disperses the souls enough to cause them to fly in from the sides
 	// the same effect can be seen if a computer is put to sleep and then woken up.
 	soul_jar.tick(5.0);
@@ -122,8 +133,8 @@ pub fn main() {
 			&mut input_mode,
 			&options,
 		) {
-			Some(input::Result::Exit) => break,
-			Some(input::Result::Fullscreen) => {
+			Ok(Some(input::Response::Exit)) => break,
+			Ok(Some(input::Response::Fullscreen)) => {
 				use sdl2::video::FullscreenType;
 				match canvas.window().fullscreen_state() {
 					FullscreenType::Off => {
@@ -134,8 +145,11 @@ pub fn main() {
 					}
 				}
 			}
-			Some(input::Result::Debug) => debug ^= true,
-			None => (),
+			Ok(Some(input::Response::Debug)) => debug ^= true,
+			Ok(None) => (),
+			Err(msg) => {
+				error!("world input processing returned an error: {msg}");
+			}
 		}
 		// Logic
 		{
@@ -152,7 +166,13 @@ pub fn main() {
 				i.draw_state.cloud.tick(delta);
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
-			action_request = world_manager.update(action_request, &lua, &mut input_mode);
+			match world_manager.update(action_request, &lua, &mut input_mode) {
+				Ok(result) => action_request = result,
+				Err(msg) => {
+					error!("world manager update returned an error: {msg}");
+					action_request = None;
+				}
+			}
 			world_manager
 				.characters
 				.retain(|character| character.borrow().hp > 0);

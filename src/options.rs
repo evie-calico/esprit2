@@ -224,7 +224,8 @@ impl TryFrom<usize> for Shortcut {
 			return Err(());
 		};
 		// This unwrap is safe because the above succeeded.
-		let keycode = Keycode::from_i32(Keycode::A.into_i32() + index).unwrap();
+		let keycode = Keycode::from_i32(Keycode::A.into_i32() + index)
+			.expect("symbol must be within the valid keycode range");
 		Ok(Self { symbol, keycode })
 	}
 }

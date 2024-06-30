@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, reason = "SDL")]
+
 use crate::prelude::*;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};

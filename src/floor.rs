@@ -1,4 +1,5 @@
 use grid::Grid;
+use tracing::warn;
 
 use crate::vault::Vault;
 
@@ -32,7 +33,11 @@ impl Floor {
 		for row in vault.tiles.chunks(vault.width) {
 			for tile in row {
 				if let Some(tile) = tile {
-					*self.map.get_mut(y, x).unwrap() = *tile;
+					if let Some(dest) = self.map.get_mut(y, x) {
+						*dest = *tile;
+					} else {
+						warn!("attempted to place vault out of bounds");
+					}
 				}
 				x += 1;
 			}

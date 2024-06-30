@@ -1,7 +1,6 @@
 use crate::prelude::*;
+use nouns::StrExt;
 use std::sync::Arc;
-
-use self::nouns::StrExt;
 
 mod piece {
 	use super::*;
@@ -77,10 +76,7 @@ mod piece {
 pub use piece::Piece;
 
 impl expression::Variables for Piece {
-	fn get<'expression>(
-		&self,
-		s: &'expression str,
-	) -> Result<expression::Integer, expression::Error<'expression>> {
+	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
 		match s {
 			"hp" => Ok(self.hp as expression::Integer),
 			"sp" => Ok(self.sp as expression::Integer),
@@ -90,22 +86,22 @@ impl expression::Variables for Piece {
 }
 
 impl Piece {
-	pub fn new(sheet: Sheet, resources: &ResourceManager) -> Self {
+	pub fn new(sheet: Sheet, resources: &resource::Manager) -> Result<Self> {
 		let stats = sheet.stats();
 		let hp = stats.heart as i32;
 		let sp = stats.soul as i32;
 		let attacks = sheet
 			.attacks
 			.iter()
-			.map(|x| resources.get_attack(x).unwrap().clone())
-			.collect();
+			.map(|x| resources.get_attack(x).cloned())
+			.collect::<Result<_>>()?;
 		let spells = sheet
 			.spells
 			.iter()
-			.map(|x| resources.get_spell(x).unwrap().clone())
-			.collect();
+			.map(|x| resources.get_spell(x).cloned())
+			.collect::<Result<_>>()?;
 
-		Self {
+		Ok(Self {
 			sheet,
 			hp,
 			sp,
@@ -118,7 +114,7 @@ impl Piece {
 			next_action: None,
 			player_controlled: false,
 			alliance: Alliance::default(),
-		}
+		})
 	}
 
 	pub fn new_turn(&mut self) {
@@ -325,10 +321,14 @@ mod sheet {
 		let mut rng = rand::thread_rng();
 
 		for _ in 0..BONUS_COUNT {
-			let stat = stats.choose_mut(&mut rng).unwrap();
+			let stat = stats
+				.choose_mut(&mut rng)
+				.expect("stats should not be empty");
 			// Prefer skipping stats that are already 0
 			if **stat == 0 {
-				**stats.choose_mut(&mut rng).unwrap() += 1;
+				**stats
+					.choose_mut(&mut rng)
+					.expect("stats should not be empty") += 1;
 			} else {
 				**stat += 1;
 			}
@@ -387,10 +387,7 @@ impl Sheet {
 }
 
 impl expression::Variables for Sheet {
-	fn get<'expression>(
-		&self,
-		s: &'expression str,
-	) -> Result<expression::Integer, expression::Error<'expression>> {
+	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
 		match s {
 			"level" => Ok(self.level as expression::Integer),
 			"speed" => Ok(self.speed as expression::Integer),
@@ -498,10 +495,7 @@ impl std::ops::Div<u32> for Stats {
 }
 
 impl expression::Variables for Stats {
-	fn get<'expression>(
-		&self,
-		s: &'expression str,
-	) -> Result<expression::Integer, expression::Error<'expression>> {
+	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
 		match s {
 			"heart" => Ok(self.heart as expression::Integer),
 			"soul" => Ok(self.soul as expression::Integer),
@@ -509,7 +503,7 @@ impl expression::Variables for Stats {
 			"defense" => Ok(self.defense as expression::Integer),
 			"magic" => Ok(self.magic as expression::Integer),
 			"resistance" => Ok(self.resistance as expression::Integer),
-			_ => Err(expression::Error::MissingVariable(s)),
+			_ => Err(expression::Error::MissingVariable(s.into())),
 		}
 	}
 }

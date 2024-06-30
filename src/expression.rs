@@ -24,22 +24,24 @@ pub enum Operation {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<'expression> {
+pub enum Error {
 	#[error("cannot evaluate variable \"{0}\": no variables defined")]
-	NoVariables(&'expression str),
+	NoVariables(String),
 	#[error("variable \"{0}\" not defined")]
-	MissingVariable(&'expression str),
+	MissingVariable(String),
 	#[error("result ({0}) out of range for {1}")]
-	OutOfRange(Integer, &'static str),
+	OutOfRange(Integer, String),
 }
 
 impl Operation {
-	fn eval<'expression>(
-		&self,
-		equation: &'expression Expression,
-		variables: &impl Variables,
-	) -> Result<Integer, Error<'expression>> {
-		let get_leaf = |i: usize| equation.leaves.get(i).unwrap().eval(equation, variables);
+	fn eval(&self, equation: &Expression, variables: &impl Variables) -> Result<Integer, Error> {
+		let get_leaf = |i: usize| {
+			equation
+				.leaves
+				.get(i)
+				.expect("invalid leaf indices")
+				.eval(equation, variables)
+		};
 
 		match self {
 			Operation::Integer(i) => Ok(*i),
@@ -63,17 +65,17 @@ pub trait Variables {
 	/// # Errors
 	///
 	/// Should return `Err(expression::Error::MissingVariable(s)` if a variable is not defined.
-	fn get<'expression>(&self, s: &'expression str) -> Result<Integer, Error<'expression>>;
+	fn get(&self, s: &str) -> Result<Integer, Error>;
 }
 
 impl Variables for () {
-	fn get<'expression>(&self, s: &'expression str) -> Result<Integer, Error<'expression>> {
-		Err(Error::NoVariables(s))
+	fn get(&self, s: &str) -> Result<Integer, Error> {
+		Err(Error::NoVariables(s.into()))
 	}
 }
 
 impl Variables for Integer {
-	fn get<'expression>(&self, _: &'expression str) -> Result<Integer, Error<'expression>> {
+	fn get(&self, _: &str) -> Result<Integer, Error> {
 		Ok(*self)
 	}
 }
@@ -101,7 +103,7 @@ impl TryFrom<String> for Expression {
 	fn try_from(source: String) -> Result<Self, Self::Error> {
 		let pairs = OperationParser::parse(Rule::equation, &source)?
 			.next()
-			.unwrap()
+			.expect("pest returned no pairs")
 			.into_inner();
 
 		let mut leaves = Vec::new();
@@ -114,14 +116,28 @@ impl TryFrom<String> for Expression {
 		let root =
 			pratt_parser()
 				.map_primary(|primary| match primary.as_rule() {
-					Rule::integer => Operation::Integer(primary.as_str().parse().unwrap()),
+					Rule::integer => Operation::Integer(
+						primary
+							.as_str()
+							.parse()
+							.expect("parser must return valid integer characters"),
+					),
 					Rule::identifier => {
 						let span = primary.as_span();
 						Operation::Variable(span.start(), span.end())
 					}
 					Rule::roll => {
-						let (amount, die) = primary.as_str().split_once('d').unwrap();
-						Operation::Roll(amount.parse().unwrap(), die.parse().unwrap())
+						let (amount, die) = primary
+							.as_str()
+							.split_once('d')
+							.expect("parser must return a string containing a 'd'");
+						Operation::Roll(
+							amount
+								.parse()
+								.expect("parser must return valid integer characters"),
+							die.parse()
+								.expect("parser must return valid integer characters"),
+						)
 					}
 					rule => unreachable!(
 						"Expr::parse expected terminal value, found {rule:?} ({})",
@@ -153,21 +169,18 @@ impl TryFrom<String> for Expression {
 	}
 }
 
-pub trait Evaluate<'expression, 'variables>: Sized {
-	fn eval(expression: &'expression Expression) -> Self {
+pub trait Evaluate<'variables>: Sized {
+	fn eval(expression: &Expression) -> Self {
 		Self::evalv(expression, &())
 	}
 
-	fn evalv(expression: &'expression Expression, variables: &'variables impl Variables) -> Self;
+	fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self;
 }
 
 macro_rules! impl_int {
 	($type:ident) => {
-		impl<'expression, 'variables> Evaluate<'expression, 'variables> for $type {
-			fn evalv(
-				expression: &'expression Expression,
-				variables: &'variables impl Variables,
-			) -> Self {
+		impl<'variables> Evaluate<'variables> for $type {
+			fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self {
 				expression
 					.root
 					.eval(expression, variables)
@@ -186,16 +199,11 @@ macro_rules! impl_int {
 			}
 		}
 
-		impl<'expression, 'variables> Evaluate<'expression, 'variables>
-			for Result<$type, Error<'expression>>
-		{
-			fn evalv(
-				expression: &'expression Expression,
-				variables: &'variables impl Variables,
-			) -> Self {
+		impl<'variables> Evaluate<'variables> for Result<$type, Error> {
+			fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self {
 				expression.root.eval(expression, variables).and_then(|x| {
 					x.try_into()
-						.map_err(|_| Error::OutOfRange(x, stringify!($type)))
+						.map_err(|_| Error::OutOfRange(x, stringify!($type).into()))
 				})
 			}
 		}

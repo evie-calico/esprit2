@@ -235,6 +235,7 @@ impl Console {
 		}
 	}
 
+	#[allow(clippy::unwrap_used, reason = "SDL")]
 	pub fn draw(&self, gui: &mut gui::Context, font: &Font) {
 		let canvas = &mut gui.canvas;
 		let rect = Rect::new(

@@ -30,6 +30,7 @@ impl<'ttf_module, 'rwops> Typography<'ttf_module, 'rwops> {
 					.ok()
 			})
 			.unwrap_or_else(|| {
+				#[allow(clippy::unwrap_used, reason = "SDL")]
 				ttf_context
 					.load_font_from_rwops(RWops::from_bytes(default_font_bytes).unwrap(), size)
 					.unwrap()
