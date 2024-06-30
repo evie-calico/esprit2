@@ -58,11 +58,11 @@ impl Affinity {
 
 impl mlua::UserData for Affinity {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method_mut("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
-		methods.add_method_mut("average", |_, this, ()| {
+		methods.add_method("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
+		methods.add_method("average", |_, this, ()| {
 			Ok(matches!(this, Affinity::Average))
 		});
-		methods.add_method_mut("strong", |_, this, ()| Ok(matches!(this, Affinity::Strong)));
+		methods.add_method("strong", |_, this, ()| Ok(matches!(this, Affinity::Strong)));
 	}
 }
 

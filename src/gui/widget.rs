@@ -392,15 +392,11 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 }
 
 fn character_buffs(player_window: &mut gui::Context<'_, '_, '_>, piece: &character::Piece) {
-	for character::Buff { stat, by, name } in piece.buffs() {
+	for status in piece.statuses.values() {
 		player_window.label_styled(
-			&format!("{name}: {by} {stat}"),
-			if by > 0 {
-				(0, 0, 255, 255)
-			} else {
-				(255, 0, 0, 255)
-			},
+			&status.tip(),
+			(255, 255, 255, 255),
 			&player_window.typography.annotation,
-		);
+		)
 	}
 }

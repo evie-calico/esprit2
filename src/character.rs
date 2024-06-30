@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use nouns::StrExt;
-use std::sync::Arc;
+use std::{collections::HashMap, rc::Rc};
 
 mod piece {
 	use super::*;
@@ -35,6 +35,26 @@ mod piece {
 		Ok(this.alliance as u32)
 	}
 
+	/// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
+	pub fn inflict(
+		lua: &mlua::Lua,
+		this: &mut Piece,
+		(key, magnitude): (String, Option<u32>),
+	) -> mlua::Result<()> {
+		let statuses = lua
+			.globals()
+			.get::<&str, resource::Handle<Status>>("Status")?;
+		let Some(status) = statuses.0.get(key.as_str()).cloned() else {
+			return Err(mlua::Error::external(resource::Error::NotFound(key)));
+		};
+		let entry = this
+			.statuses
+			.entry(key.into_boxed_str())
+			.or_insert_with(|| status);
+		entry.add_magnitude(magnitude.unwrap_or_default());
+		Ok(())
+	}
+
 	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 	#[alua(
 		method = replace_nouns,
@@ -42,6 +62,7 @@ mod piece {
 		method = force_level,
 		method = stats,
 		method = alliance,
+		method = inflict,
 	)]
 	pub struct Piece {
 		#[alua(get)]
@@ -52,15 +73,9 @@ mod piece {
 		#[alua(get, set)]
 		pub sp: i32,
 
-		/// Accumulated defense debuff. Wears off when resting.
-		#[alua(get, set)]
-		pub bleed: u32,
-		/// Confers a defense debuff until this character's next turn.
-		#[alua(get, set)]
-		pub close_combat: bool,
-
-		pub attacks: Vec<Arc<Attack>>,
-		pub spells: Vec<Arc<Spell>>,
+		pub statuses: HashMap<Box<str>, Status>,
+		pub attacks: Vec<Rc<Attack>>,
+		pub spells: Vec<Rc<Spell>>,
 
 		#[alua(get, set)]
 		pub x: i32,
@@ -105,8 +120,7 @@ impl Piece {
 			sheet,
 			hp,
 			sp,
-			bleed: 0,
-			close_combat: false,
+			statuses: HashMap::new(),
 			attacks,
 			spells,
 			x: 0,
@@ -118,16 +132,18 @@ impl Piece {
 	}
 
 	pub fn new_turn(&mut self) {
-		// Take the opportunity to back out of close range
-		self.close_combat = false;
+		// Remove any status effects with the duration of one turn.
+		self.statuses
+			.retain(|_, status| !matches!(status.duration, status::Duration::Turn));
 	}
 
 	pub fn rest(&mut self) {
 		let stats = self.stats();
 		self.restore_hp(stats.heart / 2);
 		self.restore_sp(stats.soul);
-		// Patch up any bleeding between floors.
-		self.bleed = 0;
+		// Remove any status effects lasting until the next rest.
+		self.statuses
+			.retain(|_, status| !matches!(status.duration, status::Duration::Rest));
 	}
 
 	pub fn restore_hp(&mut self, amount: u32) {
@@ -146,95 +162,17 @@ pub struct StatOutcomes {
 	pub debuffs: Stats,
 }
 
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
-pub enum WhichStat {
-	Heart,
-	Soul,
-	Power,
-	Defense,
-	Magic,
-	Resistance,
-}
-
-impl std::fmt::Display for WhichStat {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"{}",
-			match self {
-				WhichStat::Heart => "HP",
-				WhichStat::Soul => "SP",
-				WhichStat::Power => "Pow",
-				WhichStat::Defense => "Def",
-				WhichStat::Magic => "Mag",
-				WhichStat::Resistance => "Res",
-			}
-		)
-	}
-}
-
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Buff {
-	pub stat: WhichStat,
-	pub by: i32,
-	pub name: &'static str,
-}
-
 impl Piece {
-	pub fn buffs(&self) -> impl Iterator<Item = Buff> {
-		[self.bleed_debuff(), self.close_combat_debuff()]
-			.into_iter()
-			.filter(|x| x.by != 0)
-	}
-
-	pub fn bleed_debuff(&self) -> Buff {
-		let mut bleed_debuff = 0;
-		let mut bleed_amount = self.bleed;
-		while bleed_amount > (bleed_debuff + 1) * 10 {
-			bleed_amount -= (bleed_debuff + 1) * 10;
-			bleed_debuff += 1;
-		}
-
-		Buff {
-			stat: WhichStat::Defense,
-			by: -(bleed_debuff as i32),
-			name: "Bleeding",
-		}
-	}
-
-	pub fn close_combat_debuff(&self) -> Buff {
-		Buff {
-			stat: WhichStat::Defense,
-			by: if self.close_combat { -4 } else { 0 },
-			name: "Close Combat",
-		}
-	}
-
 	pub fn stats(&self) -> Stats {
 		self.stat_outcomes().stats
 	}
 
 	pub fn stat_outcomes(&self) -> StatOutcomes {
-		let mut buffs = Stats::default();
+		let buffs = Stats::default();
 		let mut debuffs = Stats::default();
 
-		for buff in self.buffs() {
-			let apply = |buffs: &mut u32, debuffs: &mut u32| {
-				if buff.by > 0 {
-					*buffs += buff.by as u32
-				} else {
-					*debuffs += -buff.by as u32
-				}
-			};
-
-			match buff.stat {
-				WhichStat::Heart => apply(&mut buffs.heart, &mut debuffs.heart),
-				WhichStat::Soul => apply(&mut buffs.soul, &mut debuffs.soul),
-				WhichStat::Power => apply(&mut buffs.power, &mut debuffs.power),
-				WhichStat::Defense => apply(&mut buffs.defense, &mut debuffs.defense),
-				WhichStat::Magic => apply(&mut buffs.magic, &mut debuffs.magic),
-				WhichStat::Resistance => apply(&mut buffs.resistance, &mut debuffs.resistance),
-			}
+		for debuff in self.statuses.values().filter_map(|x| x.on_debuff()) {
+			debuffs = debuffs + debuff;
 		}
 
 		let mut stats = self.sheet.stats();
@@ -287,7 +225,7 @@ impl OrdDir {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
 	Move(OrdDir),
-	Cast(Arc<Spell>),
+	Cast(Rc<Spell>),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -399,22 +337,28 @@ impl expression::Variables for Sheet {
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize, alua::UserData)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
+	#[serde(default)]
 	#[alua(get)]
 	pub heart: u32,
 	/// Magic, or SP; Soul Points
+	#[serde(default)]
 	#[alua(get)]
 	pub soul: u32,
 	/// Bonus damage applied to physical attacks.
+	#[serde(default)]
 	#[alua(get)]
 	pub power: u32,
 	/// Damage reduction when recieving physical attacks.
+	#[serde(default)]
 	#[alua(get)]
 	pub defense: u32,
 	/// Bonus damage applied to magical attacks.
+	#[serde(default)]
 	#[alua(get)]
 	pub magic: u32,
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
+	#[serde(default)]
 	#[alua(get)]
 	pub resistance: u32,
 }

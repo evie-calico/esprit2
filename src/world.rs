@@ -112,6 +112,8 @@ impl Manager {
 		let console = Console::new(options.ui.colors.console.clone());
 
 		lua.globals().set("Console", console.handle.clone())?;
+		lua.globals()
+			.set("Status", resource_manager.statuses_handle())?;
 
 		Ok(Manager {
 			location: world::Location {

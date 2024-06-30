@@ -1,0 +1,7 @@
+name = "Close Combat"
+duration = "Turn"
+
+[effect.Debuff]
+on_debuff = { type = "Inline", source = '''
+return { defense = 4 }
+'''}

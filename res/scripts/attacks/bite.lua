@@ -3,7 +3,7 @@ require("combat")
 local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - target:stats().defense)
 
 -- Biting requires you to get closer to the enemy, lowering your physical defense.
-user.close_combat = true;
+user:inflict("close_combat")
 
 target.hp = target.hp - damage
 

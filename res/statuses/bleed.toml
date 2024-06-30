@@ -1,0 +1,13 @@
+name = "Bleeding"
+duration = "Rest"
+
+[effect.Debuff]
+on_debuff = { type = "Inline", source = '''
+local debuff = 0
+while magnitude > (debuff + 1) * 10 do
+	magnitude = magnitude - (debuff + 1) * 10;
+	debuff = debuff + 1;
+end
+
+return { defense = debuff }
+'''}

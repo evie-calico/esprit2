@@ -1,12 +1,10 @@
 #![feature(ascii_char, path_file_prefix, lint_reasons, let_chains, once_cell_try)]
 #![warn(
-	clippy::missing_errors_doc,
 	clippy::module_name_repetitions,
 	clippy::items_after_statements,
 	clippy::inconsistent_struct_constructor,
 	clippy::unwrap_used
 )]
-#![allow(clippy::missing_errors_doc)]
 
 pub mod attack;
 pub mod character;
@@ -25,6 +23,7 @@ pub mod script;
 pub mod soul;
 pub mod spell;
 pub mod spell_menu;
+pub mod status;
 pub mod typography;
 pub mod vault;
 pub mod world;
@@ -77,6 +76,7 @@ pub mod prelude {
 	pub use script::Script;
 	pub use soul::Soul;
 	pub use spell::Spell;
+	pub use status::Status;
 	pub use typography::Typography;
 	pub use vault::Vault;
 

@@ -6,7 +6,7 @@ use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
@@ -18,6 +18,17 @@ pub enum Error {
 }
 
 type Resource<T> = HashMap<Box<str>, T>;
+
+#[derive(Clone, mlua::FromLua)]
+pub struct Handle<T>(pub Rc<Resource<T>>);
+
+impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
+	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method("get", |_lua, this, key: String| {
+			Ok(this.0.get(key.as_str()).cloned())
+		});
+	}
+}
 
 /// Handles lazy loading of textures into memory and video memory.
 #[derive(Default)]
@@ -46,17 +57,20 @@ struct TextureInfo<'texture> {
 pub struct Manager<'texture> {
 	texture_creator: &'texture TextureCreator<WindowContext>,
 
-	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Arc`.
-	attacks: Resource<Arc<Attack>>,
-	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Arc`.
-	spells: Resource<Arc<Spell>>,
+	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
+	attacks: Resource<Rc<Attack>>,
+	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
+	spells: Resource<Rc<Spell>>,
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
 	sheets: Resource<character::Sheet>,
+	statuses: Rc<Resource<Status>>,
 	textures: Resource<TextureInfo<'texture>>,
 	vaults: Resource<Vault>,
 
 	missing_texture: Texture<'texture>,
 }
+
+impl mlua::UserData for Manager<'_> {}
 
 fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
 	let mut container = Resource::new();
@@ -128,6 +142,11 @@ impl<'texture> Manager<'texture> {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
+		let statuses = register(&path.join("statuses"), &|path| {
+			Ok(toml::from_str(&fs::read_to_string(path)?)?)
+		})?
+		.into();
+
 		let attacks = register(&path.join("attacks"), &|path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
@@ -156,11 +175,16 @@ impl<'texture> Manager<'texture> {
 			attacks,
 			spells,
 			sheets,
+			statuses,
 			textures,
 			vaults,
 
 			missing_texture,
 		})
+	}
+
+	pub fn statuses_handle(&self) -> Handle<Status> {
+		Handle(self.statuses.clone())
 	}
 
 	/// Return the given sheet.
@@ -175,12 +199,24 @@ impl<'texture> Manager<'texture> {
 			.ok_or_else(|| Error::NotFound(key.into()))?)
 	}
 
+	/// Return the given status.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the status could not be found.
+	pub fn get_status(&self, key: &str) -> Result<&Status> {
+		Ok(self
+			.statuses
+			.get(key)
+			.ok_or_else(|| Error::NotFound(key.into()))?)
+	}
+
 	/// Return the given attack.
 	///
 	/// # Errors
 	///
 	/// Returns an error if the attack could not be found.
-	pub fn get_attack(&self, key: &str) -> Result<&Arc<Attack>> {
+	pub fn get_attack(&self, key: &str) -> Result<&Rc<Attack>> {
 		Ok(self
 			.attacks
 			.get(key)
@@ -192,7 +228,7 @@ impl<'texture> Manager<'texture> {
 	/// # Errors
 	///
 	/// Returns an error if the spell could not be found.
-	pub fn get_spell(&self, key: &str) -> Result<&Arc<Spell>> {
+	pub fn get_spell(&self, key: &str) -> Result<&Rc<Spell>> {
 		Ok(self
 			.spells
 			.get(key)

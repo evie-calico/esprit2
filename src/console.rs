@@ -69,7 +69,7 @@ macro_rules! console_colored_print {
 
 macro_rules! handle_colored_print {
 	(normal, $methods:ident) => {
-		$methods.add_method_mut("print", |_, this, value: String| {
+		$methods.add_method("print", |_, this, value: String| {
 			this.message_sender
 				.send(Message {
 					text: value,
@@ -81,7 +81,7 @@ macro_rules! handle_colored_print {
 
 	($which:ident, $methods:ident) => {
 		paste! {
-			$methods.add_method_mut(concat!("print_", stringify!($which)), |_, this, value: String| {
+			$methods.add_method(concat!("print_", stringify!($which)), |_, this, value: String| {
 				this.message_sender
 					.send(Message {
 						text: value,
@@ -144,7 +144,7 @@ macro_rules! impl_console {
 		impl mlua::UserData for Handle {
 			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 				$(handle_colored_print! { $impl_colors, methods } )*
-				methods.add_method_mut("combat_log", |lua, this, (text, log): (String, mlua::Value)| {
+				methods.add_method("combat_log", |lua, this, (text, log): (String, mlua::Value)| {
 					let log = lua.from_value(log)?;
 					this.message_sender
 						.send(Message {
