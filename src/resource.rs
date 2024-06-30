@@ -143,7 +143,7 @@ impl<'texture> Manager<'texture> {
 			})
 		})?;
 
-		let vaults = register(&path.join("vaults"), &|path| Ok(Vault::open(path)?))?;
+		let vaults = register(&path.join("vaults"), &|path| Vault::open(path))?;
 
 		// Include a missing texture placeholder, rather than returning an Option.
 		let missing_texture = texture_creator

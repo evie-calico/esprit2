@@ -9,18 +9,6 @@ use std::sync::Arc;
 use std::{fs, io};
 use tracing::error;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error(transparent)]
-	Io(#[from] io::Error),
-	#[error(transparent)]
-	Toml(#[from] toml::de::Error),
-	#[error("{0}")]
-	Texture(String),
-	#[error(transparent)]
-	Vault(#[from] vault::Error),
-}
-
 type Resource<T> = HashMap<PathBuf, T>;
 
 /// Handles lazy loading of textures into memory and video memory.

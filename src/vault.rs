@@ -1,5 +1,6 @@
 use crate::floor::Tile;
-use std::{collections::HashMap, fs, io, path::Path};
+use crate::prelude::*;
+use std::{collections::HashMap, fs, path::Path};
 
 #[derive(Clone, Debug)]
 pub struct Vault {
@@ -24,10 +25,6 @@ pub struct Metadata {
 pub enum Error {
 	#[error("vault is missing a layout section")]
 	MissingLayout,
-	#[error(transparent)]
-	Io(#[from] io::Error),
-	#[error("failed to parse metadata: {0}")]
-	Toml(#[from] toml::de::Error),
 	#[error("unexpected symbol: {0}")]
 	UnexpectedSymbol(char),
 }
@@ -36,7 +33,7 @@ impl Vault {
 	/// # Errors
 	///
 	/// Returns an error if the file could not be opened or parsed.
-	pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+	pub fn open(path: impl AsRef<Path>) -> Result<Self> {
 		let mut width = 0;
 
 		let vault_text = fs::read_to_string(path)?;
@@ -72,7 +69,7 @@ impl Vault {
 						'.' => Some(Tile::Floor),
 						'x' => Some(Tile::Wall),
 						'>' => Some(Tile::Exit),
-						_ => return Err(Error::UnexpectedSymbol(c)),
+						_ => Err(Error::UnexpectedSymbol(c))?,
 					});
 				}
 			}
