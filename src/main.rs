@@ -3,7 +3,7 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use std::fs;
 use std::process::exit;
-use tracing::*;
+use tracing::{error, info};
 
 fn update_delta(
 	last_time: &mut f64,
@@ -247,15 +247,9 @@ pub fn main() {
 				),
 			);
 
-			let top = pamphlet.rect.top();
-			let bottom = pamphlet.rect.bottom();
-			let x = pamphlet.rect.left() as f64;
-
 			cloudy_wave.draw(
-				&mut pamphlet,
-				top,
-				bottom,
-				x,
+				pamphlet.canvas,
+				pamphlet.rect,
 				20,
 				Color::RGB(0x08, 0x0f, 0x25),
 			);

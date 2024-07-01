@@ -3,10 +3,10 @@
 use crate::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
-use sdl2::rect::Point;
+use sdl2::pixels::Color;
+use sdl2::rect::{Point, Rect};
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use sdl2::{pixels::Color, rect::Rect};
 use std::f64::consts::{PI, TAU};
 
 const TILE_SIZE: u32 = 64;
@@ -277,53 +277,46 @@ impl CloudyWave {
 		self.timer %= TAU;
 	}
 
-	pub fn draw(
-		&self,
-		pamphlet: &mut gui::Context<'_, '_, '_>,
-		top: i32,
-		bottom: i32,
-		x: f64,
-		radius: i16,
-		color: Color,
-	) {
-		for (i, y) in (top..=bottom).step_by(30).enumerate() {
+	pub fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
+		let x = rect.x as f64;
+
+		for (i, y) in (rect.top()..=rect.bottom()).step_by(30).enumerate() {
 			let wave = (i as f64 - self.timer / 1.0).sin();
 			let superwave = (i as f64 / 8.0 + self.timer).sin();
 			let x = x + wave * 20.0 - superwave * radius as f64;
-			pamphlet
-				.canvas
+
+			canvas
 				.filled_circle(x as i16, y as i16, radius, color)
 				.unwrap();
-			pamphlet.canvas.set_draw_color(color);
+			canvas.set_draw_color(color);
 			let rect = Rect::new(
 				x as i32,
 				y - radius as i32,
-				(pamphlet.rect.right() - x as i32) as u32,
+				(rect.right() - x as i32) as u32,
 				radius as u32 * 2,
 			);
-			pamphlet.canvas.fill_rect(rect).unwrap();
+			canvas.fill_rect(rect).unwrap();
 		}
 
 		let mut seed = 0x12345678;
-		for _ in 0..(pamphlet.rect.width() * pamphlet.rect.height() / 9000) {
+		for _ in 0..(rect.width() * rect.height() / 9000) {
 			seed = xorshift(seed);
 			let twinkle = seed % 3 == 0
 				&& (self.timer + TAU * (xorshift(seed) as f64 / u32::MAX as f64)) % TAU > 5.0;
 			if twinkle {
 				continue;
 			}
-			let x = pamphlet.rect.x
+			let x = rect.x
 				+ radius as i32
-				+ (pamphlet.rect.width() as f64 * (seed & 0xFFFF) as f64 / u16::MAX as f64) as i32;
-			let y = pamphlet.rect.y
-				+ (pamphlet.rect.height() as f64 * (seed >> 16) as f64 / u16::MAX as f64) as i32;
+				+ (rect.width() as f64 * (seed & 0xFFFF) as f64 / u16::MAX as f64) as i32;
+			let y = rect.y + (rect.height() as f64 * (seed >> 16) as f64 / u16::MAX as f64) as i32;
 			let color = match y % 3 {
 				0 => Color::RED,
 				1 => Color::GREEN,
 				_ => Color::BLUE,
 			};
-			pamphlet.canvas.set_draw_color(color);
-			pamphlet.canvas.draw_point((x, y)).unwrap();
+			canvas.set_draw_color(color);
+			canvas.draw_point((x, y)).unwrap();
 		}
 	}
 }
