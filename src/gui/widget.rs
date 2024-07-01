@@ -395,7 +395,7 @@ fn character_buffs(player_window: &mut gui::Context<'_, '_, '_>, piece: &charact
 	for status in piece.statuses.values() {
 		player_window.label_styled(
 			&status.tip(),
-			(255, 255, 255, 255),
+			status.color(),
 			&player_window.typography.annotation,
 		)
 	}

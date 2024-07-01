@@ -51,7 +51,9 @@ mod piece {
 			.statuses
 			.entry(key.into_boxed_str())
 			.or_insert_with(|| status);
-		entry.add_magnitude(magnitude.unwrap_or_default());
+		if let Some(magnitude) = magnitude {
+			entry.add_magnitude(magnitude);
+		}
 		Ok(())
 	}
 

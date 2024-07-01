@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use tracing::error;
+use tracing::{error, warn};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Duration {
@@ -46,6 +46,7 @@ impl Debuff {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 enum Effect {
+	StaticDebuff(character::Stats),
 	Debuff(Debuff),
 }
 
@@ -62,40 +63,58 @@ impl Status {
 			Effect::Debuff(Debuff { magnitude, .. }) => {
 				*magnitude = magnitude.saturating_add(amount)
 			}
+			Effect::StaticDebuff(_) => {
+				warn!(
+					"attempted to increase the magnitude of \"{}\" but it had none",
+					self.name
+				);
+			}
 		}
 	}
 
 	pub fn on_debuff(&self) -> Option<character::Stats> {
 		match &self.effect {
 			Effect::Debuff(debuff) => debuff.get(),
+			Effect::StaticDebuff(debuff) => Some(*debuff),
 		}
 	}
 
 	pub fn tip(&self) -> String {
 		use std::fmt::Write;
 
+		fn print_stats(tip: &mut String, stats: &character::Stats) {
+			for (name, value) in [
+				("Heart", stats.heart),
+				("Soul", stats.soul),
+				("Power", stats.power),
+				("Defense", stats.defense),
+				("Magic", stats.magic),
+				("Resistance", stats.resistance),
+			] {
+				if value > 0 {
+					let _ = write!(tip, " -{value} {name}");
+				}
+			}
+		}
+
 		let mut tip = self.name.to_string();
 
 		match &self.effect {
 			Effect::Debuff(debuff) => {
 				if let Some(stats) = debuff.get() {
-					for (name, value) in [
-						("Heart", stats.heart),
-						("Soul", stats.soul),
-						("Power", stats.power),
-						("Defense", stats.defense),
-						("Magic", stats.magic),
-						("Resistance", stats.resistance),
-					] {
-						if value > 0 {
-							let _ = write!(tip, " -{value} {name}");
-						}
-					}
+					print_stats(&mut tip, &stats);
 				}
 			}
+			Effect::StaticDebuff(stats) => print_stats(&mut tip, stats),
 		}
 
 		tip
+	}
+
+	pub fn color(&self) -> (u8, u8, u8, u8) {
+		match &self.effect {
+			Effect::Debuff(_) | Effect::StaticDebuff(_) => (255, 0, 0, 255),
+		}
 	}
 }
 
