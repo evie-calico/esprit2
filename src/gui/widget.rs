@@ -57,7 +57,6 @@ pub fn menu(
 			.unwrap();
 	}
 
-	let font = &menu.typography.title;
 	match input_mode {
 		input::Mode::Normal => {
 			menu.label_styled(
@@ -65,7 +64,7 @@ pub fn menu(
 				options.ui.colors.normal_mode,
 				&menu.typography.annotation,
 			);
-			world_manager.console.draw(menu, font);
+			world_manager.console.draw(menu);
 		}
 		input::Mode::Cast => {
 			menu.label_styled(
@@ -73,7 +72,7 @@ pub fn menu(
 				options.ui.colors.cast_mode,
 				&menu.typography.annotation,
 			);
-			spell_menu::draw(menu, &world_manager.next_character().borrow(), font);
+			spell_menu(menu, &world_manager.next_character().borrow());
 		}
 		input::Mode::Cursor { x, y, .. } => {
 			menu.label_styled(
@@ -93,9 +92,23 @@ pub fn menu(
 					Some(&mut buff_fn),
 				]);
 			} else {
-				world_manager.console.draw(menu, font);
+				world_manager.console.draw(menu);
 			}
 		}
+	}
+}
+
+pub fn spell_menu(gui: &mut gui::Context, character: &character::Piece) {
+	for (spell, letter) in character.spells.iter().zip('a'..='z') {
+		let color = if spell.castable_by(character) {
+			gui.typography.color
+		} else {
+			(255, 0, 0, 255)
+		};
+		gui.label_color(
+			&format!("({letter}) {} - {} SP", spell.name, spell.level),
+			color,
+		);
 	}
 }
 

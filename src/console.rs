@@ -4,7 +4,6 @@ use paste::paste;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::rect::Rect;
 use sdl2::render::TextureQuery;
-use sdl2::ttf::Font;
 use std::collections::VecDeque;
 use std::sync::{mpsc, Arc};
 
@@ -236,7 +235,7 @@ impl Console {
 	}
 
 	#[allow(clippy::unwrap_used, reason = "SDL")]
-	pub fn draw(&self, gui: &mut gui::Context, font: &Font) {
+	pub fn draw(&self, gui: &mut gui::Context) {
 		let canvas = &mut gui.canvas;
 		let rect = Rect::new(
 			gui.x,
@@ -250,7 +249,9 @@ impl Console {
 		let mut cursor = rect.y + (rect.height() as i32);
 
 		let text = |message, color: Color| {
-			let texture = font
+			let texture = gui
+				.typography
+				.normal
 				.render(message)
 				.blended(color)
 				.unwrap()

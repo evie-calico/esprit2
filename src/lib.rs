@@ -22,7 +22,6 @@ pub mod resource;
 pub mod script;
 pub mod soul;
 pub mod spell;
-pub mod spell_menu;
 pub mod status;
 pub mod typography;
 pub mod vault;
