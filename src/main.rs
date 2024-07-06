@@ -59,7 +59,7 @@ pub fn main() {
 	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {
 		// This is `info` because it's actually very expected for first-time players.
-		info!("failed to open options.toml ({msg})");
+		info!("failed to open options.toml: {msg}");
 		info!("initializing options.toml instead");
 		// Attempt to save the old file, in case it exists.
 		if let Err(msg) = fs::rename(&options_path, options_path.with_extension("toml.old")) {

@@ -227,6 +227,7 @@ impl OrdDir {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
 	Move(OrdDir),
+	Attack(Rc<Attack>),
 	Cast(Rc<Spell>),
 }
 

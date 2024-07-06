@@ -29,6 +29,7 @@ pub struct CursorState {
 
 pub enum Mode {
 	Normal,
+	Attack,
 	Cast,
 	Cursor {
 		x: i32,
@@ -93,6 +94,10 @@ pub fn world(
 								*mode = Mode::Cast;
 							}
 
+							if options.controls.attack.contains(keycode) {
+								*mode = Mode::Attack;
+							}
+
 							let (x, y) = (next_character.x, next_character.y);
 							drop(next_character);
 
@@ -121,6 +126,22 @@ pub fn world(
 									.console
 									.say("Aris".into(), "I am a kitty :3".into());
 							}
+						}
+						Mode::Attack => {
+							if options.controls.escape.contains(keycode) {
+								*mode = Mode::Normal;
+							}
+
+							// TODO: just make an array of keys in the options file or something.
+							let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+							if (0..=26).contains(&selected_index)
+								&& (selected_index as usize) < next_character.spells.len()
+							{
+								next_character.next_action = Some(character::Action::Attack(
+									next_character.attacks[selected_index as usize].clone(),
+								))
+							}
+							*mode = Mode::Normal;
 						}
 						Mode::Cast => {
 							if options.controls.escape.contains(keycode) {

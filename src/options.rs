@@ -168,6 +168,7 @@ pub struct Controls {
 	pub down_right: Triggers,
 
 	pub talk: Triggers,
+	pub attack: Triggers,
 	pub cast: Triggers,
 	pub underfoot: Triggers,
 
@@ -192,7 +193,8 @@ impl Default for Controls {
 			down_right: Triggers(vec![Key(K::N), Key(K::Kp3)]),
 
 			talk: Triggers(vec![Key(K::T)]),
-			cast: Triggers(vec![Key(K::Z)]),
+			attack: Triggers(vec![Key(K::V)]),
+			cast: Triggers(vec![Key(K::C)]),
 			underfoot: Triggers(vec![Key(K::Period)]),
 
 			confirm: Triggers(vec![Key(K::Return)]),

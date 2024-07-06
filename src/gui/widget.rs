@@ -66,6 +66,14 @@ pub fn menu(
 			);
 			world_manager.console.draw(menu);
 		}
+		input::Mode::Attack => {
+			menu.label_styled(
+				"Attack",
+				options.ui.colors.cast_mode,
+				&menu.typography.annotation,
+			);
+			attack_menu(menu, &world_manager.next_character().borrow());
+		}
 		input::Mode::Cast => {
 			menu.label_styled(
 				"Cast",
@@ -109,6 +117,12 @@ pub fn spell_menu(gui: &mut gui::Context, character: &character::Piece) {
 			&format!("({letter}) {} - {} SP", spell.name, spell.level),
 			color,
 		);
+	}
+}
+
+pub fn attack_menu(gui: &mut gui::Context, character: &character::Piece) {
+	for (attack, letter) in character.attacks.iter().zip('a'..='z') {
+		gui.label(&format!("({letter}) {}", attack.name));
 	}
 }
 

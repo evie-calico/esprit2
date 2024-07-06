@@ -327,6 +327,9 @@ impl Manager {
 		};
 		match action {
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
+			character::Action::Attack(attack) => {
+				self.attack_piece(lua, attack, next_character, None)
+			}
 			character::Action::Cast(spell) => {
 				if spell.castable_by(&next_character.borrow()) {
 					let spell = spell.clone();
@@ -392,22 +395,10 @@ impl Manager {
 	pub fn attack_piece<'lua>(
 		&self,
 		lua: &'lua mlua::Lua,
+		attack: Rc<Attack>,
 		user: &CharacterRef,
-		target: &CharacterRef,
+		target: Option<&CharacterRef>,
 	) -> mlua::Result<Option<ActionRequest<'lua>>> {
-		// TODO: Allow the default/favorited attack to be changed.
-		let Some(attack) = user.borrow().attacks.first().cloned() else {
-			self.console
-				.print_unimportant("You cannot perform any melee attacks right now.".into());
-			return Ok(None);
-		};
-
-		if target.borrow().alliance == user.borrow().alliance {
-			self.console
-				.print_unimportant("You cannot attack your allies.".into());
-			return Ok(None);
-		}
-
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
@@ -421,7 +412,11 @@ impl Manager {
 		let globals = lua.globals().clone();
 
 		globals.set("user", user.clone())?;
-		globals.set("target", target.clone())?;
+		if let Some(target) = target {
+			globals.set("target", target.clone())?;
+		} else {
+			globals.set("target", mlua::Nil)?;
+		}
 		globals.set("magnitude", magnitude)?;
 
 		let value: mlua::Value = chunk.set_name(name).set_environment(globals).eval()?;
@@ -458,7 +453,12 @@ impl Manager {
 		// There's a really annoying phenomenon in Pokémon Mystery Dungeon where you can't hit ghosts that are inside of walls.
 		// I think that this is super lame, so the attack check comes before any movement.
 		if let Some(target_ref) = self.get_character_at(x, y) {
-			return self.attack_piece(lua, character, target_ref);
+			let Some(attack) = character.borrow().attacks.first().cloned() else {
+				self.console
+					.print_unimportant("You cannot perform any melee attacks right now.".into());
+				return Ok(None);
+			};
+			return self.attack_piece(lua, attack, character, Some(target_ref));
 		}
 
 		let tile = self.current_floor.map.get(y, x);
