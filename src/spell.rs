@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Energy {
@@ -58,6 +59,9 @@ impl Affinity {
 
 impl mlua::UserData for Affinity {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method("magnitude", |_, this, magnitude: u32| {
+			Ok(this.magnitude(magnitude))
+		});
 		methods.add_method("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
 		methods.add_method("average", |_, this, ()| {
 			Ok(matches!(this, Affinity::Average))
@@ -67,9 +71,24 @@ impl mlua::UserData for Affinity {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum Parameter {
+	Integer(i32),
+	Expression(Expression),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Spell {
 	pub name: String,
+	pub description: String,
 	pub icon: String,
+	/// Configurable spell parameters.
+	///
+	/// There are passed to spell scripts as global variables,
+	/// and may be displayed to the user as information about the spell.
+	/// (in addition to its description)
+	#[serde(default)]
+	pub parameters: HashMap<Box<str>, Parameter>,
 
 	/// Whether the spell concentrates or disperses energy.
 	pub energy: Energy,
@@ -78,30 +97,8 @@ pub struct Spell {
 
 	/// This is also the cost of the spell.
 	pub level: u8,
-	/// Parameters to the spell script.
-	pub parameters: Parameters,
 	/// Script to execute upon casting the spell.
 	pub on_cast: script::MaybeInline,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
-pub enum Parameters {
-	Target {
-		/// Optional field for magnitude calculation.
-		/// This could easily be part of a script,
-		/// but expressions allow the magnitude formula to be displayed.
-		magnitude: Option<Expression>,
-		/// Amount by which defense must be beaten for damage to be dealt.
-		/// Positive values filter out small spell magnitudes,
-		/// wheras negative values counteract the target's resistance.
-		///
-		/// For example, a pierce threshold of 4 means that at least 4 damage
-		/// must be dealt (after resistance) for an attack to land.
-		/// A pierce threshold of -2 reduces the enemy's resistance by 2.
-		#[serde(default)]
-		pierce_threshold: i32,
-	},
 }
 
 impl Spell {

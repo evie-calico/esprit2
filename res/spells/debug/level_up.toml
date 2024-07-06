@@ -1,4 +1,5 @@
 name = "(DEBUG) Level Up"
+description = "Causes the targeted character to gain a level."
 icon = "dummy"
 
 energy = "Positive"
@@ -7,13 +8,13 @@ harmony = "Order"
 level = 0
 
 [parameters]
-type = "Target"
+range = 5
 
 [on_cast]
 type = "Inline"
 source = '''
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = 10 })
+	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range })
   target:force_level();
   Console:print(target:replace_nouns("{Address}'s level increased to "..target.sheet.level))
 end)

@@ -351,49 +351,48 @@ impl Manager {
 			character::Action::Cast(spell) => {
 				if spell.castable_by(&next_character.borrow()) {
 					let spell = spell.clone();
-					// TODO: this is awful. just move targeting into scripts.
-					match spell.parameters.clone() {
-						spell::Parameters::Target {
-							magnitude,
-							pierce_threshold,
-						} => {
-							// Create a reference for the callback to use.
-							let caster = next_character.clone();
-							let affinity = spell.affinity(&caster.borrow());
-							let magnitude = magnitude
-								.as_ref()
-								.map(|x| affinity.magnitude(u32::evalv(x, &*caster.borrow())));
+					// Create a reference for the callback to use.
+					let caster = next_character.clone();
+					let affinity = spell.affinity(&caster.borrow());
 
-							let chunk = lua.load(spell.on_cast.contents());
-							let name = match &spell.on_cast {
-								script::MaybeInline::Inline(_) => {
-									format!("{} (inline)", spell.name)
-								}
-								script::MaybeInline::Path(script::Script { path, contents: _ }) => {
-									path.clone()
-								}
-							};
-							let globals = lua.globals().clone();
+					let chunk = lua.load(spell.on_cast.contents());
+					let name = match &spell.on_cast {
+						script::MaybeInline::Inline(_) => {
+							format!("{} (inline)", spell.name)
+						}
+						script::MaybeInline::Path(script::Script { path, contents: _ }) => {
+							path.clone()
+						}
+					};
+					let globals = lua.globals().clone();
 
-							globals.set("caster", caster)?;
-							// Maybe these should be members of the spell?
-							globals.set("magnitude", magnitude)?;
-							globals.set("pierce_threshold", pierce_threshold)?;
-							globals.set("level", spell.level)?;
-							globals.set("affinity", affinity)?;
-
-							let value: mlua::Value =
-								chunk.set_name(name).set_environment(globals).eval()?;
-
-							match value {
-								mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
-
-								mlua::Value::Nil => Ok(None),
-								_ => {
-									error!("unexpected return value");
-									Ok(None)
-								}
+					let parameters = lua.create_table()?;
+					for (k, v) in &spell.parameters {
+						let k = k.as_ref();
+						match v {
+							spell::Parameter::Integer(v) => parameters.set(k, *v)?,
+							spell::Parameter::Expression(v) => {
+								parameters.set(k, u32::evalv(v, &*caster.borrow()))?
 							}
+						}
+					}
+
+					globals.set("parameters", parameters)?;
+					globals.set("caster", caster)?;
+					// Maybe these should be members of the spell?
+					globals.set("level", spell.level)?;
+					globals.set("affinity", affinity)?;
+
+					let value: mlua::Value =
+						chunk.set_name(name).set_environment(globals).eval()?;
+
+					match value {
+						mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
+
+						mlua::Value::Nil => Ok(None),
+						_ => {
+							error!("unexpected return value");
+							Ok(None)
 						}
 					}
 				} else {

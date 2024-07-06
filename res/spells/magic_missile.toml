@@ -1,15 +1,16 @@
 name = "Magic Missile"
+description = "Constructs a searing ray of magical energy that can be fired at a target."
 icon = "magic_missile"
 
-energy = "Positive"
+energy = "Negative"
 harmony = "Order"
 
 level = 1
 
 [parameters]
-type = "Target"
 magnitude = "magic + 4"
 pierce_threshold = 2
+range = 5
 
 [on_cast]
 type = "Path"

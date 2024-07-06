@@ -1,7 +1,7 @@
 require("combat")
 
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = 5})
+	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
 
 	if caster:alliance() == target:alliance() then
 		Console:print_unimportant("You cannot attack your allies.");
@@ -9,8 +9,8 @@ return coroutine.create(function()
 	end
 
 	local damage, pierce_failed = apply_damage_with_pierce(
-		pierce_threshold,
-		magnitude - target:stats().resistance
+		parameters.pierce_threshold,
+		affinity:magnitude(parameters.magnitude) - target:stats().resistance
 	)
 
 	target.hp = target.hp - damage
