@@ -193,15 +193,23 @@ pub fn main() {
 			// Configure world viewport.
 			let window_size = canvas.window().size();
 			canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
-			canvas.set_draw_color(Color::RGB(20, 20, 20));
+			let mut camera = draw::Camera::default();
+			camera.update_size(
+				window_size.0 - options.ui.pamphlet_width,
+				window_size.1 - options.ui.console_height,
+			);
+			if let input::Mode::Cursor { position, .. } = input_mode {
+				camera.focus_character_with_cursor(
+					&world_manager.next_character().borrow(),
+					position,
+				);
+			} else {
+				camera.focus_character(&world_manager.next_character().borrow());
+			}
 
-			canvas
-				.fill_rect(Rect::new(0, 0, window_size.0, window_size.1))
-				.unwrap();
-
-			draw::tilemap(&mut canvas, &world_manager);
-			draw::characters(&world_manager, &mut canvas, &resources);
-			draw::cursor(&input_mode, &resources, &mut canvas);
+			draw::tilemap(&mut canvas, &world_manager, &camera);
+			draw::characters(&world_manager, &mut canvas, &resources, &camera);
+			draw::cursor(&input_mode, &resources, &mut canvas, &camera);
 
 			// Render User Interface
 			canvas.set_viewport(None);
@@ -210,17 +218,22 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
-				let bonuses = world_manager.party[0].piece.borrow().sheet.growth_bonuses;
-				debug.label("Potential");
-				debug.label(&format!("Heart: {0:*<1$}", "", bonuses.heart as usize));
-				debug.label(&format!("Soul: {0:*<1$}", "", bonuses.soul as usize));
-				debug.label(&format!("Power: {0:*<1$}", "", bonuses.power as usize));
-				debug.label(&format!("Defense: {0:*<1$}", "", bonuses.defense as usize));
-				debug.label(&format!("Magic: {0:*<1$}", "", bonuses.magic as usize));
-				debug.label(&format!(
-					"Resistance: {0:*<1$}",
-					"", bonuses.resistance as usize
-				));
+				for member in &world_manager.party {
+					let bonuses = member.piece.borrow().sheet.growth_bonuses;
+					debug.label(&format!(
+						"{}'s Potential",
+						&member.piece.borrow().sheet.nouns.name
+					));
+					debug.label(&format!("Heart: {0:*<1$}", "", bonuses.heart as usize));
+					debug.label(&format!("Soul: {0:*<1$}", "", bonuses.soul as usize));
+					debug.label(&format!("Power: {0:*<1$}", "", bonuses.power as usize));
+					debug.label(&format!("Defense: {0:*<1$}", "", bonuses.defense as usize));
+					debug.label(&format!("Magic: {0:*<1$}", "", bonuses.magic as usize));
+					debug.label(&format!(
+						"Resistance: {0:*<1$}",
+						"", bonuses.resistance as usize
+					));
+				}
 			}
 
 			let mut menu = gui::Context::new(

@@ -12,7 +12,38 @@ use std::f64::consts::{PI, TAU};
 const TILE_SIZE: u32 = 64;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
 
-pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager) {
+#[derive(Clone, Debug, Default)]
+pub struct Camera {
+	x: i32,
+	y: i32,
+	width: u32,
+	height: u32,
+}
+
+impl Camera {
+	pub fn update_size(&mut self, width: u32, height: u32) {
+		self.width = width;
+		self.height = height;
+	}
+
+	pub fn focus_character(&mut self, character: &character::Piece) {
+		self.x = character.x * ITILE_SIZE - (self.width as i32 - ITILE_SIZE) / 2;
+		self.y = character.y * ITILE_SIZE - (self.height as i32 - ITILE_SIZE) / 2;
+	}
+
+	pub fn focus_character_with_cursor(
+		&mut self,
+		character: &character::Piece,
+		cursor: (i32, i32),
+	) {
+		self.x = (character.x * ITILE_SIZE + cursor.0 * ITILE_SIZE) / 2
+			- (self.width as i32 - ITILE_SIZE) / 2;
+		self.y = (character.y * ITILE_SIZE + cursor.1 * ITILE_SIZE) / 2
+			- (self.height as i32 - ITILE_SIZE) / 2;
+	}
+}
+
+pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, camera: &Camera) {
 	canvas.set_draw_color(Color::WHITE);
 	for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
 		for (y, tile) in col.enumerate() {
@@ -20,16 +51,16 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager) {
 				floor::Tile::Floor => (),
 				floor::Tile::Wall => canvas
 					.fill_rect(Rect::new(
-						(x as i32) * ITILE_SIZE,
-						(y as i32) * ITILE_SIZE,
+						(x as i32) * ITILE_SIZE - camera.x,
+						(y as i32) * ITILE_SIZE - camera.y,
 						TILE_SIZE,
 						TILE_SIZE,
 					))
 					.unwrap(),
 				floor::Tile::Exit => canvas
 					.draw_rect(Rect::new(
-						(x as i32) * ITILE_SIZE + 4,
-						(y as i32) * ITILE_SIZE + 4,
+						(x as i32) * ITILE_SIZE + 4 - camera.x,
+						(y as i32) * ITILE_SIZE + 4 - camera.y,
 						TILE_SIZE - 8,
 						TILE_SIZE - 8,
 					))
@@ -43,6 +74,7 @@ pub fn cursor(
 	input_mode: &input::Mode,
 	resources: &resource::Manager<'_>,
 	canvas: &mut Canvas<Window>,
+	camera: &Camera,
 ) {
 	if let input::Mode::Cursor {
 		position: (x, y),
@@ -88,8 +120,8 @@ pub fn cursor(
 			};
 
 			let rect = Rect::new(
-				x * ITILE_SIZE + x_off,
-				y * ITILE_SIZE + y_off,
+				x * ITILE_SIZE + x_off - camera.x,
+				y * ITILE_SIZE + y_off - camera.y,
 				cursor_width,
 				cursor_height,
 			);
@@ -104,6 +136,7 @@ pub fn characters(
 	world_manager: &world::Manager,
 	canvas: &mut Canvas<Window>,
 	resources: &resource::Manager<'_>,
+	camera: &Camera,
 ) {
 	for character in world_manager.characters.iter().map(|x| x.borrow()) {
 		canvas
@@ -111,8 +144,8 @@ pub fn characters(
 				resources.get_texture(&character.sheet.icon),
 				Some(Rect::new(0, 0, 16, 16)),
 				Some(Rect::new(
-					character.x * ITILE_SIZE,
-					character.y * ITILE_SIZE,
+					character.x * ITILE_SIZE - camera.x,
+					character.y * ITILE_SIZE - camera.y,
 					TILE_SIZE,
 					TILE_SIZE,
 				)),
