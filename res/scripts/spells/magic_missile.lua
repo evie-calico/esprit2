@@ -1,7 +1,7 @@
 require("combat")
 
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y })
+	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = 5})
 
 	if caster:alliance() == target:alliance() then
 		Console:print_unimportant("You cannot attack your allies.");

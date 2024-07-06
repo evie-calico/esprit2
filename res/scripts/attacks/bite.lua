@@ -2,7 +2,7 @@ require("combat")
 
 return coroutine.create(function()
 	if target == nil then
-		target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y })
+		target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1 })
 	end
 
 	if user:alliance() == target:alliance() then

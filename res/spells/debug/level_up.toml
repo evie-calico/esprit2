@@ -13,7 +13,7 @@ type = "Target"
 type = "Inline"
 source = '''
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y })
+	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = 10 })
   target:force_level();
   Console:print(target:replace_nouns("{Address}'s level increased to "..target.sheet.level))
 end)

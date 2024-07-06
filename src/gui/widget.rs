@@ -82,7 +82,9 @@ pub fn menu(
 			);
 			spell_menu(menu, &world_manager.next_character().borrow());
 		}
-		input::Mode::Cursor { x, y, .. } => {
+		input::Mode::Cursor {
+			position: (x, y), ..
+		} => {
 			menu.label_styled(
 				"Cursor",
 				options.ui.colors.cursor_mode,

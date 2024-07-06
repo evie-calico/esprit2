@@ -199,11 +199,15 @@ impl Manager {
 		input_mode: &mut input::Mode,
 	) -> mlua::Result<Option<world::ActionRequest<'lua>>> {
 		let (renew_action, action_request) = match action_request {
-			Some(world::ActionRequest::BeginCursor { x, y, callback }) => {
+			Some(world::ActionRequest::BeginCursor {
+				x,
+				y,
+				range,
+				callback,
+			}) => {
 				match *input_mode {
 					input::Mode::Cursor {
-						x,
-						y,
+						position: (x, y),
 						submitted: true,
 						..
 					} => {
@@ -223,7 +227,12 @@ impl Manager {
 						// even if this is a no-op.
 						(
 							false,
-							Some(world::ActionRequest::BeginCursor { x, y, callback }),
+							Some(world::ActionRequest::BeginCursor {
+								x,
+								y,
+								range,
+								callback,
+							}),
 						)
 					}
 					_ => {
@@ -237,10 +246,17 @@ impl Manager {
 
 		if renew_action {
 			// Set up any new action requests.
-			if let Some(world::ActionRequest::BeginCursor { x, y, callback: _ }) = action_request {
+			if let Some(world::ActionRequest::BeginCursor {
+				x,
+				y,
+				range,
+				callback: _,
+			}) = action_request
+			{
 				*input_mode = input::Mode::Cursor {
-					x,
-					y,
+					origin: (x, y),
+					position: (x, y),
+					range,
 					submitted: false,
 					state: input::CursorState::default(),
 				};
@@ -287,6 +303,7 @@ pub enum ActionRequest<'lua> {
 	BeginCursor {
 		x: i32,
 		y: i32,
+		range: u32,
 		callback: mlua::Thread<'lua>,
 	},
 }
@@ -300,14 +317,15 @@ impl<'lua> ActionRequest<'lua> {
 		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		#[serde(tag = "type")]
 		pub enum LuaActionRequest {
-			Cursor { x: i32, y: i32 },
+			Cursor { x: i32, y: i32, range: u32 },
 		}
 
 		let action: Option<LuaActionRequest> = lua.from_value(thread.resume(args)?)?;
 		Ok(action.map(
-			|LuaActionRequest::Cursor { x, y }| ActionRequest::BeginCursor {
+			|LuaActionRequest::Cursor { x, y, range }| ActionRequest::BeginCursor {
 				x,
 				y,
+				range,
 				callback: thread,
 			},
 		))

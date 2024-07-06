@@ -45,8 +45,7 @@ pub fn cursor(
 	canvas: &mut Canvas<Window>,
 ) {
 	if let input::Mode::Cursor {
-		x,
-		y,
+		position: (x, y),
 		state: input::CursorState { float, .. },
 		..
 	} = *input_mode

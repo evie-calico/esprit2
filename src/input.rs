@@ -32,8 +32,9 @@ pub enum Mode {
 	Attack,
 	Cast,
 	Cursor {
-		x: i32,
-		y: i32,
+		origin: (i32, i32),
+		position: (i32, i32),
+		range: u32,
 		submitted: bool,
 		state: CursorState,
 	},
@@ -160,11 +161,14 @@ pub fn world(
 							*mode = Mode::Normal;
 						}
 						Mode::Cursor {
-							ref mut x,
-							ref mut y,
+							origin,
+							range,
+							position: (ref mut x, ref mut y),
 							ref mut submitted,
 							..
 						} => {
+							let range = *range as i32 + 1;
+
 							if *submitted {
 								warn!("entering cursor mode after submission");
 							}
@@ -181,8 +185,14 @@ pub fn world(
 							];
 							for (x_off, y_off, triggers) in directions {
 								if triggers.contains(keycode) {
-									*x += x_off;
-									*y += y_off;
+									let tx = *x + x_off;
+									let ty = *y + y_off;
+									if origin.0 - range < tx && origin.0 + range > tx {
+										*x = tx;
+									}
+									if origin.1 - range < ty && origin.1 + range > ty {
+										*y = ty;
+									}
 								}
 							}
 
