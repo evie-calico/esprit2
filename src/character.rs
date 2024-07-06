@@ -31,6 +31,64 @@ mod piece {
 		Ok(())
 	}
 
+	/// Used for debugging.
+	fn force_affinity(_lua: &mlua::Lua, this: &mut Piece, index: u32) -> mlua::Result<()> {
+		this.sheet.skillset = match index {
+			0 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Positive,
+				minor: None,
+			},
+			1 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Positive,
+				minor: Some(spell::Harmony::Chaos),
+			},
+			2 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Positive,
+				minor: Some(spell::Harmony::Order),
+			},
+			3 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Negative,
+				minor: None,
+			},
+			4 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Negative,
+				minor: Some(spell::Harmony::Chaos),
+			},
+			5 => spell::Skillset::EnergyMajor {
+				major: spell::Energy::Negative,
+				minor: Some(spell::Harmony::Order),
+			},
+			6 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Chaos,
+				minor: None,
+			},
+			7 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Chaos,
+				minor: Some(spell::Energy::Positive),
+			},
+			8 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Chaos,
+				minor: Some(spell::Energy::Negative),
+			},
+			9 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Order,
+				minor: None,
+			},
+			10 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Order,
+				minor: Some(spell::Energy::Positive),
+			},
+			11 => spell::Skillset::HarmonyMajor {
+				major: spell::Harmony::Order,
+				minor: Some(spell::Energy::Negative),
+			},
+			_ => {
+				return Err(mlua::Error::runtime("invalid affinity index"));
+			}
+		};
+		Ok(())
+	}
+
 	pub fn alliance(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<u32> {
 		Ok(this.alliance as u32)
 	}
@@ -59,9 +117,13 @@ mod piece {
 
 	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
 	#[alua(
+		// Nouns
 		method = replace_nouns,
 		method = replace_prefixed_nouns,
+		// Debugging
 		method = force_level,
+		method = force_affinity,
+		// Field accessors
 		method = stats,
 		method = alliance,
 		method = inflict,

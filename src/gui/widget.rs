@@ -110,10 +110,10 @@ pub fn menu(
 
 pub fn spell_menu(gui: &mut gui::Context, character: &character::Piece) {
 	for (spell, letter) in character.spells.iter().zip('a'..='z') {
-		let color = if spell.castable_by(character) {
-			gui.typography.color
-		} else {
-			(255, 0, 0, 255)
+		let color = match spell.castable_by(character) {
+			spell::Castable::Yes => gui.typography.color,
+			spell::Castable::NotEnoughSP => (255, 0, 0, 255),
+			spell::Castable::UncastableAffinity => (128, 128, 128, 255),
 		};
 		gui.label_color(
 			&format!("({letter}) {} - {} SP", spell.name, spell.level),

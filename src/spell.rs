@@ -34,7 +34,7 @@ pub enum Skillset {
 	},
 }
 
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Affinity {
 	/// No skillset matches; the spell is not castable.
 	Uncastable,
@@ -101,10 +101,25 @@ pub struct Spell {
 	pub on_cast: script::MaybeInline,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum Castable {
+	Yes,
+	NotEnoughSP,
+	UncastableAffinity,
+}
+
 impl Spell {
-	pub fn castable_by(&self, character: &character::Piece) -> bool {
-		// if this ever changes, a result should be returned instead to print more detailed messages.
-		character.sp >= self.level as i32
+	pub fn castable_by(&self, character: &character::Piece) -> Castable {
+		// Special case for debug spells
+		if self.level == 0 {
+			Castable::Yes
+		} else if character.sp < self.level as i32 {
+			Castable::NotEnoughSP
+		} else if self.affinity(character) == Affinity::Uncastable {
+			Castable::UncastableAffinity
+		} else {
+			Castable::Yes
+		}
 	}
 
 	pub fn affinity(&self, character: &character::Piece) -> Affinity {

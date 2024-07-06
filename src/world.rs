@@ -349,58 +349,68 @@ impl Manager {
 				self.attack_piece(lua, attack, next_character, None)
 			}
 			character::Action::Cast(spell) => {
-				if spell.castable_by(&next_character.borrow()) {
-					let spell = spell.clone();
-					// Create a reference for the callback to use.
-					let caster = next_character.clone();
-					let affinity = spell.affinity(&caster.borrow());
+				match spell.castable_by(&next_character.borrow()) {
+					spell::Castable::Yes => {
+						let spell = spell.clone();
+						// Create a reference for the callback to use.
+						let caster = next_character.clone();
+						let affinity = spell.affinity(&caster.borrow());
 
-					let chunk = lua.load(spell.on_cast.contents());
-					let name = match &spell.on_cast {
-						script::MaybeInline::Inline(_) => {
-							format!("{} (inline)", spell.name)
-						}
-						script::MaybeInline::Path(script::Script { path, contents: _ }) => {
-							path.clone()
-						}
-					};
-					let globals = lua.globals().clone();
+						let chunk = lua.load(spell.on_cast.contents());
+						let name = match &spell.on_cast {
+							script::MaybeInline::Inline(_) => {
+								format!("{} (inline)", spell.name)
+							}
+							script::MaybeInline::Path(script::Script { path, contents: _ }) => {
+								path.clone()
+							}
+						};
+						let globals = lua.globals().clone();
 
-					let parameters = lua.create_table()?;
-					for (k, v) in &spell.parameters {
-						let k = k.as_ref();
-						match v {
-							spell::Parameter::Integer(v) => parameters.set(k, *v)?,
-							spell::Parameter::Expression(v) => {
-								parameters.set(k, u32::evalv(v, &*caster.borrow()))?
+						let parameters = lua.create_table()?;
+						for (k, v) in &spell.parameters {
+							let k = k.as_ref();
+							match v {
+								spell::Parameter::Integer(v) => parameters.set(k, *v)?,
+								spell::Parameter::Expression(v) => {
+									parameters.set(k, u32::evalv(v, &*caster.borrow()))?
+								}
+							}
+						}
+
+						globals.set("parameters", parameters)?;
+						globals.set("caster", caster)?;
+						// Maybe these should be members of the spell?
+						globals.set("level", spell.level)?;
+						globals.set("affinity", affinity)?;
+
+						let value: mlua::Value =
+							chunk.set_name(name).set_environment(globals).eval()?;
+
+						match value {
+							mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
+
+							mlua::Value::Nil => Ok(None),
+							_ => {
+								error!("unexpected return value");
+								Ok(None)
 							}
 						}
 					}
-
-					globals.set("parameters", parameters)?;
-					globals.set("caster", caster)?;
-					// Maybe these should be members of the spell?
-					globals.set("level", spell.level)?;
-					globals.set("affinity", affinity)?;
-
-					let value: mlua::Value =
-						chunk.set_name(name).set_environment(globals).eval()?;
-
-					match value {
-						mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
-
-						mlua::Value::Nil => Ok(None),
-						_ => {
-							error!("unexpected return value");
-							Ok(None)
-						}
+					spell::Castable::NotEnoughSP => {
+						let message =
+							format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
+								.replace_nouns(&next_character.borrow().sheet.nouns);
+						self.console.print_system(message);
+						Ok(None)
 					}
-				} else {
-					let message =
-						format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-							.replace_nouns(&next_character.borrow().sheet.nouns);
-					self.console.print_system(message);
-					Ok(None)
+					spell::Castable::UncastableAffinity => {
+						let message =
+							format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
+								.replace_nouns(&next_character.borrow().sheet.nouns);
+						self.console.print_system(message);
+						Ok(None)
+					}
 				}
 			}
 		}
