@@ -1,7 +1,6 @@
-use std::cell::Cell;
-
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
+use std::cell::Cell;
 use tracing::{error, warn};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -11,7 +10,7 @@ pub enum Duration {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-struct Debuff {
+pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
 	on_debuff: script::MaybeInline,
@@ -29,7 +28,7 @@ impl Debuff {
 		Ok(stats)
 	}
 
-	fn get(&self) -> Option<character::Stats> {
+	pub fn get(&self) -> Option<character::Stats> {
 		if let Some((last_magnitude, cache)) = self.cache.get() {
 			if self.magnitude == last_magnitude {
 				return Some(cache);
@@ -45,7 +44,7 @@ impl Debuff {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-enum Effect {
+pub enum Effect {
 	StaticDebuff(character::Stats),
 	Debuff(Debuff),
 }
@@ -53,8 +52,9 @@ enum Effect {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Status {
 	pub name: String,
+	pub icon: String,
 	pub duration: Duration,
-	effect: Effect,
+	pub effect: Effect,
 }
 
 impl Status {
@@ -76,44 +76,6 @@ impl Status {
 		match &self.effect {
 			Effect::Debuff(debuff) => debuff.get(),
 			Effect::StaticDebuff(debuff) => Some(*debuff),
-		}
-	}
-
-	pub fn tip(&self) -> String {
-		use std::fmt::Write;
-
-		fn print_stats(tip: &mut String, stats: &character::Stats) {
-			for (name, value) in [
-				("Heart", stats.heart),
-				("Soul", stats.soul),
-				("Power", stats.power),
-				("Defense", stats.defense),
-				("Magic", stats.magic),
-				("Resistance", stats.resistance),
-			] {
-				if value > 0 {
-					let _ = write!(tip, " -{value} {name}");
-				}
-			}
-		}
-
-		let mut tip = self.name.to_string();
-
-		match &self.effect {
-			Effect::Debuff(debuff) => {
-				if let Some(stats) = debuff.get() {
-					print_stats(&mut tip, &stats);
-				}
-			}
-			Effect::StaticDebuff(stats) => print_stats(&mut tip, stats),
-		}
-
-		tip
-	}
-
-	pub fn color(&self) -> (u8, u8, u8, u8) {
-		match &self.effect {
-			Effect::Debuff(_) | Effect::StaticDebuff(_) => (255, 0, 0, 255),
 		}
 	}
 }

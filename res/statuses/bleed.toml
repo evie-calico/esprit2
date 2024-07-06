@@ -1,4 +1,5 @@
 name = "Bleeding"
+icon = "dummy"
 duration = "Rest"
 
 [effect.Debuff]

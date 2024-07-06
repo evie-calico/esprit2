@@ -233,7 +233,7 @@ pub fn main() {
 					options.ui.console_height,
 				),
 			);
-			gui::widget::menu(&mut menu, &options, &input_mode, &world_manager);
+			gui::widget::menu(&mut menu, &options, &input_mode, &world_manager, &resources);
 
 			// Draw pamphlet
 			let mut pamphlet = gui::Context::new(

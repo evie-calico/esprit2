@@ -1,4 +1,5 @@
 name = "Close Combat"
+icon = "dummy"
 duration = "Turn"
 
 [effect.StaticDebuff]

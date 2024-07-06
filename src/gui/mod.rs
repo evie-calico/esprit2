@@ -22,6 +22,12 @@ pub struct Context<'canvas, 'ttf_module, 'rwops> {
 	orientation: Orientation,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Justification {
+	Left,
+	Right,
+}
+
 enum Orientation {
 	Vertical,
 	Horizontal { height: i32 },
@@ -136,11 +142,30 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.label_color(s, self.typography.color)
 	}
 
+	pub fn label_justified(&mut self, s: &str, justification: Justification) {
+		self.label_custom(
+			s,
+			self.typography.color,
+			&self.typography.normal,
+			justification,
+		);
+	}
+
 	pub fn label_color(&mut self, s: &str, color: Color) {
-		self.label_styled(s, color, &self.typography.normal);
+		self.label_custom(s, color, &self.typography.normal, Justification::Left);
 	}
 
 	pub fn label_styled(&mut self, s: &str, color: Color, font: &Font) {
+		self.label_custom(s, color, font, Justification::Left);
+	}
+
+	pub fn label_custom(
+		&mut self,
+		s: &str,
+		color: Color,
+		font: &Font,
+		justification: Justification,
+	) {
 		let font_texture = font
 			.render(s)
 			.blended(color)
@@ -152,7 +177,15 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 			.copy(
 				&font_texture,
 				None,
-				Rect::new(self.x, self.y, width, height),
+				Rect::new(
+					match justification {
+						Justification::Left => self.x,
+						Justification::Right => self.rect.right() - width as i32,
+					},
+					self.y,
+					width,
+					height,
+				),
 			)
 			.unwrap();
 		// I feel like this drop is kinda silly?
@@ -193,7 +226,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 			.unwrap();
 		drop(font_texture);
 
-		self.advance(width, height);
+		self.advance(self.rect.width(), height);
 	}
 
 	pub fn expression<Colors: VariableColors>(&mut self, expression: &Expression, font: &Font) {

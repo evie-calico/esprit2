@@ -34,6 +34,7 @@ pub fn menu(
 	options: &Options,
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
+	resources: &resource::Manager<'_>,
 ) {
 	for (i, color) in [(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)]
 		.into_iter()
@@ -95,7 +96,7 @@ pub fn menu(
 					character_info(menu, &selected_character.borrow());
 				};
 				let mut buff_fn = |menu: &mut gui::Context| {
-					character_buffs(menu, &selected_character.borrow());
+					character_buffs(menu, &selected_character.borrow(), resources);
 				};
 				menu.hsplit(&mut [
 					Some((&mut character_fn) as &mut dyn FnMut(&mut gui::Context)),
@@ -181,7 +182,7 @@ pub fn pamphlet(
 					layout.flipped,
 					|player_window| {
 						character_info(player_window, &piece);
-						character_buffs(player_window, &piece);
+						character_buffs(player_window, &piece, resources);
 					},
 				);
 			});
@@ -420,12 +421,56 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 	player_window.hsplit(&mut magical_stats);
 }
 
-fn character_buffs(player_window: &mut gui::Context<'_, '_, '_>, piece: &character::Piece) {
+fn character_buffs(
+	gui: &mut gui::Context<'_, '_, '_>,
+	piece: &character::Piece,
+	resources: &resource::Manager<'_>,
+) {
+	let mut statuses = piece.statuses.values().peekable();
+	while statuses.peek().is_some() {
+		let textures_per_row = gui.rect.width() / (32 + 8);
+		gui.horizontal();
+		for _ in 0..textures_per_row {
+			if let Some(status) = statuses.next() {
+				gui.htexture(resources.get_texture(&status.icon), 32);
+				gui.advance(8, 0);
+			}
+		}
+		gui.vertical();
+		gui.advance(8, 8);
+	}
 	for status in piece.statuses.values() {
-		player_window.label_styled(
-			&status.tip(),
-			status.color(),
-			&player_window.typography.annotation,
-		)
+		character_status(gui, status);
+	}
+}
+
+fn character_status(gui: &mut gui::Context, status: &Status) {
+	gui.label(&status.name);
+
+	let mut print_stats = |stats: character::Stats| {
+		for (name, value) in [
+			("Heart", stats.heart),
+			("Soul", stats.soul),
+			("Power", stats.power),
+			("Defense", stats.defense),
+			("Magic", stats.magic),
+			("Resistance", stats.resistance),
+		] {
+			if value > 0 {
+				gui.horizontal();
+				gui.advance(30, 0);
+				gui.label(&format!("-{value} {name}"));
+				gui.vertical();
+			}
+		}
+	};
+
+	match &status.effect {
+		status::Effect::Debuff(debuff) => {
+			if let Some(stats) = debuff.get() {
+				print_stats(stats);
+			}
+		}
+		status::Effect::StaticDebuff(stats) => print_stats(*stats),
 	}
 }

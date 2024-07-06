@@ -343,6 +343,11 @@ impl Manager {
 		let Some(action) = next_character.borrow_mut().next_action.take() else {
 			return Ok(None);
 		};
+
+		// Once an action has been provided, pending turn updates may run.
+		// TODO: This should only trigger if this function returned a duration, not an action request
+		next_character.borrow_mut().new_turn();
+
 		match action {
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
 			character::Action::Attack(attack) => {
