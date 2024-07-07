@@ -194,12 +194,12 @@ impl Manager {
 
 	pub fn update<'lua>(
 		&mut self,
-		action_request: Option<world::ActionRequest<'lua>>,
+		action_request: Option<ActionRequest<'lua>>,
 		lua: &'lua mlua::Lua,
 		input_mode: &mut input::Mode,
-	) -> mlua::Result<Option<world::ActionRequest<'lua>>> {
+	) -> mlua::Result<Option<ActionRequest<'lua>>> {
 		let (renew_action, action_request) = match action_request {
-			Some(world::ActionRequest::BeginCursor {
+			Some(ActionRequest::BeginCursor {
 				x,
 				y,
 				range,
@@ -241,25 +241,41 @@ impl Manager {
 					}
 				}
 			}
+			Some(ActionRequest::ShowPrompt { message, callback }) => match *input_mode {
+				input::Mode::Prompt {
+					response: Some(response),
+					..
+				} => {
+					*input_mode = input::Mode::Normal;
+					(true, ActionRequest::poll(lua, callback, response)?)
+				}
+				input::Mode::Prompt { .. } => {
+					(false, Some(ActionRequest::ShowPrompt { message, callback }))
+				}
+				_ => (false, None),
+			},
 			None => (true, self.pop_action(lua)?),
 		};
 
 		if renew_action {
 			// Set up any new action requests.
-			if let Some(world::ActionRequest::BeginCursor {
-				x,
-				y,
-				range,
-				callback: _,
-			}) = action_request
-			{
-				*input_mode = input::Mode::Cursor {
-					origin: (x, y),
-					position: (x, y),
-					range,
-					submitted: false,
-					state: input::CursorState::default(),
-				};
+			match &action_request {
+				Some(world::ActionRequest::BeginCursor { x, y, range, .. }) => {
+					*input_mode = input::Mode::Cursor {
+						origin: (*x, *y),
+						position: (*x, *y),
+						range: *range,
+						submitted: false,
+						state: input::CursorState::default(),
+					};
+				}
+				Some(world::ActionRequest::ShowPrompt { message, .. }) => {
+					*input_mode = input::Mode::Prompt {
+						response: None,
+						message: message.clone(),
+					}
+				}
+				None => (),
 			}
 		}
 
@@ -306,6 +322,10 @@ pub enum ActionRequest<'lua> {
 		range: u32,
 		callback: mlua::Thread<'lua>,
 	},
+	ShowPrompt {
+		message: String,
+		callback: mlua::Thread<'lua>,
+	},
 }
 
 impl<'lua> ActionRequest<'lua> {
@@ -318,17 +338,22 @@ impl<'lua> ActionRequest<'lua> {
 		#[serde(tag = "type")]
 		pub enum LuaActionRequest {
 			Cursor { x: i32, y: i32, range: u32 },
+			Prompt { message: String },
 		}
 
 		let action: Option<LuaActionRequest> = lua.from_value(thread.resume(args)?)?;
-		Ok(action.map(
-			|LuaActionRequest::Cursor { x, y, range }| ActionRequest::BeginCursor {
+		Ok(action.map(|action| match action {
+			LuaActionRequest::Cursor { x, y, range } => ActionRequest::BeginCursor {
 				x,
 				y,
 				range,
 				callback: thread,
 			},
-		))
+			LuaActionRequest::Prompt { message } => ActionRequest::ShowPrompt {
+				message,
+				callback: thread,
+			},
+		}))
 	}
 }
 

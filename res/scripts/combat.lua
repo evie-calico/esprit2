@@ -7,3 +7,11 @@ function apply_damage_with_pierce(pierce_threshold, pre_damage)
 	end
 	return damage, pierce_failed
 end
+
+function alliance_check(user, target)
+	return user:alliance() == target:alliance() and not alliance_prompt()
+end
+
+function alliance_prompt()
+	return coroutine.yield({ type = "Prompt", message = "Really attack your ally?"})
+end

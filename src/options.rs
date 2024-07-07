@@ -31,6 +31,7 @@ fn find_resource_directory() -> PathBuf {
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
+	pub board: Board,
 	pub ui: UserInterface,
 	pub controls: Controls,
 }
@@ -51,6 +52,18 @@ impl Options {
 	/// Fails if the file could not be opened or parsed.
 	pub fn open(path: impl AsRef<Path>) -> Result<Self, OpenOptionsError> {
 		Ok(toml::from_str(&fs::read_to_string(path)?)?)
+	}
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Board {
+	pub scale: u32,
+}
+
+impl Default for Board {
+	fn default() -> Self {
+		Self { scale: 3 }
 	}
 }
 
@@ -172,6 +185,8 @@ pub struct Controls {
 	pub cast: Triggers,
 	pub underfoot: Triggers,
 
+	pub yes: Triggers,
+	pub no: Triggers,
 	pub confirm: Triggers,
 	pub escape: Triggers,
 	pub fullscreen: Triggers,
@@ -197,6 +212,8 @@ impl Default for Controls {
 			cast: Triggers(vec![Key(K::C)]),
 			underfoot: Triggers(vec![Key(K::Period)]),
 
+			yes: Triggers(vec![Key(K::Y)]),
+			no: Triggers(vec![Key(K::N)]),
 			confirm: Triggers(vec![Key(K::Return)]),
 			escape: Triggers(vec![Key(K::Escape)]),
 			fullscreen: Triggers(vec![Key(K::F11)]),

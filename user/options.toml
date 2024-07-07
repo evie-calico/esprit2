@@ -1,3 +1,6 @@
+[board]
+scale = 4
+
 [ui]
 pamphlet_width = 400
 console_height = 200

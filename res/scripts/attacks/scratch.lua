@@ -5,10 +5,7 @@ return coroutine.create(function()
 		target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1})
 	end
 
-	if user:alliance() == target:alliance() then
-		Console:print_unimportant("You cannot attack your allies.");
-		return
-	end
+	if alliance_check(user, target) then return end
 
 	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target:stats().defense)
 

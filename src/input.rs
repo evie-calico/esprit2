@@ -38,6 +38,10 @@ pub enum Mode {
 		submitted: bool,
 		state: CursorState,
 	},
+	Prompt {
+		response: Option<bool>,
+		message: String,
+	},
 }
 
 pub enum Response {
@@ -200,6 +204,14 @@ pub fn world(
 								*mode = Mode::Normal;
 							} else if options.controls.confirm.contains(keycode) {
 								*submitted = true;
+							}
+						}
+						Mode::Prompt { response, .. } => {
+							if options.controls.yes.contains(keycode) {
+								*response = Some(true);
+							}
+							if options.controls.no.contains(keycode) {
+								*response = Some(false);
 							}
 						}
 					}

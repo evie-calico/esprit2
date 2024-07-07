@@ -194,7 +194,6 @@ pub fn main() {
 			canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
 
 			// Render World
-			let scale = 5;
 			let width = 480;
 			let height = 320;
 			let mut camera = draw::Camera::default();
@@ -230,14 +229,14 @@ pub fn main() {
 					Rect::new(
 						(window_size.0 as i32
 							- options.ui.pamphlet_width as i32
-							- width as i32 * scale as i32)
+							- width as i32 * options.board.scale as i32)
 							/ 2,
 						(window_size.1 as i32
 							- options.ui.console_height as i32
-							- height as i32 * scale as i32)
+							- height as i32 * options.board.scale as i32)
 							/ 2,
-						width * scale,
-						height * scale,
+						width * options.board.scale,
+						height * options.board.scale,
 					),
 				)
 				.unwrap();

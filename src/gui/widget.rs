@@ -106,6 +106,15 @@ pub fn menu(
 				world_manager.console.draw(menu);
 			}
 		}
+		input::Mode::Prompt { message, .. } => {
+			menu.label_styled(
+				"Prompt",
+				options.ui.colors.cursor_mode,
+				&menu.typography.annotation,
+			);
+			menu.label(message);
+			menu.label("(y/n)");
+		}
 	}
 }
 
