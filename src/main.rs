@@ -186,18 +186,19 @@ pub fn main() {
 
 		// Rendering
 		{
+			let window_size = canvas.window().size();
+
 			// Clear the screen.
 			canvas.set_draw_color(Color::RGB(20, 20, 20));
 			canvas.clear();
-
-			// Configure world viewport.
-			let window_size = canvas.window().size();
 			canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
+
+			// Render World
+			let scale = 5;
+			let width = 480;
+			let height = 320;
 			let mut camera = draw::Camera::default();
-			camera.update_size(
-				window_size.0 - options.ui.pamphlet_width,
-				window_size.1 - options.ui.console_height,
-			);
+			camera.update_size(width, height);
 			if let input::Mode::Cursor { position, .. } = input_mode {
 				camera.focus_character_with_cursor(
 					&world_manager.next_character().borrow(),
@@ -207,9 +208,39 @@ pub fn main() {
 				camera.focus_character(&world_manager.next_character().borrow());
 			}
 
-			draw::tilemap(&mut canvas, &world_manager, &camera);
-			draw::characters(&world_manager, &mut canvas, &resources, &camera);
-			draw::cursor(&input_mode, &resources, &mut canvas, &camera);
+			let texture_creator = canvas.texture_creator();
+			let mut world_texture = texture_creator
+				.create_texture_target(texture_creator.default_pixel_format(), width, height)
+				.unwrap();
+
+			canvas
+				.with_texture_canvas(&mut world_texture, |canvas| {
+					canvas.set_draw_color(Color::RGB(20, 20, 20));
+					canvas.clear();
+					draw::tilemap(canvas, &world_manager, &camera);
+					draw::characters(canvas, &world_manager, &resources, &camera);
+					draw::cursor(canvas, &input_mode, &resources, &camera);
+				})
+				.unwrap();
+
+			canvas
+				.copy(
+					&world_texture,
+					None,
+					Rect::new(
+						(window_size.0 as i32
+							- options.ui.pamphlet_width as i32
+							- width as i32 * scale as i32)
+							/ 2,
+						(window_size.1 as i32
+							- options.ui.console_height as i32
+							- height as i32 * scale as i32)
+							/ 2,
+						width * scale,
+						height * scale,
+					),
+				)
+				.unwrap();
 
 			// Render User Interface
 			canvas.set_viewport(None);

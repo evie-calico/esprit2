@@ -9,7 +9,7 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::f64::consts::{PI, TAU};
 
-const TILE_SIZE: u32 = 64;
+const TILE_SIZE: u32 = 16;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
 
 #[derive(Clone, Debug, Default)]
@@ -71,9 +71,9 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, came
 }
 
 pub fn cursor(
+	canvas: &mut Canvas<Window>,
 	input_mode: &input::Mode,
 	resources: &resource::Manager<'_>,
-	canvas: &mut Canvas<Window>,
 	camera: &Camera,
 ) {
 	if let input::Mode::Cursor {
@@ -133,8 +133,8 @@ pub fn cursor(
 }
 
 pub fn characters(
-	world_manager: &world::Manager,
 	canvas: &mut Canvas<Window>,
+	world_manager: &world::Manager,
 	resources: &resource::Manager<'_>,
 	camera: &Camera,
 ) {
