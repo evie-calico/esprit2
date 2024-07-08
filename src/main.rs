@@ -248,10 +248,13 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
-				debug.label(&format!(
-					"Current character: {}",
-					world_manager.next_character().borrow().sheet.nouns.name
-				));
+				for i in &world_manager.characters {
+					debug.label(&format!(
+						"{} delay: {}",
+						i.borrow().sheet.nouns.name,
+						i.borrow().action_delay
+					));
+				}
 				for member in &world_manager.party {
 					let bonuses = member.piece.borrow().sheet.growth_bonuses;
 					debug.label(&format!(

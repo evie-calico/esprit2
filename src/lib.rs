@@ -56,8 +56,10 @@ type Aut = u32;
 /// This is arbitrary, but it effectively makes Auts a fixed-point fraction,
 /// which is useful for dividing by common values like 2, 3, 4, and 6.
 // 12 is divisible by lots of nice numbers!
-#[allow(unused)] // I'm not using this anywhere yet, but it's useful to have written down.
 const TURN: Aut = 12;
+/// For diagonal movement.
+/// sqrt(2) * 12 = 16.9705627485, which we round to 17.
+const SQRT2_TURN: Aut = 17;
 
 type Color = (u8, u8, u8, u8);
 

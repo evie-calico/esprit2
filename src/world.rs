@@ -399,8 +399,15 @@ impl Manager {
 			return Ok(TurnOutcome::Yield);
 		};
 
+		let delay = next_character.borrow().action_delay;
+		// The delay represents how many auts must pass until this character's next action.
+		// If the next character in the queue has a delay higher than 0,
+		// then all other characters get their delays decreased as well while the next character "waits" for their action.
+		for i in &self.characters {
+			let action_delay = &mut i.borrow_mut().action_delay;
+			*action_delay = action_delay.saturating_sub(delay);
+		}
 		// Once an action has been provided, pending turn updates may run.
-		// TODO: This should only trigger if this function returned a duration, not an action request
 		next_character.borrow_mut().new_turn();
 
 		match action {
@@ -514,10 +521,19 @@ impl Manager {
 	) -> mlua::Result<TurnOutcome<'lua>> {
 		use crate::floor::Tile;
 
-		let (x, y) = {
+		let (x, y, delay) = {
 			let character = character.borrow();
 			let (x, y) = dir.as_offset();
-			(character.x + x, character.y + y)
+			(
+				character.x + x,
+				character.y + y,
+				// Diagonal movement is sqrt(2) times slower
+				if x.abs() + y.abs() == 2 {
+					SQRT2_TURN
+				} else {
+					TURN
+				},
+			)
 		};
 
 		// There's a really annoying phenomenon in Pokémon Mystery Dungeon where you can't hit ghosts that are inside of walls.
@@ -537,7 +553,7 @@ impl Manager {
 				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				Ok(TurnOutcome::Action { delay: TURN })
+				Ok(TurnOutcome::Action { delay })
 			}
 			Some(Tile::Wall) => {
 				self.console

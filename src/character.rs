@@ -198,7 +198,6 @@ impl Piece {
 	}
 
 	pub fn new_turn(&mut self) {
-		self.action_delay = 0;
 		// Remove any status effects with the duration of one turn.
 		self.statuses
 			.retain(|_, status| !matches!(status.duration, status::Duration::Turn));
