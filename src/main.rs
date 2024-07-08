@@ -126,29 +126,37 @@ pub fn main() {
 	let mut debug = false;
 	loop {
 		// Input processing
-		match input::world(
-			&mut event_pump,
-			&mut world_manager,
-			&resources,
-			&mut input_mode,
-			&options,
-		) {
-			Ok(Some(input::Response::Exit)) => break,
-			Ok(Some(input::Response::Fullscreen)) => {
-				use sdl2::video::FullscreenType;
-				match canvas.window().fullscreen_state() {
-					FullscreenType::Off => {
-						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Desktop);
+		{
+			let next_character = world_manager.next_character();
+			if next_character.borrow().player_controlled {
+				match input::controllable_character(
+					&mut event_pump,
+					next_character.clone(),
+					&mut world_manager,
+					&resources,
+					&mut input_mode,
+					&options,
+				) {
+					Ok(Some(input::Response::Exit)) => break,
+					Ok(Some(input::Response::Fullscreen)) => {
+						use sdl2::video::FullscreenType;
+						match canvas.window().fullscreen_state() {
+							FullscreenType::Off => {
+								let _ = canvas.window_mut().set_fullscreen(FullscreenType::Desktop);
+							}
+							FullscreenType::True | FullscreenType::Desktop => {
+								let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
+							}
+						}
 					}
-					FullscreenType::True | FullscreenType::Desktop => {
-						let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
+					Ok(Some(input::Response::Debug)) => debug ^= true,
+					Ok(None) => (),
+					Err(msg) => {
+						error!("world input processing returned an error: {msg}");
 					}
 				}
-			}
-			Ok(Some(input::Response::Debug)) => debug ^= true,
-			Ok(None) => (),
-			Err(msg) => {
-				error!("world input processing returned an error: {msg}");
+			} else {
+				next_character.borrow_mut().next_action = Some(character::Action::Wait(100))
 			}
 		}
 		// Logic
@@ -198,13 +206,15 @@ pub fn main() {
 			let height = 320;
 			let mut camera = draw::Camera::default();
 			camera.update_size(width, height);
+			let focused_character = &world_manager
+				.characters
+				.iter()
+				.find(|x| x.borrow().player_controlled)
+				.unwrap();
 			if let input::Mode::Cursor { position, .. } = input_mode {
-				camera.focus_character_with_cursor(
-					&world_manager.next_character().borrow(),
-					position,
-				);
+				camera.focus_character_with_cursor(&focused_character.borrow(), position);
 			} else {
-				camera.focus_character(&world_manager.next_character().borrow());
+				camera.focus_character(&focused_character.borrow());
 			}
 
 			let texture_creator = canvas.texture_creator();

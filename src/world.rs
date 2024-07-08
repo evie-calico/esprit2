@@ -411,6 +411,7 @@ impl Manager {
 		next_character.borrow_mut().new_turn();
 
 		match action {
+			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
 			character::Action::Attack(attack) => {
 				self.attack_piece(lua, attack, next_character, None)

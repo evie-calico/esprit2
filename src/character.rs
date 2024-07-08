@@ -290,6 +290,7 @@ impl OrdDir {
 /// This is the only way that character logic or player input should communicate with pieces.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
+	Wait(Aut),
 	Move(OrdDir),
 	Attack(Rc<Attack>),
 	Cast(Rc<Spell>),
