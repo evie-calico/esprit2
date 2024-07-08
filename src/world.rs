@@ -3,8 +3,8 @@ use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
-use tracing::error;
 
 pub type CharacterRef = Rc<RefCell<character::Piece>>;
 
@@ -15,7 +15,7 @@ pub struct Manager {
 	pub location: Location,
 	pub current_floor: Floor,
 	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
-	pub characters: Vec<CharacterRef>,
+	pub characters: VecDeque<CharacterRef>,
 	pub items: Vec<item::Piece>,
 	/// Always point to the party's pieces, even across floors.
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
@@ -89,7 +89,7 @@ impl Manager {
 		options: &Options,
 	) -> Result<Self> {
 		let mut party = Vec::new();
-		let mut characters = Vec::new();
+		let mut characters = VecDeque::new();
 
 		let mut player_controlled = true;
 
@@ -105,7 +105,7 @@ impl Manager {
 				..character::Piece::new(sheet.clone(), resource_manager)?
 			}));
 			party.push(world::PartyReference::new(character.clone(), accent_color));
-			characters.push(character);
+			characters.push_front(character);
 			player_controlled = false;
 		}
 
@@ -159,12 +159,12 @@ impl Manager {
 			.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
 
-		let party_pieces: Vec<_> = self.party.iter().map(|x| x.piece.clone()).collect();
-		self.characters.clear();
+		self.characters
+			.retain(|x| self.party.iter().any(|y| x.as_ptr() == y.piece.as_ptr()));
 
 		self.console
 			.print_unimportant("You take some time to rest...".into());
-		for i in &party_pieces {
+		for i in &self.characters {
 			let mut i = i.borrow_mut();
 			// Reset positions
 			i.x = 0;
@@ -182,7 +182,6 @@ impl Manager {
 				);
 			}
 		}
-		self.characters = party_pieces;
 		let mut rng = rand::thread_rng();
 		self.apply_vault(
 			rng.gen_range(1..8),
@@ -198,88 +197,92 @@ impl Manager {
 		lua: &'lua mlua::Lua,
 		input_mode: &mut input::Mode,
 	) -> mlua::Result<Option<ActionRequest<'lua>>> {
-		let (renew_action, action_request) = match action_request {
-			Some(ActionRequest::BeginCursor {
-				x,
-				y,
-				range,
-				callback,
-			}) => {
-				match *input_mode {
-					input::Mode::Cursor {
-						position: (x, y),
-						submitted: true,
-						..
-					} => {
-						*input_mode = input::Mode::Normal;
-						if let Some(character) = self.get_character_at(x, y) {
-							(true, ActionRequest::poll(lua, callback, character.clone())?)
-						} else {
-							(false, None)
-						}
-					}
-					input::Mode::Cursor {
-						submitted: false, ..
-					} => {
-						// This match statement currently has ownership of `action_request`
-						// since the callback is `FnOnce`.
-						// Because of this, `action_request` needs to be reconstructed in all match arms,
-						// even if this is a no-op.
-						(
-							false,
-							Some(world::ActionRequest::BeginCursor {
-								x,
-								y,
-								range,
-								callback,
-							}),
-						)
-					}
-					_ => {
-						// If cursor mode is cancelled in any way, the callback will be destroyed.
-						(false, None)
-					}
+		let outcome = match (action_request, input_mode.clone()) {
+			(
+				Some(ActionRequest::BeginCursor { callback, .. }),
+				input::Mode::Cursor {
+					position: (x, y),
+					submitted: true,
+					..
+				},
+			) => {
+				if let Some(character) = self.get_character_at(x, y) {
+					TurnOutcome::poll(lua, callback, character.clone())?
+				} else {
+					TurnOutcome::Yield
 				}
 			}
-			Some(ActionRequest::ShowPrompt { message, callback }) => match *input_mode {
+			(
+				request @ Some(ActionRequest::BeginCursor { .. }),
+				input::Mode::Cursor {
+					submitted: false, ..
+				},
+			) => {
+				return Ok(request);
+			}
+			// If cursor mode is cancelled in any way, the callback will be destroyed.
+			(Some(ActionRequest::BeginCursor { .. }), _) => TurnOutcome::Yield,
+			(
+				Some(ActionRequest::ShowPrompt { callback, .. }),
 				input::Mode::Prompt {
 					response: Some(response),
 					..
-				} => {
-					*input_mode = input::Mode::Normal;
-					(true, ActionRequest::poll(lua, callback, response)?)
-				}
-				input::Mode::Prompt { .. } => {
-					(false, Some(ActionRequest::ShowPrompt { message, callback }))
-				}
-				_ => (false, None),
-			},
-			None => (true, self.pop_action(lua)?),
+				},
+			) => TurnOutcome::poll(lua, callback, response)?,
+			(
+				request @ Some(ActionRequest::ShowPrompt { .. }),
+				input::Mode::Prompt { response: None, .. },
+			) => return Ok(request),
+			(Some(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
+			(None, _) => self.next_turn(lua)?,
 		};
 
-		if renew_action {
-			// Set up any new action requests.
-			match &action_request {
-				Some(world::ActionRequest::BeginCursor { x, y, range, .. }) => {
-					*input_mode = input::Mode::Cursor {
-						origin: (*x, *y),
-						position: (*x, *y),
-						range: *range,
-						submitted: false,
-						state: input::CursorState::default(),
-					};
-				}
-				Some(world::ActionRequest::ShowPrompt { message, .. }) => {
-					*input_mode = input::Mode::Prompt {
-						response: None,
-						message: message.clone(),
+		match outcome {
+			TurnOutcome::Yield => Ok(None),
+			TurnOutcome::Action { delay } => {
+				#[allow(
+					clippy::unwrap_used,
+					reason = "next_turn already indexes the first element"
+				)]
+				let character = self.characters.pop_front().unwrap();
+				character.borrow_mut().action_delay = delay;
+				// Insert the character into the queue,
+				// immediately before the first character to have a higher action delay.
+				// This assumes that the queue is sorted.
+				self.characters.insert(
+					self.characters
+						.iter()
+						.enumerate()
+						.find(|x| x.1.borrow().action_delay > delay)
+						.map(|x| x.0)
+						.unwrap_or(self.characters.len()),
+					character,
+				);
+
+				Ok(None)
+			}
+			TurnOutcome::Request(request) => {
+				// Set up any new action requests.
+				match &request {
+					world::ActionRequest::BeginCursor { x, y, range, .. } => {
+						*input_mode = input::Mode::Cursor {
+							origin: (*x, *y),
+							position: (*x, *y),
+							range: *range,
+							submitted: false,
+							state: input::CursorState::default(),
+						};
+					}
+					world::ActionRequest::ShowPrompt { message, .. } => {
+						*input_mode = input::Mode::Prompt {
+							response: None,
+							message: message.clone(),
+						}
 					}
 				}
-				None => (),
+				Ok(Some(request))
 			}
 		}
-
-		Ok(action_request)
 	}
 
 	pub fn next_character(&self) -> &CharacterRef {
@@ -307,7 +310,7 @@ impl Manager {
 				y: y + yoff,
 				..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
 			};
-			self.characters.push(Rc::new(RefCell::new(piece)));
+			self.characters.push_front(Rc::new(RefCell::new(piece)));
 		}
 		Ok(())
 	}
@@ -328,12 +331,23 @@ pub enum ActionRequest<'lua> {
 	},
 }
 
-impl<'lua> ActionRequest<'lua> {
+impl<'lua> TurnOutcome<'lua> {
+	fn from_lua(lua: &'lua mlua::Lua, value: mlua::Value<'lua>) -> mlua::Result<Self> {
+		match value {
+			mlua::Value::Thread(thread) => TurnOutcome::poll(lua, thread, ()),
+			mlua::Value::Nil => Ok(TurnOutcome::Yield),
+			mlua::Value::Integer(delay) => Ok(TurnOutcome::Action {
+				delay: delay as Aut,
+			}),
+			_ => Err(mlua::Error::runtime("unexpected return value: {value:?}")),
+		}
+	}
+
 	fn poll(
 		lua: &'lua mlua::Lua,
 		thread: mlua::Thread<'lua>,
 		args: impl mlua::IntoLuaMulti<'lua>,
-	) -> mlua::Result<Option<ActionRequest<'lua>>> {
+	) -> mlua::Result<Self> {
 		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		#[serde(tag = "type")]
 		pub enum LuaActionRequest {
@@ -341,32 +355,48 @@ impl<'lua> ActionRequest<'lua> {
 			Prompt { message: String },
 		}
 
-		let action: Option<LuaActionRequest> = lua.from_value(thread.resume(args)?)?;
-		Ok(action.map(|action| match action {
-			LuaActionRequest::Cursor { x, y, range } => ActionRequest::BeginCursor {
-				x,
-				y,
-				range,
-				callback: thread,
-			},
-			LuaActionRequest::Prompt { message } => ActionRequest::ShowPrompt {
-				message,
-				callback: thread,
-			},
-		}))
+		let value = thread.resume(args)?;
+
+		// A resumable thread is expecting an action request response.
+		if thread.status() == mlua::ThreadStatus::Resumable {
+			Ok(match lua.from_value::<LuaActionRequest>(value)? {
+				LuaActionRequest::Cursor { x, y, range } => {
+					TurnOutcome::Request(ActionRequest::BeginCursor {
+						x,
+						y,
+						range,
+						callback: thread,
+					})
+				}
+				LuaActionRequest::Prompt { message } => {
+					TurnOutcome::Request(ActionRequest::ShowPrompt {
+						message,
+						callback: thread,
+					})
+				}
+			})
+		} else {
+			TurnOutcome::from_lua(lua, value)
+		}
 	}
 }
 
+pub enum TurnOutcome<'lua> {
+	/// No pending action; waiting for player input.
+	Yield,
+	/// Successful result of an action.
+	Action { delay: Aut },
+	/// Request extra information for a pending action.
+	Request(ActionRequest<'lua>),
+}
+
 impl Manager {
-	pub fn pop_action<'lua>(
-		&mut self,
-		lua: &'lua mlua::Lua,
-	) -> mlua::Result<Option<ActionRequest<'lua>>> {
+	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
 		// TODO: Character ordering/timing
 		let Some(action) = next_character.borrow_mut().next_action.take() else {
-			return Ok(None);
+			return Ok(TurnOutcome::Yield);
 		};
 
 		// Once an action has been provided, pending turn updates may run.
@@ -414,32 +444,24 @@ impl Manager {
 						globals.set("level", spell.level)?;
 						globals.set("affinity", affinity)?;
 
-						let value: mlua::Value =
-							chunk.set_name(name).set_environment(globals).eval()?;
-
-						match value {
-							mlua::Value::Thread(thread) => ActionRequest::poll(lua, thread, ()),
-
-							mlua::Value::Nil => Ok(None),
-							_ => {
-								error!("unexpected return value");
-								Ok(None)
-							}
-						}
+						TurnOutcome::from_lua(
+							lua,
+							chunk.set_name(name).set_environment(globals).eval()?,
+						)
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
 							format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
 						self.console.print_system(message);
-						Ok(None)
+						Ok(TurnOutcome::Yield)
 					}
 					spell::Castable::UncastableAffinity => {
 						let message =
 							format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
 						self.console.print_system(message);
-						Ok(None)
+						Ok(TurnOutcome::Yield)
 					}
 				}
 			}
@@ -455,7 +477,7 @@ impl Manager {
 		attack: Rc<Attack>,
 		user: &CharacterRef,
 		target: Option<&CharacterRef>,
-	) -> mlua::Result<Option<ActionRequest<'lua>>> {
+	) -> mlua::Result<TurnOutcome<'lua>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
@@ -474,20 +496,11 @@ impl Manager {
 		} else {
 			globals.set("target", mlua::Nil)?;
 		}
+		globals.set("use_time", attack.use_time)?;
 		globals.set("magnitude", magnitude)?;
 
 		let value: mlua::Value = chunk.set_name(name).set_environment(globals).eval()?;
-
-		match value {
-			mlua::Value::Thread(thread) => {
-				return ActionRequest::poll(lua, thread, ());
-			}
-			mlua::Value::Nil => Ok(None),
-			_ => {
-				error!("unexpected return value");
-				Ok(None)
-			}
-		}
+		TurnOutcome::from_lua(lua, value)
 	}
 
 	/// # Errors
@@ -498,7 +511,7 @@ impl Manager {
 		lua: &'lua mlua::Lua,
 		character: &CharacterRef,
 		dir: OrdDir,
-	) -> mlua::Result<Option<ActionRequest<'lua>>> {
+	) -> mlua::Result<TurnOutcome<'lua>> {
 		use crate::floor::Tile;
 
 		let (x, y) = {
@@ -513,7 +526,7 @@ impl Manager {
 			let Some(attack) = character.borrow().attacks.first().cloned() else {
 				self.console
 					.print_unimportant("You cannot perform any melee attacks right now.".into());
-				return Ok(None);
+				return Ok(TurnOutcome::Yield);
 			};
 			return self.attack_piece(lua, attack, character, Some(target_ref));
 		}
@@ -524,16 +537,16 @@ impl Manager {
 				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				Ok(None)
+				Ok(TurnOutcome::Action { delay: TURN })
 			}
 			Some(Tile::Wall) => {
 				self.console
 					.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
-				Ok(None)
+				Ok(TurnOutcome::Yield)
 			}
 			None => {
 				self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
-				Ok(None)
+				Ok(TurnOutcome::Yield)
 			}
 		}
 	}

@@ -65,4 +65,6 @@ return coroutine.create(function()
 		local log = { type = "Hit", damage = damage }
 		Console:combat_log(pick(damage_messages), log)
 	end
+
+	return parameters.cast_time
 end)

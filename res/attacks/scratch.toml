@@ -1,22 +1,8 @@
 name = "Scratch"
 description = "Causes a small amount of bleeding damage, which reduces defense."
 magnitude = "power + 4"
+use_time = 12
 
 [on_use]
 type = "Path"
 source = "scripts/attacks/scratch.lua"
-
-[messages]
-high = [
-	# Having a few of these makes it a little more common.
-	"{self_Address}'s claws rake against {target_address}",
-	"{target_Address} is struck by {self_address}'s claws",
-	"{self_Address} grazes {target_address} with {self_their} claws",
-	"{self_Address} strikes {target_address} with {self_their} claws",
-	"{self_Address} digs {self_their} claws into {target_address}",
-]
-low = [
-	"{self_Address}'s claws barely missed {target_address}",
-	"{target_Address} was tickled by {self_address}'s claws",
-	"{self_Address}'s claws lightly slid across {target_address}",
-]

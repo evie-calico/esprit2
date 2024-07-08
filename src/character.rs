@@ -146,6 +146,7 @@ mod piece {
 		#[alua(get, set)]
 		pub y: i32,
 		pub next_action: Option<Action>,
+		pub action_delay: Aut,
 		#[alua(get, set)]
 		pub player_controlled: bool,
 		pub alliance: Alliance,
@@ -190,12 +191,14 @@ impl Piece {
 			x: 0,
 			y: 0,
 			next_action: None,
+			action_delay: 0,
 			player_controlled: false,
 			alliance: Alliance::default(),
 		})
 	}
 
 	pub fn new_turn(&mut self) {
+		self.action_delay = 0;
 		// Remove any status effects with the duration of one turn.
 		self.statuses
 			.retain(|_, status| !matches!(status.duration, status::Duration::Turn));

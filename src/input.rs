@@ -27,6 +27,7 @@ pub struct CursorState {
 	pub float: SinWave,
 }
 
+#[derive(Clone)]
 pub enum Mode {
 	Normal,
 	Attack,
@@ -57,6 +58,16 @@ pub fn world(
 	mode: &mut Mode,
 	options: &Options,
 ) -> Result<Option<Response>> {
+	match mode {
+		input::Mode::Cursor {
+			submitted: true, ..
+		}
+		| input::Mode::Prompt {
+			response: Some(_), ..
+		} => *mode = input::Mode::Normal,
+		_ => (),
+	}
+
 	for event in event_pump.poll_iter() {
 		match event {
 			Event::Quit { .. } => return Ok(Some(Response::Exit)),
@@ -65,7 +76,7 @@ pub fn world(
 				..
 			} => {
 				let mut next_character = world_manager.next_character().borrow_mut();
-				if next_character.player_controlled {
+				if true {
 					match mode {
 						Mode::Normal => {
 							// Eventually this will be a more involved binding.

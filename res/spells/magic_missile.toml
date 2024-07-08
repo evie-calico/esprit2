@@ -11,6 +11,7 @@ level = 1
 magnitude = "magic + 4"
 pierce_threshold = 2
 range = 5
+cast_time = 12
 
 [on_cast]
 type = "Path"

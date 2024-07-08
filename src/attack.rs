@@ -8,12 +8,5 @@ pub struct Attack {
 	pub description: String,
 	pub magnitude: Expression,
 	pub on_use: script::MaybeInline,
-	pub messages: Messages,
-}
-
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct Messages {
-	// Special messages for "comically" low damage.
-	pub low: Option<Vec<String>>,
-	pub high: Vec<String>,
+	pub use_time: Aut,
 }
