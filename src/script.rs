@@ -9,6 +9,12 @@ pub enum MaybeInline {
 }
 
 impl MaybeInline {
+	pub fn name(&self, parent: &str) -> String {
+		match self {
+			MaybeInline::Inline(_) => format!("{parent} (inline)"),
+			MaybeInline::Path(Script { path, .. }) => path.clone(),
+		}
+	}
 	pub fn contents(&self) -> &str {
 		match self {
 			MaybeInline::Inline(s) => s,

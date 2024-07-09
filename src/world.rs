@@ -2,11 +2,10 @@ use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
-pub type CharacterRef = Rc<RefCell<character::Piece>>;
+pub use character::Ref as CharacterRef;
 
 /// This struct contains all information that is relevant during gameplay.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -99,11 +98,11 @@ impl Manager {
 		} in party_blueprint
 		{
 			let sheet = resource_manager.get_sheet(sheet)?;
-			let character = Rc::new(RefCell::new(character::Piece {
+			let character = CharacterRef::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
 				..character::Piece::new(sheet.clone(), resource_manager)?
-			}));
+			});
 			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push_front(character);
 			player_controlled = false;
@@ -198,6 +197,7 @@ impl Manager {
 		input_mode: &mut input::Mode,
 	) -> mlua::Result<Option<ActionRequest<'lua>>> {
 		let outcome = match (action_request, input_mode.clone()) {
+			// Handle cursor submission
 			(
 				Some(ActionRequest::BeginCursor { callback, .. }),
 				input::Mode::Cursor {
@@ -209,9 +209,13 @@ impl Manager {
 				if let Some(character) = self.get_character_at(x, y) {
 					TurnOutcome::poll(lua, callback, character.clone())?
 				} else {
+					// If the cursor hasn't selected a character,
+					// cancel the request altogther.
+					// This destroys the lua callback.
 					TurnOutcome::Yield
 				}
 			}
+			// An unsubmitted cursor yields the same action request.
 			(
 				request @ Some(ActionRequest::BeginCursor { .. }),
 				input::Mode::Cursor {
@@ -222,6 +226,7 @@ impl Manager {
 			}
 			// If cursor mode is cancelled in any way, the callback will be destroyed.
 			(Some(ActionRequest::BeginCursor { .. }), _) => TurnOutcome::Yield,
+			// Prompt with submitted response
 			(
 				Some(ActionRequest::ShowPrompt { callback, .. }),
 				input::Mode::Prompt {
@@ -229,11 +234,14 @@ impl Manager {
 					..
 				},
 			) => TurnOutcome::poll(lua, callback, response)?,
+			// Prompt with unsubmitted response
 			(
 				request @ Some(ActionRequest::ShowPrompt { .. }),
 				input::Mode::Prompt { response: None, .. },
 			) => return Ok(request),
+			// Prompt outside of prompt mode (this is different from answering no!).
 			(Some(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
+			// If there is no pending request, pop a turn off the character queue.
 			(None, _) => self.next_turn(lua)?,
 		};
 
@@ -310,7 +318,7 @@ impl Manager {
 				y: y + yoff,
 				..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
 			};
-			self.characters.push_front(Rc::new(RefCell::new(piece)));
+			self.characters.push_front(character::Ref::new(piece));
 		}
 		Ok(())
 	}
@@ -391,6 +399,56 @@ pub enum TurnOutcome<'lua> {
 }
 
 impl Manager {
+	pub fn consider_turn(&mut self, lua: &mlua::Lua) -> mlua::Result<Vec<Consider>> {
+		let next_character = self.next_character();
+
+		let mut considerations = Vec::new();
+
+		for spell in &next_character.borrow().spells {
+			if let (spell::Castable::Yes, Some(on_consider)) = (
+				spell.castable_by(&next_character.borrow()),
+				&spell.on_consider,
+			) {
+				// Create a reference for the callback to use.
+				let caster = next_character.clone();
+
+				let globals = lua.globals().clone();
+
+				let parameters = lua.create_table()?;
+				for (k, v) in &spell.parameters {
+					let k = k.as_ref();
+					match v {
+						spell::Parameter::Integer(v) => parameters.set(k, *v)?,
+						spell::Parameter::Expression(v) => {
+							parameters.set(k, u32::evalv(v, &*caster.borrow()))?
+						}
+					}
+				}
+
+				globals.set("parameters", parameters)?;
+				// Maybe these should be members of the spell?
+				globals.set("level", spell.level)?;
+				globals.set("affinity", spell.affinity(&caster.borrow()))?;
+				globals.set("caster", caster)?;
+
+				globals.set(
+					"nearby_characters",
+					lua.create_table_from(self.characters.iter().cloned().enumerate())?,
+				)?;
+
+				let chunk = lua.load(on_consider.contents());
+				let spell_considerations: consider::SpellList = chunk
+					.set_name(on_consider.name(&spell.name))
+					.set_environment(globals)
+					.call(consider::SpellList::default())?;
+				for i in spell_considerations.0 {
+					considerations.push(Consider::Spell(spell.clone(), i));
+				}
+			}
+		}
+
+		Ok(considerations)
+	}
 	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
@@ -419,20 +477,10 @@ impl Manager {
 			character::Action::Cast(spell) => {
 				match spell.castable_by(&next_character.borrow()) {
 					spell::Castable::Yes => {
-						let spell = spell.clone();
 						// Create a reference for the callback to use.
 						let caster = next_character.clone();
 						let affinity = spell.affinity(&caster.borrow());
 
-						let chunk = lua.load(spell.on_cast.contents());
-						let name = match &spell.on_cast {
-							script::MaybeInline::Inline(_) => {
-								format!("{} (inline)", spell.name)
-							}
-							script::MaybeInline::Path(script::Script { path, contents: _ }) => {
-								path.clone()
-							}
-						};
 						let globals = lua.globals().clone();
 
 						let parameters = lua.create_table()?;
@@ -452,9 +500,13 @@ impl Manager {
 						globals.set("level", spell.level)?;
 						globals.set("affinity", affinity)?;
 
+						let chunk = lua.load(spell.on_cast.contents());
 						TurnOutcome::from_lua(
 							lua,
-							chunk.set_name(name).set_environment(globals).eval()?,
+							chunk
+								.set_name(spell.on_cast.name(&spell.name))
+								.set_environment(globals)
+								.eval()?,
 						)
 					}
 					spell::Castable::NotEnoughSP => {

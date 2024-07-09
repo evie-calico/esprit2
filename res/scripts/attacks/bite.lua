@@ -8,7 +8,7 @@ return coroutine.create(function()
 	if alliance_check(user, target) then return end
 
 	-- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-	local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - target:stats().defense)
+	local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - target.stats.defense)
 
 	-- Biting requires you to get closer to the enemy, lowering your physical defense.
 	user:inflict("close_combat")

@@ -1,13 +1,15 @@
 require("combat")
 
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+	if target == nil then
+		target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+	end
 
-	if alliance_check(caster, target) then return end
+	if alliance_check(caster, target) and not alliance_prompt() then return end
 
 	local damage, pierce_failed = apply_damage_with_pierce(
 		parameters.pierce_threshold,
-		affinity:magnitude(parameters.magnitude) - target:stats().resistance
+		basic_magic_attack_against(target)
 	)
 
 	target.hp = target.hp - damage

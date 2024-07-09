@@ -258,6 +258,18 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
+				for i in world_manager.consider_turn(&lua).unwrap() {
+					match i {
+						Consider::Attack(_, _) => todo!(),
+						Consider::Spell(spell, consider::Spell::Damage { target, amount }) => debug
+							.label(&format!(
+								"Cast {} on {} ({} damage)",
+								spell.name,
+								target.borrow().sheet.nouns.name,
+								amount
+							)),
+					}
+				}
 				for i in &world_manager.characters {
 					debug.label(&format!(
 						"{} delay: {}",

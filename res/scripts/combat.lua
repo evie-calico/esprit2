@@ -1,3 +1,8 @@
+-- Used by basic magic spells.
+function basic_magic_attack_against(target)
+	return affinity:magnitude(parameters.magnitude) - target.stats.resistance
+end
+
 function apply_damage_with_pierce(pierce_threshold, pre_damage)
 	local damage = math.max(pre_damage + math.min(pierce_threshold, 0), 0)
 	local pierce_failed = false
@@ -9,7 +14,7 @@ function apply_damage_with_pierce(pierce_threshold, pre_damage)
 end
 
 function alliance_check(user, target)
-	return user:alliance() == target:alliance() and not alliance_prompt()
+	return user.alliance == target.alliance
 end
 
 function alliance_prompt()

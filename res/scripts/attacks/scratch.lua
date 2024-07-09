@@ -7,7 +7,7 @@ return coroutine.create(function()
 
 	if alliance_check(user, target) then return end
 
-	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target:stats().defense)
+	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target.stats.defense)
 
 	target.hp = target.hp - damage
 	if damage > 0 or pierce_failed then

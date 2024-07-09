@@ -1,159 +1,177 @@
 use crate::prelude::*;
 use nouns::StrExt;
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-mod piece {
-	use super::*;
-
-	fn stats(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<Stats> {
-		Ok(this.stats())
-	}
-
-	fn replace_nouns(_lua: &mlua::Lua, this: &mut Piece, string: String) -> mlua::Result<String> {
-		Ok(string.replace_nouns(&this.sheet.nouns))
-	}
-
-	fn replace_prefixed_nouns(
-		_lua: &mlua::Lua,
-		this: &mut Piece,
-		(prefix, string): (String, String),
-	) -> mlua::Result<String> {
-		Ok(string.replace_prefixed_nouns(&this.sheet.nouns, &prefix))
-	}
-
-	/// Used for debugging.
-	///
-	/// While fields of `Piece` are settable from Lua,
-	/// fields of `Sheet` and `Stats` are not.
-	/// This method circumvents that.
-	fn force_level(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<()> {
-		this.sheet.level = this.sheet.level.saturating_add(1);
-		Ok(())
-	}
-
-	/// Used for debugging.
-	fn force_affinity(_lua: &mlua::Lua, this: &mut Piece, index: u32) -> mlua::Result<()> {
-		this.sheet.skillset = match index {
-			0 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Positive,
-				minor: None,
-			},
-			1 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Positive,
-				minor: Some(spell::Harmony::Chaos),
-			},
-			2 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Positive,
-				minor: Some(spell::Harmony::Order),
-			},
-			3 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Negative,
-				minor: None,
-			},
-			4 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Negative,
-				minor: Some(spell::Harmony::Chaos),
-			},
-			5 => spell::Skillset::EnergyMajor {
-				major: spell::Energy::Negative,
-				minor: Some(spell::Harmony::Order),
-			},
-			6 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Chaos,
-				minor: None,
-			},
-			7 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Chaos,
-				minor: Some(spell::Energy::Positive),
-			},
-			8 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Chaos,
-				minor: Some(spell::Energy::Negative),
-			},
-			9 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Order,
-				minor: None,
-			},
-			10 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Order,
-				minor: Some(spell::Energy::Positive),
-			},
-			11 => spell::Skillset::HarmonyMajor {
-				major: spell::Harmony::Order,
-				minor: Some(spell::Energy::Negative),
-			},
-			_ => {
-				return Err(mlua::Error::runtime("invalid affinity index"));
-			}
-		};
-		Ok(())
-	}
-
-	pub fn alliance(_lua: &mlua::Lua, this: &mut Piece, _: ()) -> mlua::Result<u32> {
-		Ok(this.alliance as u32)
-	}
-
-	/// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
-	pub fn inflict(
-		lua: &mlua::Lua,
-		this: &mut Piece,
-		(key, magnitude): (String, Option<u32>),
-	) -> mlua::Result<()> {
-		let statuses = lua
-			.globals()
-			.get::<&str, resource::Handle<Status>>("Status")?;
-		let Some(status) = statuses.0.get(key.as_str()).cloned() else {
-			return Err(mlua::Error::external(resource::Error::NotFound(key)));
-		};
-		let entry = this
-			.statuses
-			.entry(key.into_boxed_str())
-			.or_insert_with(|| status);
-		if let Some(magnitude) = magnitude {
-			entry.add_magnitude(magnitude);
+/// Used for debugging.
+fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> {
+	this.borrow_mut().sheet.skillset = match index {
+		0 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Positive,
+			minor: None,
+		},
+		1 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Positive,
+			minor: Some(spell::Harmony::Chaos),
+		},
+		2 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Positive,
+			minor: Some(spell::Harmony::Order),
+		},
+		3 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Negative,
+			minor: None,
+		},
+		4 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Negative,
+			minor: Some(spell::Harmony::Chaos),
+		},
+		5 => spell::Skillset::EnergyMajor {
+			major: spell::Energy::Negative,
+			minor: Some(spell::Harmony::Order),
+		},
+		6 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Chaos,
+			minor: None,
+		},
+		7 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Chaos,
+			minor: Some(spell::Energy::Positive),
+		},
+		8 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Chaos,
+			minor: Some(spell::Energy::Negative),
+		},
+		9 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Order,
+			minor: None,
+		},
+		10 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Order,
+			minor: Some(spell::Energy::Positive),
+		},
+		11 => spell::Skillset::HarmonyMajor {
+			major: spell::Harmony::Order,
+			minor: Some(spell::Energy::Negative),
+		},
+		_ => {
+			return Err(mlua::Error::runtime("invalid affinity index"));
 		}
-		Ok(())
+	};
+	Ok(())
+}
+
+/// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
+pub fn inflict(
+	lua: &mlua::Lua,
+	this: &Ref,
+	(key, magnitude): (String, Option<u32>),
+) -> mlua::Result<()> {
+	let statuses = lua
+		.globals()
+		.get::<&str, resource::Handle<Status>>("Status")?;
+	let Some(status) = statuses.0.get(key.as_str()).cloned() else {
+		return Err(mlua::Error::external(resource::Error::NotFound(key)));
+	};
+	let mut entry = this.borrow_mut();
+	let entry = entry
+		.statuses
+		.entry(key.into_boxed_str())
+		.or_insert_with(|| status);
+	if let Some(magnitude) = magnitude {
+		entry.add_magnitude(magnitude);
 	}
+	Ok(())
+}
 
-	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
-	#[alua(
-		// Nouns
-		method = replace_nouns,
-		method = replace_prefixed_nouns,
-		// Debugging
-		method = force_level,
-		method = force_affinity,
-		// Field accessors
-		method = stats,
-		method = alliance,
-		method = inflict,
-	)]
-	pub struct Piece {
-		#[alua(get)]
-		pub sheet: Sheet,
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
+pub struct Ref(Rc<RefCell<character::Piece>>);
 
-		#[alua(get, set)]
-		pub hp: i32,
-		#[alua(get, set)]
-		pub sp: i32,
-
-		pub statuses: HashMap<Box<str>, Status>,
-		pub attacks: Vec<Rc<Attack>>,
-		pub spells: Vec<Rc<Spell>>,
-
-		#[alua(get, set)]
-		pub x: i32,
-		#[alua(get, set)]
-		pub y: i32,
-		pub next_action: Option<Action>,
-		pub action_delay: Aut,
-		#[alua(get, set)]
-		pub player_controlled: bool,
-		pub alliance: Alliance,
+impl Ref {
+	pub fn new(character: character::Piece) -> Self {
+		Self(Rc::new(RefCell::new(character)))
 	}
 }
 
-pub use piece::Piece;
+impl std::ops::Deref for Ref {
+	type Target = Rc<RefCell<character::Piece>>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl std::ops::DerefMut for Ref {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
+	}
+}
+
+impl mlua::UserData for Ref {
+	fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+		fields.add_field_method_get("sheet", |_, this| Ok(this.borrow().sheet.clone()));
+		fields.add_field_method_get("stats", |_, this| Ok(this.borrow().stats()));
+		fields.add_field_method_get("hp", |_, this| Ok(this.borrow().hp));
+		fields.add_field_method_get("sp", |_, this| Ok(this.borrow().sp));
+		fields.add_field_method_get("x", |_, this| Ok(this.borrow().x));
+		fields.add_field_method_get("y", |_, this| Ok(this.borrow().y));
+		fields.add_field_method_get("alliance", |_, this| Ok(this.borrow().alliance as u32));
+
+		fields.add_field_method_set("hp", |_, this, value| {
+			this.borrow_mut().hp = value;
+			Ok(())
+		});
+		fields.add_field_method_set("sp", |_, this, value| {
+			this.borrow_mut().sp = value;
+			Ok(())
+		});
+		fields.add_field_method_set("x", |_, this, value| {
+			this.borrow_mut().x = value;
+			Ok(())
+		});
+		fields.add_field_method_set("y", |_, this, value| {
+			this.borrow_mut().y = value;
+			Ok(())
+		});
+	}
+	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method("replace_nouns", |_, this, s: String| {
+			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
+		});
+		methods.add_method(
+			"replace_prefixed_nouns",
+			|_, this, (prefix, string): (String, String)| {
+				Ok(string.replace_prefixed_nouns(&this.borrow().sheet.nouns, &prefix))
+			},
+		);
+		methods.add_method("force_level", |_, this, ()| {
+			let level = &mut this.borrow_mut().sheet.level;
+			*level = level.saturating_add(1);
+			Ok(())
+		});
+		// TODO: Make these functions into Rust methods of Piece.
+		methods.add_method("force_affinity", force_affinity);
+		methods.add_method("inflict", inflict);
+	}
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Piece {
+	pub sheet: Sheet,
+
+	pub hp: i32,
+	pub sp: i32,
+
+	pub statuses: HashMap<Box<str>, Status>,
+	pub attacks: Vec<Rc<Attack>>,
+	pub spells: Vec<Rc<Spell>>,
+
+	pub x: i32,
+	pub y: i32,
+	pub next_action: Option<Action>,
+	pub action_delay: Aut,
+	pub player_controlled: bool,
+	pub alliance: Alliance,
+}
 
 impl expression::Variables for Piece {
 	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {

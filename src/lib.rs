@@ -9,6 +9,7 @@
 pub mod attack;
 pub mod character;
 pub mod combat;
+pub mod consider;
 pub mod console;
 pub mod draw;
 pub mod expression;
@@ -68,6 +69,7 @@ pub mod prelude {
 
 	// Import redundant module::Struct names.
 	pub use attack::Attack;
+	pub use consider::Consider;
 	pub use console::Console;
 	pub use expression::Expression;
 	pub use floor::Floor;
@@ -84,4 +86,6 @@ pub mod prelude {
 	// Export common traits
 	pub use expression::Evaluate;
 	pub use rand::Rng;
+
+	pub use tracing::{debug, error, info};
 }
