@@ -404,6 +404,43 @@ impl Manager {
 
 		let mut considerations = Vec::new();
 
+		let nearby_characters = [
+			OrdDir::Up,
+			OrdDir::UpRight,
+			OrdDir::Right,
+			OrdDir::DownRight,
+			OrdDir::Down,
+			OrdDir::DownLeft,
+			OrdDir::Left,
+			OrdDir::UpLeft,
+		]
+		.into_iter()
+		.filter_map(|dir| {
+			let (x, y) = dir.as_offset();
+			let character = next_character.borrow();
+			self.get_character_at(x + character.x, y + character.y)
+		})
+		.cloned()
+		.collect::<Vec<_>>();
+		for attack in &next_character.borrow().attacks {
+			if let Some(on_consider) = &attack.on_consider {
+				let user = next_character.clone();
+				let globals = lua.globals().clone();
+				globals.set("use_time", attack.use_time)?;
+				globals.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
+				globals.set("user", user)?;
+				globals.set("nearby_characters", nearby_characters.clone())?;
+				let attack_considerations: consider::AttackList = lua
+					.load(on_consider.contents())
+					.set_name(on_consider.name(&attack.name))
+					.set_environment(globals)
+					.call(consider::AttackList::default())?;
+				for i in attack_considerations.0 {
+					considerations.push(Consider::Attack(attack.clone(), i));
+				}
+			}
+		}
+
 		for spell in &next_character.borrow().spells {
 			if let (spell::Castable::Yes, Some(on_consider)) = (
 				spell.castable_by(&next_character.borrow()),

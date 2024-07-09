@@ -6,3 +6,7 @@ use_time = 12
 [on_use]
 type = "Path"
 source = "scripts/attacks/bite.lua"
+
+[on_consider]
+type = "Path"
+source = "scripts/consider/melee_attack.lua"

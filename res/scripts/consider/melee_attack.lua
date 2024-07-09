@@ -3,10 +3,10 @@ require("combat")
 local considerations = ...
 
 for i, character in ipairs(nearby_characters) do
-	if not alliance_check(caster, character) then
+	if not alliance_check(user, character) then
 		considerations:damage(
 			character,
-			basic_magic_attack_against(character)
+			magnitude - character.stats.defense
 		)
 	end
 end

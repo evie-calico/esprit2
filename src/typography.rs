@@ -48,9 +48,9 @@ impl<'ttf_module, 'rwops> Typography<'ttf_module, 'rwops> {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Options {
-	font: Option<PathBuf>,
-	font_size: u16,
-	font_color: Color,
+	pub font: Option<PathBuf>,
+	pub font_size: u16,
+	pub font_color: Color,
 }
 
 impl Default for Options {

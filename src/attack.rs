@@ -8,5 +8,6 @@ pub struct Attack {
 	pub description: String,
 	pub magnitude: Expression,
 	pub on_use: script::MaybeInline,
+	pub on_consider: Option<script::MaybeInline>,
 	pub use_time: Aut,
 }

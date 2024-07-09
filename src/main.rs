@@ -260,7 +260,14 @@ pub fn main() {
 				debug.label(&format!("FPS: {fps:.0}"));
 				for i in world_manager.consider_turn(&lua).unwrap() {
 					match i {
-						Consider::Attack(_, _) => todo!(),
+						Consider::Attack(attack, consider::Attack::Damage { target, amount }) => {
+							debug.label(&format!(
+								"Use {} on {} ({} damage)",
+								attack.name,
+								target.borrow().sheet.nouns.name,
+								amount
+							))
+						}
 						Consider::Spell(spell, consider::Spell::Damage { target, amount }) => debug
 							.label(&format!(
 								"Cast {} on {} ({} damage)",
