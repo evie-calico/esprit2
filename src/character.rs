@@ -167,10 +167,14 @@ pub struct Piece {
 
 	pub x: i32,
 	pub y: i32,
-	pub next_action: Option<Action>,
 	pub action_delay: Aut,
 	pub player_controlled: bool,
 	pub alliance: Alliance,
+
+	// Temporary associated storage
+	// TODO: Does this even need to be a field?
+	#[serde(skip)]
+	pub next_action: Option<Action>,
 }
 
 impl expression::Variables for Piece {
@@ -306,12 +310,14 @@ impl OrdDir {
 /// Anything a character piece can "do".
 ///
 /// This is the only way that character logic or player input should communicate with pieces.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// The information here should be enough to perform the action, but in the event it isn't
+/// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
+#[derive(Clone, Debug)]
 pub enum Action {
 	Wait(Aut),
 	Move(OrdDir),
-	Attack(Rc<Attack>),
-	Cast(Rc<Spell>),
+	Attack(Rc<Attack>, Option<mlua::OwnedTable>),
+	Cast(Rc<Spell>, Option<mlua::OwnedTable>),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

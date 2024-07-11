@@ -134,6 +134,7 @@ pub fn main() {
 					next_character.clone(),
 					&mut world_manager,
 					&resources,
+					&lua,
 					&mut input_mode,
 					&options,
 				) {

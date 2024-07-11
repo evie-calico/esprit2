@@ -425,16 +425,16 @@ impl Manager {
 		for attack in &next_character.borrow().attacks {
 			if let Some(on_consider) = &attack.on_consider {
 				let user = next_character.clone();
-				let globals = lua.globals().clone();
-				globals.set("use_time", attack.use_time)?;
-				globals.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
-				globals.set("user", user)?;
-				globals.set("nearby_characters", nearby_characters.clone())?;
-				globals.set("Heuristic", consider::HeuristicConstructor)?;
+				let environment = inherit_environment(lua)?;
+				environment.set("use_time", attack.use_time)?;
+				environment.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
+				environment.set("user", user)?;
+				environment.set("nearby_characters", nearby_characters.clone())?;
+				environment.set("Heuristic", consider::HeuristicConstructor)?;
 				let mut attack_considerations: consider::AttackList = lua
 					.load(on_consider.contents())
 					.set_name(on_consider.name(&attack.name))
-					.set_environment(globals)
+					.set_environment(environment)
 					.call(consider::AttackList::new(attack.clone()))?;
 				considerations.append(&mut attack_considerations.results);
 			}
@@ -446,7 +446,6 @@ impl Manager {
 				&spell.on_consider,
 			) {
 				let caster = next_character.clone();
-				let globals = lua.globals().clone();
 				let parameters = lua.create_table()?;
 				for (k, v) in &spell.parameters {
 					let k = k.as_ref();
@@ -458,14 +457,15 @@ impl Manager {
 					}
 				}
 
-				globals.set("parameters", parameters)?;
+				let environment = inherit_environment(lua)?;
+				environment.set("parameters", parameters)?;
 				// Maybe these should be members of the spell?
-				globals.set("level", spell.level)?;
-				globals.set("affinity", spell.affinity(&caster.borrow()))?;
-				globals.set("caster", caster)?;
-				globals.set("Heuristic", consider::HeuristicConstructor)?;
+				environment.set("level", spell.level)?;
+				environment.set("affinity", spell.affinity(&caster.borrow()))?;
+				environment.set("caster", caster)?;
+				environment.set("Heuristic", consider::HeuristicConstructor)?;
 
-				globals.set(
+				environment.set(
 					"nearby_characters",
 					lua.create_table_from(self.characters.iter().cloned().enumerate())?,
 				)?;
@@ -473,7 +473,7 @@ impl Manager {
 				let chunk = lua.load(on_consider.contents());
 				let mut spell_considerations: consider::SpellList = chunk
 					.set_name(on_consider.name(&spell.name))
-					.set_environment(globals)
+					.set_environment(environment)
 					.call(consider::SpellList::new(spell.clone()))?;
 				considerations.append(&mut spell_considerations.results);
 			}
@@ -481,6 +481,24 @@ impl Manager {
 
 		Ok(considerations)
 	}
+
+	pub fn consider_action(
+		&self,
+		lua: &mlua::Lua,
+		considerations: Vec<Consider>,
+	) -> mlua::Result<character::Action> {
+		// TODO: anything but this
+		match considerations.into_iter().next() {
+			Some(Consider::Attack(attack, _heuristics, parameters)) => {
+				Ok(character::Action::Attack(attack, Some(parameters)))
+			}
+			Some(Consider::Spell(spell, _heuristics, parameters)) => {
+				Ok(character::Action::Cast(spell, Some(parameters)))
+			}
+			None => Ok(character::Action::Wait(TURN)),
+		}
+	}
+
 	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
@@ -503,41 +521,42 @@ impl Manager {
 		match action {
 			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
 			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
-			character::Action::Attack(attack) => {
-				self.attack_piece(lua, attack, next_character, None)
+			character::Action::Attack(attack, parameters) => {
+				self.attack_piece(lua, attack, next_character, parameters)
 			}
-			character::Action::Cast(spell) => {
-				match spell.castable_by(&next_character.borrow()) {
+			character::Action::Cast(spell, parameters) => {
+				let castable = spell.castable_by(&next_character.borrow());
+				match castable {
 					spell::Castable::Yes => {
-						// Create a reference for the callback to use.
-						let caster = next_character.clone();
-						let affinity = spell.affinity(&caster.borrow());
+						let affinity = spell.affinity(&next_character.borrow());
 
-						let globals = lua.globals().clone();
-
-						let parameters = lua.create_table()?;
+						let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
+							Some(parameters) => parameters,
+							None => lua.create_table()?,
+						};
 						for (k, v) in &spell.parameters {
 							let k = k.as_ref();
 							match v {
 								spell::Parameter::Integer(v) => parameters.set(k, *v)?,
 								spell::Parameter::Expression(v) => {
-									parameters.set(k, u32::evalv(v, &*caster.borrow()))?
+									parameters.set(k, u32::evalv(v, &*next_character.borrow()))?
 								}
 							}
 						}
 
-						globals.set("parameters", parameters)?;
-						globals.set("caster", caster)?;
+						let environment = inherit_environment(lua)?;
+						environment.set("parameters", parameters)?;
+						environment.set("caster", next_character.clone())?;
 						// Maybe these should be members of the spell?
-						globals.set("level", spell.level)?;
-						globals.set("affinity", affinity)?;
+						environment.set("level", spell.level)?;
+						environment.set("affinity", affinity)?;
 
 						let chunk = lua.load(spell.on_cast.contents());
 						TurnOutcome::from_lua(
 							lua,
 							chunk
 								.set_name(spell.on_cast.name(&spell.name))
-								.set_environment(globals)
+								.set_environment(environment)
 								.eval()?,
 						)
 					}
@@ -568,7 +587,7 @@ impl Manager {
 		lua: &'lua mlua::Lua,
 		attack: Rc<Attack>,
 		user: &CharacterRef,
-		target: Option<&CharacterRef>,
+		parameters: Option<mlua::OwnedTable>,
 	) -> mlua::Result<TurnOutcome<'lua>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
@@ -580,18 +599,14 @@ impl Manager {
 			}
 			script::MaybeInline::Path(script::Script { path, contents: _ }) => path.clone(),
 		};
-		let globals = lua.globals().clone();
 
-		globals.set("user", user.clone())?;
-		if let Some(target) = target {
-			globals.set("target", target.clone())?;
-		} else {
-			globals.set("target", mlua::Nil)?;
-		}
-		globals.set("use_time", attack.use_time)?;
-		globals.set("magnitude", magnitude)?;
+		let environment = inherit_environment(lua)?;
+		environment.set("user", user.clone())?;
+		environment.set("parameters", parameters)?;
+		environment.set("use_time", attack.use_time)?;
+		environment.set("magnitude", magnitude)?;
 
-		let value: mlua::Value = chunk.set_name(name).set_environment(globals).eval()?;
+		let value: mlua::Value = chunk.set_name(name).set_environment(environment).eval()?;
 		TurnOutcome::from_lua(lua, value)
 	}
 
@@ -629,7 +644,15 @@ impl Manager {
 					.print_unimportant("You cannot perform any melee attacks right now.".into());
 				return Ok(TurnOutcome::Yield);
 			};
-			return self.attack_piece(lua, attack, character, Some(target_ref));
+			return self.attack_piece(
+				lua,
+				attack,
+				character,
+				Some(
+					lua.create_table_from([("target", target_ref.clone())].into_iter())?
+						.into_owned(),
+				),
+			);
 		}
 
 		let tile = self.current_floor.map.get(y, x);
@@ -651,4 +674,12 @@ impl Manager {
 			}
 		}
 	}
+}
+
+fn inherit_environment(lua: &mlua::Lua) -> Result<mlua::Table, mlua::Error> {
+	let environment = lua.create_table()?;
+	let environment_metatable = lua.create_table()?;
+	environment_metatable.set("__index", lua.globals())?;
+	environment.set_metatable(Some(environment_metatable));
+	Ok(environment)
 }

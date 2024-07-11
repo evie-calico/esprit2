@@ -1,17 +1,19 @@
 require("combat")
 
 return coroutine.create(function()
-	target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+	if parameters.target == nil then
+		parameters.target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+	end
 
-	if alliance_check(caster, target) and not alliance_prompt() then return end
+	if alliance_check(caster, parameters.target) and not alliance_prompt() then return end
 
 	local damage, pierce_failed = apply_damage_with_pierce(
 		parameters.pierce_threshold,
-		basic_magic_attack_against(target)
+		affinity:magnitude(parameters.magnitude) - parameters.target.stats.resistance
 	)
 
-	target.hp = target.hp - damage
-	caster.sp = target.sp - level
+	parameters.target.hp = parameters.target.hp - damage
+	caster.sp = caster.sp - level
 
 	local damage_messages = {
 		"{self_Address}'s magic missile strikes {target_address}",
@@ -40,7 +42,7 @@ return coroutine.create(function()
 	}
 
 	function pick(table)
-		return target:replace_prefixed_nouns(
+		return parameters.target:replace_prefixed_nouns(
 			"target_",
 			caster:replace_prefixed_nouns(
 				"self_",

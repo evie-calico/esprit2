@@ -1,20 +1,20 @@
 require("combat")
 
 return coroutine.create(function()
-	if target == nil then
-		target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1})
+	if parameters.target == nil then
+		parameters.target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1})
 	end
 
-	if alliance_check(user, target) then return end
+	if alliance_check(user, parameters.target) then return end
 
-	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - target.stats.defense)
+	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - parameters.target.stats.defense)
 
-	target.hp = target.hp - damage
+	parameters.target.hp = parameters.target.hp - damage
 	if damage > 0 or pierce_failed then
 		-- Apply a small bleeding effect even if damage is 0
 		-- to help weaker characters overcome their glancing blows
 		-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
-		target:inflict("bleed", 5 + damage);
+		parameters.target:inflict("bleed", 5 + damage);
 	end
 
 	damage_messages = {
@@ -35,7 +35,7 @@ return coroutine.create(function()
 	}
 
 	function pick(table)
-		return target:replace_prefixed_nouns(
+		return parameters.target:replace_prefixed_nouns(
 			"target_",
 			user:replace_prefixed_nouns(
 				"self_",

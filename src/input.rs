@@ -56,6 +56,7 @@ pub fn controllable_character(
 	next_character: world::CharacterRef,
 	world_manager: &mut world::Manager,
 	resources: &resource::Manager,
+	lua: &mlua::Lua,
 	mode: &mut Mode,
 	options: &Options,
 ) -> Result<Option<Response>> {
@@ -143,6 +144,13 @@ pub fn controllable_character(
 								.console
 								.say("Aris".into(), "I am a kitty :3".into());
 						}
+
+						if options.controls.autocombat.contains(keycode) {
+							let considerations = world_manager.consider_turn(lua).unwrap();
+							let action =
+								world_manager.consider_action(lua, considerations).unwrap();
+							next_character.borrow_mut().next_action = Some(action);
+						}
 					}
 					Mode::Attack => {
 						if options.controls.escape.contains(keycode) {
@@ -157,6 +165,7 @@ pub fn controllable_character(
 						{
 							next_character.next_action = Some(character::Action::Attack(
 								next_character.attacks[selected_index as usize].clone(),
+								None,
 							))
 						}
 						*mode = Mode::Normal;
@@ -174,6 +183,7 @@ pub fn controllable_character(
 						{
 							next_character.next_action = Some(character::Action::Cast(
 								next_character.spells[selected_index as usize].clone(),
+								None,
 							))
 						}
 						*mode = Mode::Normal;

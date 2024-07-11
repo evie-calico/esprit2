@@ -4,10 +4,13 @@ local considerations = ...
 
 for i, character in ipairs(nearby_characters) do
 	if not alliance_check(caster, character) then
-		considerations:push(Heuristic:damage(
-			character,
-			basic_magic_attack_against(character)
-		))
+		considerations:push(
+			{ target = character },
+			Heuristic:damage(
+				character,
+				affinity:magnitude(parameters.magnitude) - character.stats.resistance
+			)
+		)
 	end
 end
 
