@@ -4,6 +4,8 @@ spells = ["magic_missile", "debug/level_up", "debug/aff/neg_ord"]
 speed = 12
 icon = "luvui"
 
+on_consider = "scripts/consider/characters/basic.lua"
+
 [nouns]
 name = "Luvui"
 proper_name = true

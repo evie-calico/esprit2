@@ -485,10 +485,19 @@ impl Manager {
 	pub fn consider_action(
 		&self,
 		lua: &mlua::Lua,
+		character: CharacterRef,
 		considerations: Vec<Consider>,
 	) -> mlua::Result<character::Action> {
+		let considerations = consider::Considerations::new(considerations);
+		let environment = inherit_environment(lua)?;
+		environment.set("user", character.clone())?;
+		let consider = lua
+			.load(&character.borrow().sheet.on_consider.contents)
+			.set_name(character.borrow().sheet.on_consider.path.clone())
+			.set_environment(environment)
+			.call(considerations)?;
 		// TODO: anything but this
-		match considerations.into_iter().next() {
+		match consider {
 			Some(Consider::Attack(attack, _heuristics, parameters)) => {
 				Ok(character::Action::Attack(attack, Some(parameters)))
 			}

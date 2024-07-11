@@ -29,7 +29,27 @@ pub enum Heuristic {
 	},
 }
 
-impl mlua::UserData for Heuristic {}
+impl mlua::UserData for Heuristic {
+	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+		fields.add_field_method_get("target", |_, this| match this {
+			Heuristic::Damage { target, .. } => Ok(target.clone()),
+			Heuristic::Debuff { target, .. } => Ok(target.clone()),
+		});
+		fields.add_field_method_get("amount", |_, this| match this {
+			Heuristic::Damage { amount, .. } => Ok(*amount),
+			Heuristic::Debuff { amount, .. } => Ok(*amount),
+		});
+	}
+
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method("damage", |_, this, ()| {
+			Ok(matches!(this, Heuristic::Damage { .. }))
+		});
+		methods.add_method("debuff", |_, this, ()| {
+			Ok(matches!(this, Heuristic::Debuff { .. }))
+		});
+	}
+}
 
 pub struct HeuristicConstructor;
 
@@ -50,14 +70,56 @@ impl mlua::UserData for HeuristicConstructor {
 	}
 }
 
-#[derive(Clone, Debug)]
-/// These owned tables are relatively dangerous; don't put them in UserData!
+#[derive(Clone, Debug, mlua::FromLua)]
 pub enum Consider {
 	Attack(Rc<Attack>, Vec<Heuristic>, mlua::OwnedTable),
 	Spell(Rc<Spell>, Vec<Heuristic>, mlua::OwnedTable),
 }
 
-impl mlua::UserData for Consider {}
+impl mlua::UserData for Consider {
+	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+		fields.add_field_method_get("heuristics", |_, this| match this {
+			// TODO: All variants should have heuristics; move them out
+			Consider::Attack(_, heuristics, _) | Consider::Spell(_, heuristics, _) => {
+				// TODO: consume instead of cloning?
+				Ok(heuristics.clone())
+			}
+		});
+	}
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method("attack", |_, this, ()| {
+			Ok(matches!(this, Consider::Attack(..)))
+		});
+		methods.add_method("spell", |_, this, ()| {
+			Ok(matches!(this, Consider::Spell(..)))
+		});
+	}
+}
+
+#[derive(Clone, Debug, mlua::FromLua)]
+pub struct Considerations(Option<Vec<Consider>>);
+
+impl Considerations {
+	pub fn new(considerations: Vec<Consider>) -> Self {
+		Self(Some(considerations))
+	}
+}
+
+impl mlua::UserData for Considerations {
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_method_mut("for_each", |_, this, function: mlua::Function<'lua>| {
+			let Some(considerations) = this.0.take() else {
+				return Err(mlua::Error::runtime(
+					"Considerations list has been exhausted",
+				));
+			};
+			for consider in considerations {
+				let () = function.call(consider)?;
+			}
+			Ok(())
+		});
+	}
+}
 
 #[derive(Clone, Debug, mlua::FromLua)]
 pub struct AttackList {

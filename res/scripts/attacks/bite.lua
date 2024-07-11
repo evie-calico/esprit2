@@ -1,19 +1,19 @@
 require("combat")
 
 return coroutine.create(function()
-	if target == nil then
-		target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1 })
+	if parameters.target == nil then
+		parameters.target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1 })
 	end
 
-	if alliance_check(user, target) then return end
+	if alliance_check(user, parameters.target) then return end
 
 	-- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-	local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - target.stats.defense)
+	local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - parameters.target.stats.defense)
 
 	-- Biting requires you to get closer to the enemy, lowering your physical defense.
 	user:inflict("close_combat")
 
-	target.hp = target.hp - damage
+	parameters.target.hp = parameters.target.hp - damage
 
 	damage_messages = {
 		"{self_Address} bites {target_address}",
@@ -31,7 +31,7 @@ return coroutine.create(function()
 	}
 
 	function pick(table)
-		return target:replace_prefixed_nouns(
+		return parameters.target:replace_prefixed_nouns(
 			"target_",
 			user:replace_prefixed_nouns(
 				"self_",

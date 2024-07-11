@@ -147,8 +147,9 @@ pub fn controllable_character(
 
 						if options.controls.autocombat.contains(keycode) {
 							let considerations = world_manager.consider_turn(lua).unwrap();
-							let action =
-								world_manager.consider_action(lua, considerations).unwrap();
+							let action = world_manager
+								.consider_action(lua, next_character.clone(), considerations)
+								.unwrap();
 							next_character.borrow_mut().next_action = Some(action);
 						}
 					}

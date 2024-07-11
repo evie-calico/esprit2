@@ -4,6 +4,8 @@ spells = []
 speed = 12
 icon = "aris"
 
+on_consider = "scripts/consider/characters/basic.lua"
+
 [nouns]
 name = "Aris"
 proper_name = true

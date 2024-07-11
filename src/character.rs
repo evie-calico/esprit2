@@ -397,6 +397,9 @@ mod sheet {
 		pub attacks: Vec<String>,
 		#[alua(get)]
 		pub spells: Vec<String>,
+
+		/// Script to decide on an action from a list of considerations
+		pub on_consider: Script,
 	}
 }
 
