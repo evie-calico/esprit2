@@ -1,4 +1,4 @@
-#![feature(ascii_char, path_file_prefix, lint_reasons, let_chains, once_cell_try)]
+#![feature(ascii_char, path_file_prefix, let_chains, once_cell_try)]
 #![warn(
 	clippy::module_name_repetitions,
 	clippy::items_after_statements,

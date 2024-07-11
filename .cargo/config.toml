@@ -1,0 +1,5 @@
+build.target = "x86_64-unknown-linux-gnu"
+
+[unstable]
+build-std = ["core", "std", "alloc", "proc_macro", "test"]
+build-std-features = ["core/debug_refcell"]

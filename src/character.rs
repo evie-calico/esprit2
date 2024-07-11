@@ -108,31 +108,32 @@ impl std::ops::DerefMut for Ref {
 
 impl mlua::UserData for Ref {
 	fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+		macro_rules! get {
+			($field:ident) => {
+				fields.add_field_method_get(stringify!($field), |_, this| Ok(this.borrow().$field.clone()));
+			};
+			($($field:ident),+$(,)?) => {
+				$( get! { $field } )+
+			}
+		}
+		macro_rules! set {
+			($field:ident) => {
+				fields.add_field_method_set(stringify!($field), |_, this, value| {
+					this.borrow_mut().$field = value;
+					Ok(())
+				});
+			};
+			($($field:ident),+$(,)?) => {
+				$( set! { $field } )+
+			}
+		}
 		fields.add_field_method_get("sheet", |_, this| Ok(this.borrow().sheet.clone()));
 		fields.add_field_method_get("stats", |_, this| Ok(this.borrow().stats()));
-		fields.add_field_method_get("hp", |_, this| Ok(this.borrow().hp));
-		fields.add_field_method_get("sp", |_, this| Ok(this.borrow().sp));
-		fields.add_field_method_get("x", |_, this| Ok(this.borrow().x));
-		fields.add_field_method_get("y", |_, this| Ok(this.borrow().y));
 		fields.add_field_method_get("alliance", |_, this| Ok(this.borrow().alliance as u32));
-
-		fields.add_field_method_set("hp", |_, this, value| {
-			this.borrow_mut().hp = value;
-			Ok(())
-		});
-		fields.add_field_method_set("sp", |_, this, value| {
-			this.borrow_mut().sp = value;
-			Ok(())
-		});
-		fields.add_field_method_set("x", |_, this, value| {
-			this.borrow_mut().x = value;
-			Ok(())
-		});
-		fields.add_field_method_set("y", |_, this, value| {
-			this.borrow_mut().y = value;
-			Ok(())
-		});
+		get!(hp, sp, x, y);
+		set!(hp, sp, x, y);
 	}
+
 	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_method("replace_nouns", |_, this, s: String| {
 			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
