@@ -1,9 +1,7 @@
 require("combat")
 
 return coroutine.create(function()
-	if target == nil then
-		target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
-	end
+	target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
 
 	if alliance_check(caster, target) and not alliance_prompt() then return end
 

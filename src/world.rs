@@ -430,14 +430,13 @@ impl Manager {
 				globals.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
 				globals.set("user", user)?;
 				globals.set("nearby_characters", nearby_characters.clone())?;
-				let attack_considerations: consider::AttackList = lua
+				globals.set("Heuristic", consider::HeuristicConstructor)?;
+				let mut attack_considerations: consider::AttackList = lua
 					.load(on_consider.contents())
 					.set_name(on_consider.name(&attack.name))
 					.set_environment(globals)
-					.call(consider::AttackList::default())?;
-				for i in attack_considerations.0 {
-					considerations.push(Consider::Attack(attack.clone(), i));
-				}
+					.call(consider::AttackList::new(attack.clone()))?;
+				considerations.append(&mut attack_considerations.results);
 			}
 		}
 
@@ -446,11 +445,8 @@ impl Manager {
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
 			) {
-				// Create a reference for the callback to use.
 				let caster = next_character.clone();
-
 				let globals = lua.globals().clone();
-
 				let parameters = lua.create_table()?;
 				for (k, v) in &spell.parameters {
 					let k = k.as_ref();
@@ -467,6 +463,7 @@ impl Manager {
 				globals.set("level", spell.level)?;
 				globals.set("affinity", spell.affinity(&caster.borrow()))?;
 				globals.set("caster", caster)?;
+				globals.set("Heuristic", consider::HeuristicConstructor)?;
 
 				globals.set(
 					"nearby_characters",
@@ -474,13 +471,11 @@ impl Manager {
 				)?;
 
 				let chunk = lua.load(on_consider.contents());
-				let spell_considerations: consider::SpellList = chunk
+				let mut spell_considerations: consider::SpellList = chunk
 					.set_name(on_consider.name(&spell.name))
 					.set_environment(globals)
-					.call(consider::SpellList::default())?;
-				for i in spell_considerations.0 {
-					considerations.push(Consider::Spell(spell.clone(), i));
-				}
+					.call(consider::SpellList::new(spell.clone()))?;
+				considerations.append(&mut spell_considerations.results);
 			}
 		}
 

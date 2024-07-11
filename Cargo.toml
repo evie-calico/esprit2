@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # Lua scripting
 alua = { version = "0.1.3", features = ["userdata"] }
-mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize", "vendored"] }
+mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize", "unstable", "vendored"] }
 
 # Parser generator for expression.rs
 pest = "2.7.10"

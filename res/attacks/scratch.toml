@@ -9,4 +9,4 @@ source = "scripts/attacks/scratch.lua"
 
 [on_consider]
 type = "Path"
-source = "scripts/consider/melee_attack.lua"
+source = "scripts/consider/scratch.lua"
