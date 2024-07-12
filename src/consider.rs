@@ -27,17 +27,35 @@ pub enum Heuristic {
 		target: world::CharacterRef,
 		amount: u32,
 	},
+	Move {
+		x: i32,
+		y: i32,
+	},
+}
+
+fn wrong_variant() -> mlua::Error {
+	mlua::Error::runtime("attempted to retrieve missing field from heuristic variant")
 }
 
 impl mlua::UserData for Heuristic {
 	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+		fields.add_field_method_get("x", |_, this| match this {
+			Heuristic::Move { x, .. } => Ok(*x),
+			Heuristic::Damage { .. } | Heuristic::Debuff { .. } => Err(wrong_variant()),
+		});
+		fields.add_field_method_get("y", |_, this| match this {
+			Heuristic::Move { y, .. } => Ok(*y),
+			Heuristic::Damage { .. } | Heuristic::Debuff { .. } => Err(wrong_variant()),
+		});
 		fields.add_field_method_get("target", |_, this| match this {
-			Heuristic::Damage { target, .. } => Ok(target.clone()),
-			Heuristic::Debuff { target, .. } => Ok(target.clone()),
+			Heuristic::Damage { target, .. } | Heuristic::Debuff { target, .. } => {
+				Ok(target.clone())
+			}
+			Heuristic::Move { .. } => Err(wrong_variant()),
 		});
 		fields.add_field_method_get("amount", |_, this| match this {
-			Heuristic::Damage { amount, .. } => Ok(*amount),
-			Heuristic::Debuff { amount, .. } => Ok(*amount),
+			Heuristic::Damage { amount, .. } | Heuristic::Debuff { amount, .. } => Ok(*amount),
+			Heuristic::Move { .. } => Err(wrong_variant()),
 		});
 	}
 
@@ -71,27 +89,21 @@ impl mlua::UserData for HeuristicConstructor {
 }
 
 #[derive(Clone, Debug, mlua::FromLua)]
-pub enum Consider {
-	Attack(Rc<Attack>, Vec<Heuristic>, mlua::OwnedTable),
-	Spell(Rc<Spell>, Vec<Heuristic>, mlua::OwnedTable),
+pub struct Consider {
+	pub action: character::Action,
+	pub heuristics: Vec<Heuristic>,
 }
 
 impl mlua::UserData for Consider {
 	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
-		fields.add_field_method_get("heuristics", |_, this| match this {
-			// TODO: All variants should have heuristics; move them out
-			Consider::Attack(_, heuristics, _) | Consider::Spell(_, heuristics, _) => {
-				// TODO: consume instead of cloning?
-				Ok(heuristics.clone())
-			}
-		});
+		fields.add_field_method_get("heuristics", |_, this| Ok(this.heuristics.clone()));
 	}
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_method("attack", |_, this, ()| {
-			Ok(matches!(this, Consider::Attack(..)))
+			Ok(matches!(this.action, character::Action::Attack(..)))
 		});
 		methods.add_method("spell", |_, this, ()| {
-			Ok(matches!(this, Consider::Spell(..)))
+			Ok(matches!(this.action, character::Action::Cast(..)))
 		});
 	}
 }
@@ -141,11 +153,10 @@ impl mlua::UserData for AttackList {
 		methods.add_method_mut(
 			"push",
 			|_, this, (table, heuristics): (mlua::OwnedTable, mlua::Variadic<Heuristic>)| {
-				this.results.push(Consider::Attack(
-					this.base.clone(),
-					heuristics.into_iter().collect(),
-					table,
-				));
+				this.results.push(Consider {
+					action: character::Action::Attack(this.base.clone(), Some(table)),
+					heuristics: heuristics.into_iter().collect(),
+				});
 				Ok(())
 			},
 		);
@@ -172,11 +183,10 @@ impl mlua::UserData for SpellList {
 		methods.add_method_mut(
 			"push",
 			|_, this, (table, heuristics): (mlua::OwnedTable, mlua::Variadic<Heuristic>)| {
-				this.results.push(Consider::Spell(
-					this.base.clone(),
-					heuristics.into_iter().collect(),
-					table,
-				));
+				this.results.push(Consider {
+					action: character::Action::Cast(this.base.clone(), Some(table)),
+					heuristics: heuristics.into_iter().collect(),
+				});
 				Ok(())
 			},
 		);

@@ -400,11 +400,7 @@ pub enum TurnOutcome<'lua> {
 
 impl Manager {
 	pub fn consider_turn(&mut self, lua: &mlua::Lua) -> mlua::Result<Vec<Consider>> {
-		let next_character = self.next_character();
-
-		let mut considerations = Vec::new();
-
-		let nearby_characters = [
+		let directions = [
 			OrdDir::Up,
 			OrdDir::UpRight,
 			OrdDir::Right,
@@ -413,15 +409,54 @@ impl Manager {
 			OrdDir::DownLeft,
 			OrdDir::Left,
 			OrdDir::UpLeft,
-		]
-		.into_iter()
-		.filter_map(|dir| {
-			let (x, y) = dir.as_offset();
-			let character = next_character.borrow();
-			self.get_character_at(x + character.x, y + character.y)
-		})
-		.cloned()
-		.collect::<Vec<_>>();
+		];
+		let next_character = self.next_character();
+
+		let mut considerations = Vec::new();
+
+		for character in self
+			.characters
+			.iter()
+			.filter(|x| x.borrow().alliance != next_character.borrow().alliance)
+		{
+			use character::OrdDir;
+			use std::cmp::Ordering;
+			let character = character.borrow();
+			let next_character = next_character.borrow();
+			let x = character.x;
+			let y = character.y;
+			let dir = match x.cmp(&next_character.x) {
+				Ordering::Less => match y.cmp(&next_character.y) {
+					Ordering::Less => OrdDir::UpLeft,
+					Ordering::Equal => OrdDir::Left,
+					Ordering::Greater => OrdDir::DownLeft,
+				},
+				Ordering::Equal => match y.cmp(&next_character.y) {
+					Ordering::Less => OrdDir::Up,
+					Ordering::Equal => continue,
+					Ordering::Greater => OrdDir::Down,
+				},
+				Ordering::Greater => match y.cmp(&next_character.y) {
+					Ordering::Less => OrdDir::UpRight,
+					Ordering::Equal => OrdDir::Right,
+					Ordering::Greater => OrdDir::DownRight,
+				},
+			};
+			considerations.push(Consider {
+				action: character::Action::Move(dir),
+				heuristics: vec![consider::Heuristic::Move { x, y }],
+			})
+		}
+
+		let nearby_characters = directions
+			.into_iter()
+			.filter_map(|dir| {
+				let (x, y) = dir.as_offset();
+				let character = next_character.borrow();
+				self.get_character_at(x + character.x, y + character.y)
+			})
+			.cloned()
+			.collect::<Vec<_>>();
 		for attack in &next_character.borrow().attacks {
 			if let Some(on_consider) = &attack.on_consider {
 				let user = next_character.clone();
@@ -491,21 +526,13 @@ impl Manager {
 		let considerations = consider::Considerations::new(considerations);
 		let environment = inherit_environment(lua)?;
 		environment.set("user", character.clone())?;
-		let consider = lua
+		Ok(lua
 			.load(&character.borrow().sheet.on_consider.contents)
 			.set_name(character.borrow().sheet.on_consider.path.clone())
 			.set_environment(environment)
-			.call(considerations)?;
-		// TODO: anything but this
-		match consider {
-			Some(Consider::Attack(attack, _heuristics, parameters)) => {
-				Ok(character::Action::Attack(attack, Some(parameters)))
-			}
-			Some(Consider::Spell(spell, _heuristics, parameters)) => {
-				Ok(character::Action::Cast(spell, Some(parameters)))
-			}
-			None => Ok(character::Action::Wait(TURN)),
-		}
+			.call::<_, Option<Consider>>(considerations)?
+			.map(|x| x.action)
+			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
 	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {

@@ -259,34 +259,6 @@ pub fn main() {
 				let mut debug =
 					gui::Context::new(&mut canvas, &typography, Rect::new(0, 0, 100, 400));
 				debug.label(&format!("FPS: {fps:.0}"));
-				for i in world_manager.consider_turn(&lua).unwrap() {
-					match i {
-						Consider::Attack(attack, heuristics, _parameters) => debug.label(&format!(
-							"Attack {} ({})",
-							attack.name,
-							heuristics
-								.iter()
-								.fold(String::new(), |a, heuristic| match heuristic {
-									consider::Heuristic::Damage { amount, .. } =>
-										format!("{a}{amount} damage "),
-									consider::Heuristic::Debuff { amount, .. } =>
-										format!("{a}{amount} debuff "),
-								}),
-						)),
-						Consider::Spell(spell, heuristics, _parameters) => debug.label(&format!(
-							"Cast {} ({})",
-							spell.name,
-							heuristics
-								.iter()
-								.fold(String::new(), |a, heuristic| match heuristic {
-									consider::Heuristic::Damage { amount, .. } =>
-										format!("{a}{amount} damage "),
-									consider::Heuristic::Debuff { amount, .. } =>
-										format!("{a}{amount} debuff "),
-								}),
-						)),
-					}
-				}
 				for i in &world_manager.characters {
 					debug.label(&format!(
 						"{} delay: {}",
