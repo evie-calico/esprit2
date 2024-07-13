@@ -316,7 +316,7 @@ impl OrdDir {
 #[derive(Clone, Debug)]
 pub enum Action {
 	Wait(Aut),
-	Move(OrdDir),
+	Move(i32, i32),
 	Attack(Rc<Attack>, Option<mlua::OwnedTable>),
 	Cast(Rc<Spell>, Option<mlua::OwnedTable>),
 }

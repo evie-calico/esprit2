@@ -2,6 +2,7 @@ use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -419,31 +420,11 @@ impl Manager {
 			.iter()
 			.filter(|x| x.borrow().alliance != next_character.borrow().alliance)
 		{
-			use character::OrdDir;
-			use std::cmp::Ordering;
 			let character = character.borrow();
-			let next_character = next_character.borrow();
 			let x = character.x;
 			let y = character.y;
-			let dir = match x.cmp(&next_character.x) {
-				Ordering::Less => match y.cmp(&next_character.y) {
-					Ordering::Less => OrdDir::UpLeft,
-					Ordering::Equal => OrdDir::Left,
-					Ordering::Greater => OrdDir::DownLeft,
-				},
-				Ordering::Equal => match y.cmp(&next_character.y) {
-					Ordering::Less => OrdDir::Up,
-					Ordering::Equal => continue,
-					Ordering::Greater => OrdDir::Down,
-				},
-				Ordering::Greater => match y.cmp(&next_character.y) {
-					Ordering::Less => OrdDir::UpRight,
-					Ordering::Equal => OrdDir::Right,
-					Ordering::Greater => OrdDir::DownRight,
-				},
-			};
 			considerations.push(Consider {
-				action: character::Action::Move(dir),
+				action: character::Action::Move(x, y),
 				heuristics: vec![consider::Heuristic::Move { x, y }],
 			})
 		}
@@ -556,7 +537,28 @@ impl Manager {
 
 		match action {
 			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
-			character::Action::Move(dir) => self.move_piece(lua, next_character, dir),
+			character::Action::Move(x, y) => {
+				let dir = {
+					let next_character = next_character.borrow();
+					match x.cmp(&next_character.x) {
+						Ordering::Less => match y.cmp(&next_character.y) {
+							Ordering::Less => OrdDir::UpLeft,
+							Ordering::Equal => OrdDir::Left,
+							Ordering::Greater => OrdDir::DownLeft,
+						},
+						Ordering::Equal => match y.cmp(&next_character.y) {
+							Ordering::Less => OrdDir::Up,
+							Ordering::Equal | Ordering::Greater => OrdDir::Down,
+						},
+						Ordering::Greater => match y.cmp(&next_character.y) {
+							Ordering::Less => OrdDir::UpRight,
+							Ordering::Equal => OrdDir::Right,
+							Ordering::Greater => OrdDir::DownRight,
+						},
+					}
+				};
+				self.move_piece(lua, next_character, dir)
+			}
 			character::Action::Attack(attack, parameters) => {
 				self.attack_piece(lua, attack, next_character, parameters)
 			}
@@ -628,21 +630,21 @@ impl Manager {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
-		let chunk = lua.load(attack.on_use.contents());
-		let name = match &attack.on_use {
-			script::MaybeInline::Inline(_) => {
-				format!("{} (inline)", attack.name)
-			}
-			script::MaybeInline::Path(script::Script { path, contents: _ }) => path.clone(),
+		let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
+			Some(parameters) => parameters,
+			None => lua.create_table()?,
 		};
-
 		let environment = inherit_environment(lua)?;
 		environment.set("user", user.clone())?;
 		environment.set("parameters", parameters)?;
 		environment.set("use_time", attack.use_time)?;
 		environment.set("magnitude", magnitude)?;
 
-		let value: mlua::Value = chunk.set_name(name).set_environment(environment).eval()?;
+		let value: mlua::Value = lua
+			.load(attack.on_use.contents())
+			.set_name(attack.on_use.name(&attack.name))
+			.set_environment(environment)
+			.eval()?;
 		TurnOutcome::from_lua(lua, value)
 	}
 

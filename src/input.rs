@@ -90,19 +90,23 @@ pub fn controllable_character(
 							return Ok(Some(Response::Fullscreen));
 						}
 						let directions = [
-							(&options.controls.left, character::OrdDir::Left),
-							(&options.controls.right, character::OrdDir::Right),
-							(&options.controls.up, character::OrdDir::Up),
-							(&options.controls.down, character::OrdDir::Down),
-							(&options.controls.up_left, character::OrdDir::UpLeft),
-							(&options.controls.up_right, character::OrdDir::UpRight),
-							(&options.controls.down_left, character::OrdDir::DownLeft),
-							(&options.controls.down_right, character::OrdDir::DownRight),
+							(&options.controls.left, -1, 0),
+							(&options.controls.right, 1, 0),
+							(&options.controls.up, 0, -1),
+							(&options.controls.down, 0, 1),
+							(&options.controls.up_left, -1, -1),
+							(&options.controls.up_right, 1, -1),
+							(&options.controls.down_left, -1, 1),
+							(&options.controls.down_right, 1, 1),
 						];
-						for (triggers, direction) in directions {
+						for (triggers, xoff, yoff) in directions {
 							if triggers.contains(keycode) {
+								let (x, y) = {
+									let next_character = next_character.borrow();
+									(next_character.x, next_character.y)
+								};
 								next_character.borrow_mut().next_action =
-									Some(character::Action::Move(direction));
+									Some(character::Action::Move(x + xoff, y + yoff));
 							}
 						}
 
@@ -146,10 +150,12 @@ pub fn controllable_character(
 						}
 
 						if options.controls.autocombat.contains(keycode) {
-							let considerations = world_manager.consider_turn(lua).unwrap();
-							let action = world_manager
-								.consider_action(lua, next_character.clone(), considerations)
-								.unwrap();
+							let considerations = world_manager.consider_turn(lua)?;
+							let action = world_manager.consider_action(
+								lua,
+								next_character.clone(),
+								considerations,
+							)?;
 							next_character.borrow_mut().next_action = Some(action);
 						}
 					}
