@@ -1,5 +1,5 @@
 [board]
-scale = 4
+scale = 3
 
 [ui]
 pamphlet_width = 400
@@ -34,9 +34,12 @@ up_right = ["U", "Keypad 9"]
 down_left = ["B", "Keypad 1"]
 down_right = ["N", "Keypad 3"]
 talk = ["T"]
+autocombat = ["Tab"]
 attack = ["V"]
 cast = ["C"]
 underfoot = ["."]
+yes = ["Y"]
+no = ["N"]
 confirm = ["Return"]
 escape = ["Escape"]
 fullscreen = ["F11"]

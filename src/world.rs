@@ -246,28 +246,37 @@ impl Manager {
 			(None, _) => self.next_turn(lua)?,
 		};
 
-		match outcome {
-			TurnOutcome::Yield => Ok(None),
-			TurnOutcome::Action { delay } => {
-				#[allow(
-					clippy::unwrap_used,
-					reason = "next_turn already indexes the first element"
-				)]
-				let character = self.characters.pop_front().unwrap();
-				character.borrow_mut().action_delay = delay;
-				// Insert the character into the queue,
-				// immediately before the first character to have a higher action delay.
-				// This assumes that the queue is sorted.
-				self.characters.insert(
-					self.characters
-						.iter()
-						.enumerate()
-						.find(|x| x.1.borrow().action_delay > delay)
-						.map(|x| x.0)
-						.unwrap_or(self.characters.len()),
-					character,
-				);
+		let player_controlled = self.next_character().borrow().player_controlled;
+		let mut apply_delay = |delay| {
+			#[allow(
+				clippy::unwrap_used,
+				reason = "next_turn already indexes the first element"
+			)]
+			let character = self.characters.pop_front().unwrap();
+			character.borrow_mut().action_delay = delay;
+			// Insert the character into the queue,
+			// immediately before the first character to have a higher action delay.
+			// This assumes that the queue is sorted.
+			self.characters.insert(
+				self.characters
+					.iter()
+					.enumerate()
+					.find(|x| x.1.borrow().action_delay > delay)
+					.map(|x| x.0)
+					.unwrap_or(self.characters.len()),
+				character,
+			);
+		};
 
+		match outcome {
+			TurnOutcome::Yield => {
+				if !player_controlled {
+					apply_delay(TURN);
+				}
+				Ok(None)
+			}
+			TurnOutcome::Action { delay } => {
+				apply_delay(delay);
 				Ok(None)
 			}
 			TurnOutcome::Request(request) => {

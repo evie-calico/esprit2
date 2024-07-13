@@ -127,11 +127,11 @@ pub fn main() {
 	loop {
 		// Input processing
 		{
-			let next_character = world_manager.next_character();
+			let next_character = world_manager.next_character().clone();
 			if next_character.borrow().player_controlled {
 				match input::controllable_character(
 					&mut event_pump,
-					next_character.clone(),
+					next_character,
 					&mut world_manager,
 					&resources,
 					&lua,
@@ -157,7 +157,11 @@ pub fn main() {
 					}
 				}
 			} else {
-				next_character.borrow_mut().next_action = Some(character::Action::Wait(100))
+				let considerations = world_manager.consider_turn(&lua).unwrap();
+				let action = world_manager
+					.consider_action(&lua, next_character, considerations)
+					.unwrap();
+				world_manager.next_character().borrow_mut().next_action = Some(action);
 			}
 		}
 		// Logic
