@@ -193,7 +193,7 @@ pub fn main() {
 			soul_jar.tick(delta as f32);
 			cloudy_wave.tick(delta);
 			if let input::Mode::Cursor { state, .. } = &mut input_mode {
-				state.float.increment(delta);
+				state.float.increment(delta * 0.75);
 			}
 		}
 

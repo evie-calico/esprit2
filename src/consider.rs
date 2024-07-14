@@ -75,8 +75,11 @@ impl mlua::UserData for HeuristicConstructor {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_method(
 			"damage",
-			|_, _, (target, amount): (world::CharacterRef, u32)| {
-				Ok(Heuristic::Damage { target, amount })
+			|_, _, (target, amount): (world::CharacterRef, mlua::Integer)| {
+				Ok(Heuristic::Damage {
+					target,
+					amount: amount.try_into().unwrap_or_default(),
+				})
 			},
 		);
 		methods.add_method(

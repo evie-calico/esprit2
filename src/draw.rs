@@ -9,8 +9,10 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::f64::consts::{PI, TAU};
 
-const TILE_SIZE: u32 = 16;
+const TILE_SIZE: u32 = 12;
 const ITILE_SIZE: i32 = TILE_SIZE as i32;
+const PIECE_SIZE: u32 = 16;
+const IPIECE_SIZE: i32 = PIECE_SIZE as i32;
 
 #[derive(Clone, Debug, Default)]
 pub struct Camera {
@@ -59,10 +61,10 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, came
 					.unwrap(),
 				floor::Tile::Exit => canvas
 					.draw_rect(Rect::new(
-						(x as i32) * ITILE_SIZE + 4 - camera.x,
-						(y as i32) * ITILE_SIZE + 4 - camera.y,
-						TILE_SIZE - 8,
-						TILE_SIZE - 8,
+						(x as i32) * ITILE_SIZE + 2 - camera.x,
+						(y as i32) * ITILE_SIZE + 2 - camera.y,
+						TILE_SIZE - 4,
+						TILE_SIZE - 4,
 					))
 					.unwrap(),
 			}
@@ -91,12 +93,11 @@ pub fn cursor(
 
 		let cursor = resources.get_texture("cursor");
 		let cursor_info = cursor.query();
-		let cursor_scale = TILE_SIZE / 16;
-		let cursor_width = cursor_info.width * cursor_scale;
-		let cursor_height = cursor_info.height * cursor_scale;
+		let cursor_width = cursor_info.width;
+		let cursor_height = cursor_info.height;
 		let right_offset = ITILE_SIZE - cursor_width as i32;
 		let bottom_offset = ITILE_SIZE - cursor_height as i32;
-		let float = ((float.sin() + 1.0) * ((TILE_SIZE / 16) as f64)) as i32;
+		let float = ((float.sin() + 2.0) * 2.0) as i32;
 
 		for side in [
 			Side::TopLeft,
@@ -142,12 +143,12 @@ pub fn characters(
 		canvas
 			.copy(
 				resources.get_texture(&character.sheet.icon),
-				Some(Rect::new(0, 0, 16, 16)),
+				Some(Rect::new(0, 0, PIECE_SIZE, PIECE_SIZE)),
 				Some(Rect::new(
-					character.x * ITILE_SIZE - camera.x,
-					character.y * ITILE_SIZE - camera.y,
-					TILE_SIZE,
-					TILE_SIZE,
+					character.x * ITILE_SIZE - camera.x - (IPIECE_SIZE - ITILE_SIZE) / 2,
+					character.y * ITILE_SIZE - camera.y - (IPIECE_SIZE - ITILE_SIZE),
+					PIECE_SIZE,
+					PIECE_SIZE,
 				)),
 			)
 			.unwrap();
