@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 /// (A u8 would be limited to about 20 turns of unencumbered movement)
 type Distance = u16;
 
-const UNEXPLORED: u16 = u16::MAX;
-const IMPASSABLE: u16 = u16::MAX - 1;
+pub const UNEXPLORED: u16 = u16::MAX;
+pub const IMPASSABLE: u16 = u16::MAX - 1;
 
 /// A grid of distances from an arbitrary number of targets.
 #[derive(Clone, Debug)]
@@ -65,7 +65,12 @@ impl DijkstraMap {
 		map
 	}
 
-	pub fn explore(&mut self, x: usize, y: usize, floor: &Floor) {
+	pub fn explore(
+		&mut self,
+		x: usize,
+		y: usize,
+		evaluate_tile: impl Fn(usize, usize, Distance) -> Distance,
+	) {
 		// TODO: better heuristics for searching frontier
 		while let Some(next) = self.frontier.pop_front() {
 			let base_distance = self
@@ -79,11 +84,7 @@ impl DijkstraMap {
 					&& let Some(tile) = self.get(ax, ay)
 					&& tile != IMPASSABLE
 				{
-					let floor_tile = floor.map.get(ay, ax).expect("floor/map size mismatch");
-					let distance = match floor_tile {
-						floor::Tile::Floor | floor::Tile::Exit => base_distance + 1,
-						floor::Tile::Wall => IMPASSABLE,
-					};
+					let distance = evaluate_tile(ax, ay, base_distance);
 					if distance < tile {
 						self.explore_tile(ax, ay, distance);
 					}
@@ -98,14 +99,7 @@ impl DijkstraMap {
 
 /// Usage
 impl DijkstraMap {
-	pub fn step(&mut self, x: i32, y: i32, floor: &Floor) -> Option<OrdDir> {
-		{
-			let x: usize = x.try_into().ok()?;
-			let y: usize = y.try_into().ok()?;
-			if self.get(x, y)? == UNEXPLORED {
-				self.explore(x, y, floor);
-			}
-		}
+	pub fn step(&mut self, x: i32, y: i32) -> Option<OrdDir> {
 		OrdDir::all()
 			.fold(None, |a: Option<(OrdDir, Distance)>, direction: OrdDir| {
 				let (xoff, yoff) = direction.as_offset();

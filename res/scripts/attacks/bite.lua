@@ -5,7 +5,7 @@ return coroutine.create(function()
 		parameters.target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1 })
 	end
 
-	if alliance_check(user, parameters.target) then return end
+	if alliance_check(user, parameters.target) and not alliance_prompt() then return end
 
 	-- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
 	local damage, pierce_failed = apply_damage_with_pierce(4, magnitude - parameters.target.stats.defense)

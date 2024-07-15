@@ -534,6 +534,7 @@ impl Manager {
 		match action {
 			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
 			character::Action::Move(x, y) => {
+				// TODO: Don't use a dijkstra map for 1-tile distances.
 				let mut dijkstra = astar::DijkstraMap::target(
 					self.current_floor.map.cols(),
 					self.current_floor.map.rows(),
@@ -543,7 +544,28 @@ impl Manager {
 					let next_character = next_character.borrow();
 					(next_character.x, next_character.y)
 				};
-				if let Some(direction) = dijkstra.step(x, y, &self.current_floor) {
+				if let Ok(x) = x.try_into()
+					&& let Ok(y) = y.try_into()
+				{
+					dijkstra.explore(x, y, |x, y, base| {
+						if let Some(character) = self.get_character_at(x as i32, y as i32)
+							&& character.as_ptr() != next_character.as_ptr()
+							&& character.borrow().alliance == next_character.borrow().alliance
+						{
+							return astar::IMPASSABLE;
+						}
+						match self
+							.current_floor
+							.map
+							.get(y, x)
+							.expect("dijkstra map size mismatch")
+						{
+							floor::Tile::Floor | floor::Tile::Exit => base + 1,
+							floor::Tile::Wall => astar::IMPASSABLE,
+						}
+					});
+				}
+				if let Some(direction) = dijkstra.step(x, y) {
 					self.move_piece(lua, next_character, direction)
 				} else {
 					Ok(TurnOutcome::Yield)

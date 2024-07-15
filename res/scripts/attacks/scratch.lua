@@ -5,7 +5,7 @@ return coroutine.create(function()
 		parameters.target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1})
 	end
 
-	if alliance_check(user, parameters.target) then return end
+	if alliance_check(user, parameters.target) and not alliance_prompt() then return end
 
 	local damage, pierce_failed = apply_damage_with_pierce(1, magnitude - parameters.target.stats.defense)
 
