@@ -1,8 +1,6 @@
-use crate::character::OrdDir;
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -410,16 +408,6 @@ pub enum TurnOutcome<'lua> {
 
 impl Manager {
 	pub fn consider_turn(&mut self, lua: &mlua::Lua) -> mlua::Result<Vec<Consider>> {
-		let directions = [
-			OrdDir::Up,
-			OrdDir::UpRight,
-			OrdDir::Right,
-			OrdDir::DownRight,
-			OrdDir::Down,
-			OrdDir::DownLeft,
-			OrdDir::Left,
-			OrdDir::UpLeft,
-		];
 		let next_character = self.next_character();
 
 		let mut considerations = Vec::new();
@@ -438,8 +426,7 @@ impl Manager {
 			})
 		}
 
-		let nearby_characters = directions
-			.into_iter()
+		let nearby_characters = OrdDir::all()
 			.filter_map(|dir| {
 				let (x, y) = dir.as_offset();
 				let character = next_character.borrow();
@@ -547,26 +534,20 @@ impl Manager {
 		match action {
 			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
 			character::Action::Move(x, y) => {
-				let dir = {
+				let mut dijkstra = astar::DijkstraMap::target(
+					self.current_floor.map.cols(),
+					self.current_floor.map.rows(),
+					&[(x, y)],
+				);
+				let (x, y) = {
 					let next_character = next_character.borrow();
-					match x.cmp(&next_character.x) {
-						Ordering::Less => match y.cmp(&next_character.y) {
-							Ordering::Less => OrdDir::UpLeft,
-							Ordering::Equal => OrdDir::Left,
-							Ordering::Greater => OrdDir::DownLeft,
-						},
-						Ordering::Equal => match y.cmp(&next_character.y) {
-							Ordering::Less => OrdDir::Up,
-							Ordering::Equal | Ordering::Greater => OrdDir::Down,
-						},
-						Ordering::Greater => match y.cmp(&next_character.y) {
-							Ordering::Less => OrdDir::UpRight,
-							Ordering::Equal => OrdDir::Right,
-							Ordering::Greater => OrdDir::DownRight,
-						},
-					}
+					(next_character.x, next_character.y)
 				};
-				self.move_piece(lua, next_character, dir)
+				if let Some(direction) = dijkstra.step(x, y, &self.current_floor) {
+					self.move_piece(lua, next_character, direction)
+				} else {
+					Ok(TurnOutcome::Yield)
+				}
 			}
 			character::Action::Attack(attack, parameters) => {
 				self.attack_piece(lua, attack, next_character, parameters)

@@ -280,34 +280,6 @@ impl Piece {
 	}
 }
 
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub enum OrdDir {
-	Up,
-	UpRight,
-	Right,
-	DownRight,
-	Down,
-	DownLeft,
-	Left,
-	UpLeft,
-}
-
-impl OrdDir {
-	pub fn as_offset(self) -> (i32, i32) {
-		let (x, y) = match self {
-			OrdDir::Up => (0, -1),
-			OrdDir::UpRight => (1, -1),
-			OrdDir::Right => (1, 0),
-			OrdDir::DownRight => (1, 1),
-			OrdDir::Down => (0, 1),
-			OrdDir::DownLeft => (-1, 1),
-			OrdDir::Left => (-1, 0),
-			OrdDir::UpLeft => (-1, -1),
-		};
-		(x, y)
-	}
-}
-
 /// Anything a character piece can "do".
 ///
 /// This is the only way that character logic or player input should communicate with pieces.

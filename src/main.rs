@@ -1,9 +1,9 @@
 use esprit2::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use std::fs;
 use std::process::exit;
-use tracing::{error, info};
+use std::{fs, io};
+use tracing::{error, info, warn};
 
 fn update_delta(
 	last_time: &mut f64,
@@ -62,10 +62,13 @@ pub fn main() {
 		info!("failed to open options.toml: {msg}");
 		info!("initializing options.toml instead");
 		// Attempt to save the old file, in case it exists.
+
 		if let Err(msg) = fs::rename(&options_path, options_path.with_extension("toml.old")) {
-			info!("failed to backup existing options.toml: {msg}");
+			if msg.kind() != io::ErrorKind::NotFound {
+				warn!("failed to backup existing options.toml: {msg}");
+			}
 		} else {
-			info!("exiting options.toml was backed up to options.toml.old");
+			info!("existing options.toml was backed up to options.toml.old");
 		}
 		let options = Options::default();
 		if let Err(msg) = fs::write(&options_path, toml::to_string(&options).unwrap()) {

@@ -6,6 +6,7 @@
 	clippy::unwrap_used
 )]
 
+pub mod astar;
 pub mod attack;
 pub mod character;
 pub mod combat;
@@ -63,6 +64,48 @@ const TURN: Aut = 12;
 const SQRT2_TURN: Aut = 17;
 
 type Color = (u8, u8, u8, u8);
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum OrdDir {
+	Up,
+	UpRight,
+	Right,
+	DownRight,
+	Down,
+	DownLeft,
+	Left,
+	UpLeft,
+}
+
+impl OrdDir {
+	pub fn all() -> impl Iterator<Item = Self> {
+		[
+			OrdDir::Up,
+			OrdDir::UpRight,
+			OrdDir::Right,
+			OrdDir::DownRight,
+			OrdDir::Down,
+			OrdDir::DownLeft,
+			OrdDir::Left,
+			OrdDir::UpLeft,
+		]
+		.into_iter()
+	}
+
+	pub fn as_offset(self) -> (i32, i32) {
+		let (x, y) = match self {
+			OrdDir::Up => (0, -1),
+			OrdDir::UpRight => (1, -1),
+			OrdDir::Right => (1, 0),
+			OrdDir::DownRight => (1, 1),
+			OrdDir::Down => (0, 1),
+			OrdDir::DownLeft => (-1, 1),
+			OrdDir::Left => (-1, 0),
+			OrdDir::UpLeft => (-1, -1),
+		};
+		(x, y)
+	}
+}
 
 pub mod prelude {
 	pub use super::*;
