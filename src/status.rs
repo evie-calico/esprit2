@@ -21,11 +21,12 @@ pub struct Debuff {
 
 impl Debuff {
 	fn get_script(&self) -> Result<character::Stats> {
-		// TODO: OnceCell
-		let lua = mlua::Lua::new();
-		lua.globals().set("magnitude", self.magnitude)?;
-		let stats = lua.from_value(lua.load(self.on_debuff.contents()).eval()?)?;
-		Ok(stats)
+		thread_local! { static LUA: mlua::Lua = mlua::Lua::new() }
+		LUA.with(|lua| {
+			lua.globals().set("magnitude", self.magnitude)?;
+			let stats = lua.from_value(lua.load(self.on_debuff.contents()).eval()?)?;
+			Ok(stats)
+		})
 	}
 
 	pub fn get(&self) -> Option<character::Stats> {

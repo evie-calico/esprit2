@@ -1,4 +1,11 @@
-#![feature(ascii_char, path_file_prefix, let_chains, once_cell_try)]
+#![feature(
+	ascii_char,
+	path_file_prefix,
+	let_chains,
+	once_cell_try,
+	new_uninit,
+	maybe_uninit_fill
+)]
 #![warn(
 	clippy::module_name_repetitions,
 	clippy::items_after_statements,
@@ -93,7 +100,7 @@ impl OrdDir {
 	}
 
 	pub fn as_offset(self) -> (i32, i32) {
-		let (x, y) = match self {
+		match self {
 			OrdDir::Up => (0, -1),
 			OrdDir::UpRight => (1, -1),
 			OrdDir::Right => (1, 0),
@@ -102,8 +109,21 @@ impl OrdDir {
 			OrdDir::DownLeft => (-1, 1),
 			OrdDir::Left => (-1, 0),
 			OrdDir::UpLeft => (-1, -1),
-		};
-		(x, y)
+		}
+	}
+
+	pub fn from_offset(x: i32, y: i32) -> Option<Self> {
+		match (x, y) {
+			(0, -1) => Some(OrdDir::Up),
+			(1, -1) => Some(OrdDir::UpRight),
+			(1, 0) => Some(OrdDir::Right),
+			(1, 1) => Some(OrdDir::DownRight),
+			(0, 1) => Some(OrdDir::Down),
+			(-1, 1) => Some(OrdDir::DownLeft),
+			(-1, 0) => Some(OrdDir::Left),
+			(-1, -1) => Some(OrdDir::UpLeft),
+			_ => None,
+		}
 	}
 }
 

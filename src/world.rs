@@ -515,7 +515,6 @@ impl Manager {
 	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
-		// TODO: Character ordering/timing
 		let Some(action) = next_character.borrow_mut().next_action.take() else {
 			return Ok(TurnOutcome::Yield);
 		};
@@ -533,42 +532,46 @@ impl Manager {
 
 		match action {
 			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
-			character::Action::Move(x, y) => {
-				// TODO: Don't use a dijkstra map for 1-tile distances.
-				let mut dijkstra = astar::DijkstraMap::target(
-					self.current_floor.map.cols(),
-					self.current_floor.map.rows(),
-					&[(x, y)],
-				);
+			character::Action::Move(target_x, target_y) => {
 				let (x, y) = {
 					let next_character = next_character.borrow();
 					(next_character.x, next_character.y)
 				};
-				if let Ok(x) = x.try_into()
-					&& let Ok(y) = y.try_into()
-				{
-					dijkstra.explore(x, y, |x, y, base| {
-						if let Some(character) = self.get_character_at(x as i32, y as i32)
-							&& character.as_ptr() != next_character.as_ptr()
-							&& character.borrow().alliance == next_character.borrow().alliance
-						{
-							return astar::IMPASSABLE;
-						}
-						match self
-							.current_floor
-							.map
-							.get(y, x)
-							.expect("dijkstra map size mismatch")
-						{
-							floor::Tile::Floor | floor::Tile::Exit => base + 1,
-							floor::Tile::Wall => astar::IMPASSABLE,
-						}
-					});
-				}
-				if let Some(direction) = dijkstra.step(x, y) {
-					self.move_piece(lua, next_character, direction)
+				// For distances of 1 tile, don't bother using a dijkstra map.
+				if let Some(direction) = OrdDir::from_offset(target_x - x, target_y - y) {
+					self.move_piece(next_character, direction)
 				} else {
-					Ok(TurnOutcome::Yield)
+					let mut dijkstra = astar::DijkstraMap::target(
+						self.current_floor.map.cols(),
+						self.current_floor.map.rows(),
+						&[(target_x, target_y)],
+					);
+					if let Ok(x) = x.try_into()
+						&& let Ok(y) = y.try_into()
+					{
+						dijkstra.explore(x, y, |x, y, base| {
+							if let Some(character) = self.get_character_at(x as i32, y as i32)
+								&& character.as_ptr() != next_character.as_ptr()
+								&& character.borrow().alliance == next_character.borrow().alliance
+							{
+								return astar::IMPASSABLE;
+							}
+							match self
+								.current_floor
+								.map
+								.get(y, x)
+								.expect("dijkstra map size mismatch")
+							{
+								floor::Tile::Floor | floor::Tile::Exit => base + 1,
+								floor::Tile::Wall => astar::IMPASSABLE,
+							}
+						});
+					}
+					if let Some(direction) = dijkstra.step(x, y) {
+						self.move_piece(next_character, direction)
+					} else {
+						Ok(TurnOutcome::Yield)
+					}
 				}
 			}
 			character::Action::Attack(attack, parameters) => {
@@ -629,9 +632,6 @@ impl Manager {
 		}
 	}
 
-	/// # Errors
-	///
-	/// Returns an error if the target is an ally, or if the user has no attacks.
 	pub fn attack_piece<'lua>(
 		&self,
 		lua: &'lua mlua::Lua,
@@ -660,12 +660,8 @@ impl Manager {
 		TurnOutcome::from_lua(lua, value)
 	}
 
-	/// # Errors
-	///
-	/// Fails if a wall or void is in the way, or if an implicit attack failed.
 	pub fn move_piece<'lua>(
 		&self,
-		lua: &'lua mlua::Lua,
 		character: &CharacterRef,
 		dir: OrdDir,
 	) -> mlua::Result<TurnOutcome<'lua>> {
@@ -685,25 +681,6 @@ impl Manager {
 				},
 			)
 		};
-
-		// There's a really annoying phenomenon in Pokémon Mystery Dungeon where you can't hit ghosts that are inside of walls.
-		// I think that this is super lame, so the attack check comes before any movement.
-		if let Some(target_ref) = self.get_character_at(x, y) {
-			let Some(attack) = character.borrow().attacks.first().cloned() else {
-				self.console
-					.print_unimportant("You cannot perform any melee attacks right now.".into());
-				return Ok(TurnOutcome::Yield);
-			};
-			return self.attack_piece(
-				lua,
-				attack,
-				character,
-				Some(
-					lua.create_table_from([("target", target_ref.clone())].into_iter())?
-						.into_owned(),
-				),
-			);
-		}
 
 		let tile = self.current_floor.map.get(y, x);
 		match tile {

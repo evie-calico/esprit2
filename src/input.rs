@@ -103,10 +103,29 @@ pub fn controllable_character(
 							if triggers.contains(keycode) {
 								let (x, y) = {
 									let next_character = next_character.borrow();
-									(next_character.x, next_character.y)
+									(next_character.x + xoff, next_character.y + yoff)
 								};
-								next_character.borrow_mut().next_action =
-									Some(character::Action::Move(x + xoff, y + yoff));
+								if let Some(potential_target) = world_manager.get_character_at(x, y)
+								{
+									let default_attack =
+										next_character.borrow().attacks.first().cloned();
+									if let Some(default_attack) = default_attack {
+										next_character.borrow_mut().next_action =
+											Some(character::Action::Attack(
+												default_attack,
+												Some(
+													lua.create_table_from([(
+														"target",
+														potential_target.clone(),
+													)])?
+													.into_owned(),
+												),
+											))
+									}
+								} else {
+									next_character.borrow_mut().next_action =
+										Some(character::Action::Move(x, y));
+								}
 							}
 						}
 

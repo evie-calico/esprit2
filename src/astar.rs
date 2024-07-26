@@ -42,13 +42,9 @@ impl DijkstraMap {
 	}
 
 	pub fn target(width: usize, height: usize, targets: &[(i32, i32)]) -> Self {
-		// I shouldn't have to go through a Vec to do this
-		let mut grid = Vec::with_capacity(width * height);
-		// ...because this resize can realloc (hence the with_capacity above)
-		grid.resize(width * height, UNEXPLORED);
-		// But luckily this doesn't allocate a new buffer,
-		// although it does still have a potential realloc.
-		let grid = grid.into_boxed_slice();
+		let mut grid = Box::new_uninit_slice(width * height);
+		std::mem::MaybeUninit::fill(&mut grid, UNEXPLORED);
+		let grid = unsafe { grid.assume_init() };
 
 		let mut map = Self {
 			width,
