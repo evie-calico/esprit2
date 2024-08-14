@@ -3,16 +3,16 @@
 ## Engine
 
 - [x] resource loader.
-- [ ] Actor system
+- [x] Actor system
 	- [x] Pass around actions. inputs|ai -> actions
 	- [x] party
 	- [ ] non-party allies
-- [ ] Spells
-- [ ] various attacks
+- [x] Spells
+- [x] various attacks
 - [x] cool UI :)
-- [ ] tilemap
+- [x] tilemap
 - [ ] level generation
-	- [ ] dcss-style vaults
-		- [ ] defining these with text files (like dcss) is enough
+	- [x] dcss-style vaults
+		- [x] defining these with text files (like dcss) is enough
 - [ ] save files via serde. party, flags, etc...
 - [ ] really dynamic & varied messages

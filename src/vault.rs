@@ -2,6 +2,14 @@ use crate::floor::Tile;
 use crate::prelude::*;
 use std::{collections::HashMap, fs, path::Path};
 
+pub struct Set {
+	pub vaults: Vec<String>,
+	/// Nodes per floor
+	pub density: u32,
+	/// ratio of halls to vaults.
+	pub hall_ratio: i32,
+}
+
 #[derive(Clone, Debug)]
 pub struct Vault {
 	pub tiles: Vec<Option<Tile>>,

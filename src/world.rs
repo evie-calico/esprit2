@@ -1,6 +1,7 @@
 use crate::nouns::StrExt;
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -312,6 +313,30 @@ impl Manager {
 		})
 	}
 
+	pub fn generate_floor(&mut self, seed: &str, set: &vault::Set, resources: &resource::Manager) {
+		const SEED_LENGTH: usize = 32;
+
+		let _enter = tracing::error_span!("level gen", seed).entered();
+		let mut seed_slice = [0; SEED_LENGTH];
+		for (str_byte, seed_byte) in seed.bytes().take(SEED_LENGTH).zip(seed_slice.iter_mut()) {
+			*seed_byte = str_byte;
+		}
+		let mut rng = rand::rngs::StdRng::from_seed(seed_slice);
+		for _ in 0..set.density {
+			let x = rng.gen_range(0..self.current_floor.map.cols() as i32);
+			let y = rng.gen_range(0..self.current_floor.map.rows() as i32);
+			match set.vaults.choose(&mut rng).map(|k| {
+				resources
+					.get_vault(k)
+					.and_then(|vault| self.apply_vault(x, y, vault, resources))
+			}) {
+				Some(Ok(())) => (),
+				Some(Err(msg)) => error!("{msg}"),
+				None => error!("vault set has no vaults"),
+			}
+		}
+	}
+
 	pub fn apply_vault(
 		&mut self,
 		x: i32,
@@ -319,14 +344,15 @@ impl Manager {
 		vault: &Vault,
 		resources: &resource::Manager,
 	) -> Result<()> {
-		self.current_floor.blit_vault(x as usize, y as usize, vault);
-		for (xoff, yoff, sheet_name) in &vault.characters {
-			let piece = character::Piece {
-				x: x + xoff,
-				y: y + yoff,
-				..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
-			};
-			self.characters.push_front(character::Ref::new(piece));
+		if self.current_floor.blit_vault(x as usize, y as usize, vault) {
+			for (xoff, yoff, sheet_name) in &vault.characters {
+				let piece = character::Piece {
+					x: x + xoff,
+					y: y + yoff,
+					..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
+				};
+				self.characters.push_front(character::Ref::new(piece));
+			}
 		}
 		Ok(())
 	}
@@ -556,14 +582,9 @@ impl Manager {
 							{
 								return astar::IMPASSABLE;
 							}
-							match self
-								.current_floor
-								.map
-								.get(y, x)
-								.expect("dijkstra map size mismatch")
-							{
-								floor::Tile::Floor | floor::Tile::Exit => base + 1,
-								floor::Tile::Wall => astar::IMPASSABLE,
+							match self.current_floor.map.get(y, x) {
+								Some(floor::Tile::Floor) | Some(floor::Tile::Exit) => base + 1,
+								Some(floor::Tile::Wall) | None => astar::IMPASSABLE,
 							}
 						});
 					}

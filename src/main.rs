@@ -105,11 +105,15 @@ pub fn main() {
 				error!("failed to initialize world manager: {msg}");
 				exit(1);
 			});
-	if let Err(msg) =
-		world_manager.apply_vault(1, 1, resources.get_vault("example").unwrap(), &resources)
-	{
-		error!("failed to apply vault \"example\": {msg}");
-	}
+	world_manager.generate_floor(
+		"default seed",
+		&vault::Set {
+			vaults: vec!["example".into()],
+			density: 4,
+			hall_ratio: 1,
+		},
+		&resources,
+	);
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
