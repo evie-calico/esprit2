@@ -3,7 +3,7 @@ icon = "dummy"
 duration = "Rest"
 
 [effect.Debuff]
-on_debuff = { type = "Inline", source = '''
+on_debuff = '''
 local debuff = 0
 while magnitude > (debuff + 1) * 10 do
 	magnitude = magnitude - (debuff + 1) * 10;
@@ -11,4 +11,4 @@ while magnitude > (debuff + 1) * 10 do
 end
 
 return { defense = debuff }
-'''}
+'''

@@ -1,10 +1,10 @@
 level = 1
 attacks = ["scratch", "bite"]
-spells = ["magic_missile", "debug/level_up", "debug/aff/neg_ord"]
+spells = ["magic_missile", "debug/level_up", "debug/change_affinity"]
 speed = 12
 icon = "luvui"
 
-on_consider = "scripts/consider/characters/basic.lua"
+on_consider = "consider/characters/basic"
 
 [nouns]
 name = "Luvui"

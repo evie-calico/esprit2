@@ -7,7 +7,7 @@ pub struct Attack {
 	pub name: String,
 	pub description: String,
 	pub magnitude: Expression,
-	pub on_use: script::MaybeInline,
-	pub on_consider: Option<script::MaybeInline>,
+	pub on_use: resource::Id,
+	pub on_consider: Option<resource::Id>,
 	pub use_time: Aut,
 }

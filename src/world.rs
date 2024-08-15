@@ -193,9 +193,9 @@ impl Manager {
 	pub fn update<'lua>(
 		&mut self,
 		action_request: Option<ActionRequest<'lua>>,
-		lua: &'lua mlua::Lua,
+		scripts: &'lua resource::Scripts,
 		input_mode: &mut input::Mode,
-	) -> mlua::Result<Option<ActionRequest<'lua>>> {
+	) -> Result<Option<ActionRequest<'lua>>> {
 		let outcome = match (action_request, input_mode.clone()) {
 			// Handle cursor submission
 			(
@@ -207,7 +207,7 @@ impl Manager {
 				},
 			) => {
 				if let Some(character) = self.get_character_at(x, y) {
-					TurnOutcome::poll(lua, callback, character.clone())?
+					TurnOutcome::poll(scripts.runtime, callback, character.clone())?
 				} else {
 					// If the cursor hasn't selected a character,
 					// cancel the request altogther.
@@ -233,7 +233,7 @@ impl Manager {
 					response: Some(response),
 					..
 				},
-			) => TurnOutcome::poll(lua, callback, response)?,
+			) => TurnOutcome::poll(scripts.runtime, callback, response)?,
 			// Prompt with unsubmitted response
 			(
 				request @ Some(ActionRequest::ShowPrompt { .. }),
@@ -242,7 +242,7 @@ impl Manager {
 			// Prompt outside of prompt mode (this is different from answering no!).
 			(Some(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
 			// If there is no pending request, pop a turn off the character queue.
-			(None, _) => self.next_turn(lua)?,
+			(None, _) => self.next_turn(scripts)?,
 		};
 
 		let player_controlled = self.next_character().borrow().player_controlled;
@@ -433,7 +433,7 @@ pub enum TurnOutcome<'lua> {
 }
 
 impl Manager {
-	pub fn consider_turn(&mut self, lua: &mlua::Lua) -> mlua::Result<Vec<Consider>> {
+	pub fn consider_turn(&mut self, scripts: &resource::Scripts) -> Result<Vec<Consider>> {
 		let next_character = self.next_character();
 
 		let mut considerations = Vec::new();
@@ -463,17 +463,16 @@ impl Manager {
 		for attack in &next_character.borrow().attacks {
 			if let Some(on_consider) = &attack.on_consider {
 				let user = next_character.clone();
-				let environment = inherit_environment(lua)?;
+				let environment = inherit_environment(scripts.runtime)?;
 				environment.set("use_time", attack.use_time)?;
 				environment.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
 				environment.set("user", user)?;
 				environment.set("nearby_characters", nearby_characters.clone())?;
 				environment.set("Heuristic", consider::HeuristicConstructor)?;
-				let mut attack_considerations: consider::AttackList = lua
-					.load(on_consider.contents())
-					.set_name(on_consider.name(&attack.name))
-					.set_environment(environment)
-					.call(consider::AttackList::new(attack.clone()))?;
+				let function = scripts.get(on_consider)?;
+				function.set_environment(environment)?;
+				let mut attack_considerations: consider::AttackList =
+					function.call(consider::AttackList::new(attack.clone()))?;
 				considerations.append(&mut attack_considerations.results);
 			}
 		}
@@ -484,7 +483,7 @@ impl Manager {
 				&spell.on_consider,
 			) {
 				let caster = next_character.clone();
-				let parameters = lua.create_table()?;
+				let parameters = scripts.runtime.create_table()?;
 				for (k, v) in &spell.parameters {
 					let k = k.as_ref();
 					match v {
@@ -495,7 +494,7 @@ impl Manager {
 					}
 				}
 
-				let environment = inherit_environment(lua)?;
+				let environment = inherit_environment(scripts.runtime)?;
 				environment.set("parameters", parameters)?;
 				// Maybe these should be members of the spell?
 				environment.set("level", spell.level)?;
@@ -505,14 +504,15 @@ impl Manager {
 
 				environment.set(
 					"nearby_characters",
-					lua.create_table_from(self.characters.iter().cloned().enumerate())?,
+					scripts
+						.runtime
+						.create_table_from(self.characters.iter().cloned().enumerate())?,
 				)?;
 
-				let chunk = lua.load(on_consider.contents());
-				let mut spell_considerations: consider::SpellList = chunk
-					.set_name(on_consider.name(&spell.name))
-					.set_environment(environment)
-					.call(consider::SpellList::new(spell.clone()))?;
+				let function = scripts.get(on_consider)?;
+				function.set_environment(environment)?;
+				let mut spell_considerations: consider::SpellList =
+					function.call(consider::SpellList::new(spell.clone()))?;
 				considerations.append(&mut spell_considerations.results);
 			}
 		}
@@ -522,23 +522,26 @@ impl Manager {
 
 	pub fn consider_action(
 		&self,
-		lua: &mlua::Lua,
+		scripts: &resource::Scripts,
 		character: CharacterRef,
 		considerations: Vec<Consider>,
-	) -> mlua::Result<character::Action> {
+	) -> Result<character::Action> {
 		let considerations = consider::Considerations::new(considerations);
-		let environment = inherit_environment(lua)?;
+		let environment = inherit_environment(scripts.runtime)?;
 		environment.set("user", character.clone())?;
-		Ok(lua
-			.load(&character.borrow().sheet.on_consider.contents)
-			.set_name(character.borrow().sheet.on_consider.path.clone())
-			.set_environment(environment)
+		let function = scripts.get(&character.borrow().sheet.on_consider)?;
+		function.set_environment(environment)?;
+
+		Ok(function
 			.call::<_, Option<Consider>>(considerations)?
 			.map(|x| x.action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
-	pub fn next_turn<'lua>(&mut self, lua: &'lua mlua::Lua) -> mlua::Result<TurnOutcome<'lua>> {
+	pub fn next_turn<'lua>(
+		&mut self,
+		scripts: &'lua resource::Scripts,
+	) -> Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
 		let Some(action) = next_character.borrow_mut().next_action.take() else {
@@ -596,7 +599,7 @@ impl Manager {
 				}
 			}
 			character::Action::Attack(attack, parameters) => {
-				self.attack_piece(lua, attack, next_character, parameters)
+				Ok(self.attack_piece(scripts, attack, next_character, parameters)?)
 			}
 			character::Action::Cast(spell, parameters) => {
 				let castable = spell.castable_by(&next_character.borrow());
@@ -606,7 +609,7 @@ impl Manager {
 
 						let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
 							Some(parameters) => parameters,
-							None => lua.create_table()?,
+							None => scripts.runtime.create_table()?,
 						};
 						for (k, v) in &spell.parameters {
 							let k = k.as_ref();
@@ -618,21 +621,16 @@ impl Manager {
 							}
 						}
 
-						let environment = inherit_environment(lua)?;
+						let environment = inherit_environment(scripts.runtime)?;
 						environment.set("parameters", parameters)?;
 						environment.set("caster", next_character.clone())?;
 						// Maybe these should be members of the spell?
 						environment.set("level", spell.level)?;
 						environment.set("affinity", affinity)?;
 
-						let chunk = lua.load(spell.on_cast.contents());
-						TurnOutcome::from_lua(
-							lua,
-							chunk
-								.set_name(spell.on_cast.name(&spell.name))
-								.set_environment(environment)
-								.eval()?,
-						)
+						let function = scripts.get(&spell.on_cast)?;
+						function.set_environment(environment)?;
+						Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
@@ -655,37 +653,34 @@ impl Manager {
 
 	pub fn attack_piece<'lua>(
 		&self,
-		lua: &'lua mlua::Lua,
+		scripts: &'lua resource::Scripts,
 		attack: Rc<Attack>,
 		user: &CharacterRef,
 		parameters: Option<mlua::OwnedTable>,
-	) -> mlua::Result<TurnOutcome<'lua>> {
+	) -> Result<TurnOutcome<'lua>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
 		let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
 			Some(parameters) => parameters,
-			None => lua.create_table()?,
+			None => scripts.runtime.create_table()?,
 		};
-		let environment = inherit_environment(lua)?;
+		let environment = inherit_environment(scripts.runtime)?;
 		environment.set("user", user.clone())?;
 		environment.set("parameters", parameters)?;
 		environment.set("use_time", attack.use_time)?;
 		environment.set("magnitude", magnitude)?;
 
-		let value: mlua::Value = lua
-			.load(attack.on_use.contents())
-			.set_name(attack.on_use.name(&attack.name))
-			.set_environment(environment)
-			.eval()?;
-		TurnOutcome::from_lua(lua, value)
+		let function = scripts.get(&attack.on_use)?;
+		function.set_environment(environment)?;
+		Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
 	}
 
 	pub fn move_piece<'lua>(
 		&self,
 		character: &CharacterRef,
 		dir: OrdDir,
-	) -> mlua::Result<TurnOutcome<'lua>> {
+	) -> Result<TurnOutcome<'lua>> {
 		use crate::floor::Tile;
 
 		let (x, y, delay) = {

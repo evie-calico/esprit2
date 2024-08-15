@@ -56,7 +56,7 @@ pub fn controllable_character(
 	next_character: world::CharacterRef,
 	world_manager: &mut world::Manager,
 	resources: &resource::Manager,
-	lua: &mlua::Lua,
+	scripts: &resource::Scripts,
 	mode: &mut Mode,
 	options: &Options,
 ) -> Result<Option<Response>> {
@@ -114,11 +114,13 @@ pub fn controllable_character(
 											Some(character::Action::Attack(
 												default_attack,
 												Some(
-													lua.create_table_from([(
-														"target",
-														potential_target.clone(),
-													)])?
-													.into_owned(),
+													scripts
+														.runtime
+														.create_table_from([(
+															"target",
+															potential_target.clone(),
+														)])?
+														.into_owned(),
 												),
 											))
 									}
@@ -169,9 +171,9 @@ pub fn controllable_character(
 						}
 
 						if options.controls.autocombat.contains(keycode) {
-							let considerations = world_manager.consider_turn(lua)?;
+							let considerations = world_manager.consider_turn(scripts)?;
 							let action = world_manager.consider_action(
-								lua,
+								scripts,
 								next_character.clone(),
 								considerations,
 							)?;

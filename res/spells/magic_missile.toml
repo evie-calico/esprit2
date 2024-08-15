@@ -9,17 +9,12 @@ level = 1
 
 consideration_range = 5
 
+on_cast = "spells/magic_missile"
+on_consider = "consider/spells/magic_missile"
+
 [parameters]
 magnitude = "magic + 4"
 pierce_threshold = 2
 range = 5
 cast_time = 12
-
-[on_cast]
-type = "Path"
-source = "scripts/spells/magic_missile.lua"
-
-[on_consider]
-type = "Path"
-source = "scripts/consider/spells/magic_missile.lua"
 

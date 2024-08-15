@@ -56,6 +56,26 @@ pub fn main() {
 			exit(1);
 		}
 	};
+	let lua = mlua::Lua::new();
+	lua.globals()
+		.get::<&str, mlua::Table>("package")
+		.unwrap()
+		.set(
+			"path",
+			options::resource_directory()
+				.join("scripts/?.lua")
+				.to_str()
+				.unwrap(),
+		)
+		.unwrap();
+	let scripts =
+		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
+			Ok(scripts) => scripts,
+			Err(msg) => {
+				error!("failed to open scripts directory: {msg}");
+				exit(1);
+			}
+		};
 	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {
 		// This is `info` because it's actually very expected for first-time players.
@@ -87,18 +107,6 @@ pub fn main() {
 			accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 		},
 	];
-	let lua = mlua::Lua::new();
-	lua.globals()
-		.get::<&str, mlua::Table>("package")
-		.unwrap()
-		.set(
-			"path",
-			options::resource_directory()
-				.join("scripts/?.lua")
-				.to_str()
-				.unwrap(),
-		)
-		.unwrap();
 	let mut world_manager =
 		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options)
 			.unwrap_or_else(|msg| {
@@ -141,7 +149,7 @@ pub fn main() {
 					next_character,
 					&mut world_manager,
 					&resources,
-					&lua,
+					&scripts,
 					&mut input_mode,
 					&options,
 				) {
@@ -164,9 +172,9 @@ pub fn main() {
 					}
 				}
 			} else {
-				let considerations = world_manager.consider_turn(&lua).unwrap();
+				let considerations = world_manager.consider_turn(&scripts).unwrap();
 				let action = world_manager
-					.consider_action(&lua, next_character, considerations)
+					.consider_action(&scripts, next_character, considerations)
 					.unwrap();
 				world_manager.next_character().borrow_mut().next_action = Some(action);
 			}
@@ -186,7 +194,7 @@ pub fn main() {
 				i.draw_state.cloud.tick(delta);
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
-			match world_manager.update(action_request, &lua, &mut input_mode) {
+			match world_manager.update(action_request, &scripts, &mut input_mode) {
 				Ok(result) => action_request = result,
 				Err(msg) => {
 					error!("world manager update returned an error: {msg}");

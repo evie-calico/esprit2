@@ -13,7 +13,7 @@ pub enum Duration {
 pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
-	on_debuff: script::MaybeInline,
+	on_debuff: Box<str>,
 
 	#[serde(skip)]
 	cache: Cell<Option<(u32, character::Stats)>>,
@@ -24,7 +24,7 @@ impl Debuff {
 		thread_local! { static LUA: mlua::Lua = mlua::Lua::new() }
 		LUA.with(|lua| {
 			lua.globals().set("magnitude", self.magnitude)?;
-			let stats = lua.from_value(lua.load(self.on_debuff.contents()).eval()?)?;
+			let stats = lua.from_value(lua.load(&*self.on_debuff).eval()?)?;
 			Ok(stats)
 		})
 	}

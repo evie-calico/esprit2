@@ -12,12 +12,32 @@ use tracing::error;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error("resource {0} not found")]
-	NotFound(String),
+	NotFound(Id),
 	#[error("keys (file names) must be representable in UTF8")]
 	InvalidKey,
 }
 
-type Resource<T> = HashMap<Box<str>, T>;
+pub type Id = Box<str>;
+
+pub struct Resource<T>(HashMap<Id, T>);
+
+impl<T> Resource<T> {
+	pub fn new() -> Self {
+		Self(HashMap::new())
+	}
+
+	pub fn get(&self, key: &str) -> Result<&T> {
+		self.0
+			.get(key)
+			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))
+	}
+}
+
+impl<T> Default for Resource<T> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
 
 #[derive(Clone, mlua::FromLua)]
 pub struct Handle<T>(pub Rc<Resource<T>>);
@@ -25,7 +45,10 @@ pub struct Handle<T>(pub Rc<Resource<T>>);
 impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
 	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_method("get", |_lua, this, key: String| {
-			Ok(this.0.get(key.as_str()).cloned())
+			this.0
+				.get(key.as_str())
+				.cloned()
+				.map_err(mlua::Error::external)
 		});
 	}
 }
@@ -72,6 +95,19 @@ pub struct Manager<'texture> {
 
 impl mlua::UserData for Manager<'_> {}
 
+pub struct Scripts<'lua> {
+	pub runtime: &'lua mlua::Lua,
+	scripts: Resource<mlua::Function<'lua>>,
+}
+
+impl<'lua> std::ops::Deref for Scripts<'lua> {
+	type Target = Resource<mlua::Function<'lua>>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.scripts
+	}
+}
+
 fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
 	let mut container = Resource::new();
 	recurse(&mut container, directory, directory, loader)?;
@@ -109,7 +145,7 @@ fn recurse<T>(
 
 					match loader(&path) {
 						Ok(resource) => {
-							container.insert(reference.into(), resource);
+							container.0.insert(reference.into(), resource);
 						}
 						Err(msg) => {
 							error!("Failed to load {reference} ({}): {msg}", path.display());
@@ -193,10 +229,7 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the sheet could not be found.
 	pub fn get_sheet(&self, key: &str) -> Result<&character::Sheet> {
-		Ok(self
-			.sheets
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?)
+		self.sheets.get(key)
 	}
 
 	/// Return the given status.
@@ -205,10 +238,7 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the status could not be found.
 	pub fn get_status(&self, key: &str) -> Result<&Status> {
-		Ok(self
-			.statuses
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?)
+		self.statuses.get(key)
 	}
 
 	/// Return the given attack.
@@ -217,10 +247,7 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the attack could not be found.
 	pub fn get_attack(&self, key: &str) -> Result<&Rc<Attack>> {
-		Ok(self
-			.attacks
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?)
+		self.attacks.get(key)
 	}
 
 	/// Return the given spell.
@@ -229,16 +256,13 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the spell could not be found.
 	pub fn get_spell(&self, key: &str) -> Result<&Rc<Spell>> {
-		Ok(self
-			.spells
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?)
+		self.spells.get(key)
 	}
 
 	/// Return the given texture.
 	/// If the texture cannot be found, returns the missing texture placeholder.
 	pub fn get_texture(&self, key: &str) -> &Texture {
-		let Some(texture_info) = self.textures.get(key) else {
+		let Ok(texture_info) = self.textures.get(key) else {
 			return &self.missing_texture;
 		};
 		texture_info
@@ -270,10 +294,7 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the texture could not be found, loaded, or parsed.
 	pub fn get_owned_texture(&self, key: &str) -> Result<Texture> {
-		let texture_info = self
-			.textures
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?;
+		let texture_info = self.textures.get(key)?;
 
 		let image = texture_info
 			.image
@@ -289,9 +310,17 @@ impl<'texture> Manager<'texture> {
 	///
 	/// Returns an error if the vault could not be found.
 	pub fn get_vault(&self, key: &str) -> Result<&Vault> {
-		Ok(self
-			.vaults
-			.get(key)
-			.ok_or_else(|| Error::NotFound(key.into()))?)
+		self.vaults.get(key)
+	}
+}
+
+impl<'lua> Scripts<'lua> {
+	pub fn open(path: impl AsRef<Path>, lua: &'lua mlua::Lua) -> Result<Scripts<'lua>> {
+		Ok(Self {
+			runtime: lua,
+			scripts: register(path.as_ref(), &|path| {
+				Ok(lua.load(&fs::read_to_string(path)?).into_function()?)
+			})?,
+		})
 	}
 }

@@ -69,9 +69,11 @@ pub fn inflict(
 	let statuses = lua
 		.globals()
 		.get::<&str, resource::Handle<Status>>("Status")?;
-	let Some(status) = statuses.0.get(key.as_str()).cloned() else {
-		return Err(mlua::Error::external(resource::Error::NotFound(key)));
-	};
+	let status = statuses
+		.0
+		.get(&key)
+		.cloned()
+		.map_err(mlua::Error::external)?;
 	let mut entry = this.borrow_mut();
 	let entry = entry
 		.statuses
@@ -371,7 +373,7 @@ mod sheet {
 		pub spells: Vec<String>,
 
 		/// Script to decide on an action from a list of considerations
-		pub on_consider: Script,
+		pub on_consider: resource::Id,
 	}
 }
 

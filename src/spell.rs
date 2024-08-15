@@ -105,13 +105,13 @@ pub struct Spell {
 	pub consideration_range: Option<u32>,
 
 	/// Script to execute upon casting the spell.
-	pub on_cast: script::MaybeInline,
+	pub on_cast: resource::Id,
 	/// Script to return all possible spell actions.
 	///
 	/// Returns an array of `consider::Consideration`s for each possible usage of the spell.
 	/// For an attack, this means potential targets.
 	/// For a self-buff, this should roughly estimate the potential benefit of casting the spell.
-	pub on_consider: Option<script::MaybeInline>,
+	pub on_consider: Option<resource::Id>,
 }
 
 #[derive(Clone, Copy, Debug)]

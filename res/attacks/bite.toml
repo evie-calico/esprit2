@@ -2,11 +2,5 @@ name = "Bite"
 description = "Lowers your defense until your next turn."
 magnitude = "power + 8"
 use_time = 12
-
-[on_use]
-type = "Path"
-source = "scripts/attacks/bite.lua"
-
-[on_consider]
-type = "Path"
-source = "scripts/consider/attacks/bite.lua"
+on_use = "attacks/bite"
+on_consider = "consider/attacks/bite"

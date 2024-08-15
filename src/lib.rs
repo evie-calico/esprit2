@@ -28,7 +28,6 @@ pub mod item;
 pub mod nouns;
 pub mod options;
 pub mod resource;
-pub mod script;
 pub mod soul;
 pub mod spell;
 pub mod status;
@@ -139,7 +138,6 @@ pub mod prelude {
 	pub use item::Item;
 	pub use nouns::Nouns;
 	pub use options::Options;
-	pub use script::Script;
 	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use status::Status;
