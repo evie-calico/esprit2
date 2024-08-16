@@ -1,6 +1,7 @@
 use crate::prelude::*;
-use nouns::StrExt;
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Used for debugging.
 fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> {
@@ -282,11 +283,11 @@ impl Piece {
 /// The information here should be enough to perform the action, but in the event it isn't
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
 #[derive(Clone, Debug)]
-pub enum Action {
+pub enum Action<'lua> {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(Rc<Attack>, Option<mlua::OwnedTable>),
-	Cast(Rc<Spell>, Option<mlua::OwnedTable>),
+	Attack(Rc<Attack>, Option<mlua::Table<'lua>>),
+	Cast(Rc<Spell>, Option<mlua::Table<'lua>>),
 }
 
 #[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

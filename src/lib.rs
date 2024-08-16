@@ -146,6 +146,7 @@ pub mod prelude {
 
 	// Export common traits
 	pub use expression::Evaluate;
+	pub use nouns::StrExt;
 	pub use rand::Rng;
 
 	pub use tracing::{debug, error, info};

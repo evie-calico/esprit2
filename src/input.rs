@@ -45,22 +45,22 @@ pub enum Mode {
 	},
 }
 
-pub enum Response {
+pub enum Response<'lua> {
 	Exit,
 	Fullscreen,
 	Debug,
-	Act(character::Action),
+	Act(character::Action<'lua>),
 }
 
-pub fn controllable_character(
+pub fn controllable_character<'lua>(
 	event_pump: &mut sdl2::EventPump,
 	next_character: world::CharacterRef,
 	world_manager: &mut world::Manager,
 	resources: &resource::Manager,
-	scripts: &resource::Scripts,
+	scripts: &'lua resource::Scripts,
 	mode: &mut Mode,
 	options: &Options,
-) -> Result<Option<Response>> {
+) -> Result<Option<Response<'lua>>> {
 	match mode {
 		input::Mode::Cursor {
 			submitted: true, ..
@@ -113,15 +113,10 @@ pub fn controllable_character(
 									if let Some(default_attack) = default_attack {
 										return Ok(Some(Response::Act(character::Action::Attack(
 											default_attack,
-											Some(
-												scripts
-													.runtime
-													.create_table_from([(
-														"target",
-														potential_target.clone(),
-													)])?
-													.into_owned(),
-											),
+											Some(scripts.runtime.create_table_from([(
+												"target",
+												potential_target.clone(),
+											)])?),
 										))));
 									}
 								} else {

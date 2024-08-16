@@ -1,5 +1,5 @@
-use crate::nouns::StrExt;
 use crate::prelude::*;
+use consider::TaggedHeuristics;
 use mlua::LuaSerdeExt;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use std::collections::VecDeque;
@@ -359,7 +359,7 @@ impl Manager {
 }
 
 pub enum PartialAction<'lua> {
-	Action(character::Action),
+	Action(character::Action<'lua>),
 	Request(ActionRequest<'lua>),
 }
 
@@ -438,7 +438,10 @@ pub enum TurnOutcome<'lua> {
 }
 
 impl Manager {
-	pub fn consider_turn(&mut self, scripts: &resource::Scripts) -> Result<Vec<Consider>> {
+	pub fn consider_turn<'lua>(
+		&mut self,
+		scripts: &'lua resource::Scripts,
+	) -> Result<Vec<Consider<'lua>>> {
 		let next_character = self.next_character();
 
 		let mut considerations = Vec::new();
@@ -474,10 +477,17 @@ impl Manager {
 				environment.set("user", user)?;
 				environment.set("nearby_characters", nearby_characters.clone())?;
 				environment.set("Heuristic", consider::HeuristicConstructor)?;
-				let mut attack_considerations: consider::AttackList = scripts
-					.sandbox(on_consider, environment)?
-					.call(consider::AttackList::new(attack.clone()))?;
-				considerations.append(&mut attack_considerations.results);
+				let attack_heuristics: mlua::Table =
+					scripts.sandbox(on_consider, environment)?.call(())?;
+				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
+					let heuristics = heuristics?;
+					let parameters = heuristics.get("parameters")?;
+					let heuristics = heuristics.get("heuristics")?;
+					considerations.push(Consider {
+						action: character::Action::Attack(attack.clone(), Some(parameters)),
+						heuristics,
+					})
+				}
 			}
 		}
 
@@ -512,37 +522,47 @@ impl Manager {
 						.create_table_from(self.characters.iter().cloned().enumerate())?,
 				)?;
 
-				let mut spell_considerations: consider::SpellList = scripts
-					.sandbox(on_consider, environment)?
-					.call(consider::SpellList::new(spell.clone()))?;
-				considerations.append(&mut spell_considerations.results);
+				let spell_heuristics: mlua::Table =
+					scripts.sandbox(on_consider, environment)?.call(())?;
+				for heuristics in spell_heuristics.sequence_values::<mlua::Table>() {
+					let heuristics = heuristics?;
+					let parameters = heuristics.get("parameters")?;
+					let heuristics = heuristics.get("heuristics")?;
+					considerations.push(Consider {
+						action: character::Action::Cast(spell.clone(), Some(parameters)),
+						heuristics,
+					})
+				}
 			}
 		}
 
 		Ok(considerations)
 	}
 
-	pub fn consider_action(
+	pub fn consider_action<'lua>(
 		&self,
-		scripts: &resource::Scripts,
+		scripts: &'lua resource::Scripts,
 		character: CharacterRef,
-		considerations: Vec<Consider>,
-	) -> Result<character::Action> {
-		let considerations = consider::Considerations::new(considerations);
+		mut considerations: Vec<Consider<'lua>>,
+	) -> Result<character::Action<'lua>> {
 		let environment = scripts.runtime.create_table()?;
 		environment.set("user", character.clone())?;
 		let function = scripts.sandbox(&character.borrow().sheet.on_consider, environment)?;
 
+		let partial_considerations = scripts
+			.runtime
+			.create_sequence_from(considerations.iter().map(TaggedHeuristics::new))?;
+
 		Ok(function
-			.call::<_, Option<Consider>>(considerations)?
-			.map(|x| x.action)
+			.call::<_, Option<usize>>(partial_considerations)?
+			.map(|index| considerations.remove(index - 1).action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
 	pub fn next_turn<'lua>(
 		&mut self,
 		scripts: &'lua resource::Scripts,
-		action: character::Action,
+		action: character::Action<'lua>,
 	) -> Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
 
@@ -605,7 +625,7 @@ impl Manager {
 					spell::Castable::Yes => {
 						let affinity = spell.affinity(&next_character.borrow());
 
-						let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
+						let parameters = match parameters {
 							Some(parameters) => parameters,
 							None => scripts.runtime.create_table()?,
 						};
@@ -653,12 +673,12 @@ impl Manager {
 		scripts: &'lua resource::Scripts,
 		attack: Rc<Attack>,
 		user: &CharacterRef,
-		parameters: Option<mlua::OwnedTable>,
+		parameters: Option<mlua::Table<'lua>>,
 	) -> Result<TurnOutcome<'lua>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
-		let parameters = match parameters.as_ref().map(mlua::OwnedTable::to_ref) {
+		let parameters = match parameters {
 			Some(parameters) => parameters,
 			None => scripts.runtime.create_table()?,
 		};

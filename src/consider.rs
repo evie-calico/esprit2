@@ -4,7 +4,6 @@
 //! such as showing a sorted list of potential spell targets rather than a cursor.
 
 use crate::prelude::*;
-use std::rc::Rc;
 
 /// Rough approximations of an action's result.
 /// Used to estimate the outcome of a certain action.
@@ -91,107 +90,51 @@ impl mlua::UserData for HeuristicConstructor {
 	}
 }
 
-#[derive(Clone, Debug, mlua::FromLua)]
-pub struct Consider {
-	pub action: character::Action,
+#[derive(Clone, Debug)]
+pub struct Consider<'lua> {
+	pub action: character::Action<'lua>,
 	pub heuristics: Vec<Heuristic>,
 }
 
-impl mlua::UserData for Consider {
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ActionType {
+	Wait,
+	Move,
+	Attack,
+	Cast,
+}
+
+#[derive(Clone, Debug, mlua::FromLua)]
+pub struct TaggedHeuristics {
+	action_type: ActionType,
+	heuristics: Vec<Heuristic>,
+}
+
+impl TaggedHeuristics {
+	pub fn new(consider: &Consider) -> Self {
+		Self {
+			action_type: match consider.action {
+				character::Action::Wait(_) => ActionType::Wait,
+				character::Action::Move(_, _) => ActionType::Move,
+				character::Action::Attack(_, _) => ActionType::Attack,
+				character::Action::Cast(_, _) => ActionType::Cast,
+			},
+			heuristics: consider.heuristics.clone(),
+		}
+	}
+}
+
+impl mlua::UserData for TaggedHeuristics {
 	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
 		fields.add_field_method_get("heuristics", |_, this| Ok(this.heuristics.clone()));
 	}
+
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_method("attack", |_, this, ()| {
-			Ok(matches!(this.action, character::Action::Attack(..)))
+			Ok(this.action_type == ActionType::Attack)
 		});
 		methods.add_method("spell", |_, this, ()| {
-			Ok(matches!(this.action, character::Action::Cast(..)))
+			Ok(this.action_type == ActionType::Cast)
 		});
-	}
-}
-
-#[derive(Clone, Debug, mlua::FromLua)]
-pub struct Considerations(Option<Vec<Consider>>);
-
-impl Considerations {
-	pub fn new(considerations: Vec<Consider>) -> Self {
-		Self(Some(considerations))
-	}
-}
-
-impl mlua::UserData for Considerations {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method_mut("for_each", |_, this, function: mlua::Function<'lua>| {
-			let Some(considerations) = this.0.take() else {
-				return Err(mlua::Error::runtime(
-					"Considerations list has been exhausted",
-				));
-			};
-			for consider in considerations {
-				let () = function.call(consider)?;
-			}
-			Ok(())
-		});
-	}
-}
-
-#[derive(Clone, Debug, mlua::FromLua)]
-pub struct AttackList {
-	base: Rc<Attack>,
-	pub results: Vec<Consider>,
-}
-
-impl AttackList {
-	pub fn new(base: Rc<Attack>) -> Self {
-		Self {
-			base,
-			results: Vec::new(),
-		}
-	}
-}
-
-impl mlua::UserData for AttackList {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method_mut(
-			"push",
-			|_, this, (table, heuristics): (mlua::OwnedTable, mlua::Variadic<Heuristic>)| {
-				this.results.push(Consider {
-					action: character::Action::Attack(this.base.clone(), Some(table)),
-					heuristics: heuristics.into_iter().collect(),
-				});
-				Ok(())
-			},
-		);
-	}
-}
-
-#[derive(Clone, Debug, mlua::FromLua)]
-pub struct SpellList {
-	base: Rc<Spell>,
-	pub results: Vec<Consider>,
-}
-
-impl SpellList {
-	pub fn new(base: Rc<Spell>) -> Self {
-		Self {
-			base,
-			results: Vec::new(),
-		}
-	}
-}
-
-impl mlua::UserData for SpellList {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method_mut(
-			"push",
-			|_, this, (table, heuristics): (mlua::OwnedTable, mlua::Variadic<Heuristic>)| {
-				this.results.push(Consider {
-					action: character::Action::Cast(this.base.clone(), Some(table)),
-					heuristics: heuristics.into_iter().collect(),
-				});
-				Ok(())
-			},
-		);
 	}
 }

@@ -36,21 +36,16 @@ function sum_heuristics(consider, weight)
 			score = score + debuff_score(heuristic) * weight
 		end
 	end
-	table.insert(scores, {
-		consider = consider,
-		score = score
-	})
+	return score
 end
 
-considerations:for_each(function(consider)
-	if consider:attack() then
-		sum_heuristics(consider)
-	elseif consider:spell() then
-		sum_heuristics(consider)
-	else
-		sum_heuristics(consider)
-	end
-end)
+local scores = {}
+for i, consider in ipairs(considerations) do
+	table.insert(scores, {
+		index = i,
+		score = sum_heuristics(consider),
+	})
+end
 
 local highest
 
@@ -60,4 +55,4 @@ for i, x in ipairs(scores) do
 	end
 end
 
-if highest ~= nil then return highest.consider else return nil end
+if highest ~= nil then return highest.index else return nil end
