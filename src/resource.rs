@@ -347,18 +347,7 @@ impl<'lua> Scripts<'lua> {
 		self.scripts.get(key)
 	}
 
-	pub fn sandbox(
-		&'lua self,
-		key: &str,
-		environment: mlua::Table<'lua>,
-	) -> Result<&mlua::Function<'lua>> {
-		let function = self.scripts.get(key)?;
-		environment.set_metatable(Some(self.sandbox_metatable.clone()));
-		function.set_environment(environment)?;
-		Ok(function)
-	}
-
-	pub fn sandbox_builder(&'lua self, key: &str) -> Result<SandboxBuilder<'lua>> {
+	pub fn sandbox(&'lua self, key: &str) -> Result<SandboxBuilder<'lua>> {
 		let function = self.scripts.get(key)?;
 		let environment = self.runtime.create_table()?;
 		// This is cloning a reference, which is a lot cheaper than creating a new table.

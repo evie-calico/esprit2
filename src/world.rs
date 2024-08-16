@@ -470,15 +470,17 @@ impl Manager {
 			.collect::<Vec<_>>();
 		for attack in &next_character.borrow().attacks {
 			if let Some(on_consider) = &attack.on_consider {
-				let user = next_character.clone();
-				let environment = scripts.runtime.create_table()?;
-				environment.set("use_time", attack.use_time)?;
-				environment.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
-				environment.set("user", user)?;
-				environment.set("nearby_characters", nearby_characters.clone())?;
-				environment.set("Heuristic", consider::HeuristicConstructor)?;
-				let attack_heuristics: mlua::Table =
-					scripts.sandbox(on_consider, environment)?.call(())?;
+				let attack_heuristics: mlua::Table = scripts
+					.sandbox(on_consider)?
+					.insert("use_time", attack.use_time)?
+					.insert(
+						"magnitude",
+						u32::evalv(&attack.magnitude, &*next_character.borrow()),
+					)?
+					.insert("user", next_character.clone())?
+					.insert("nearby_characters", nearby_characters.clone())?
+					.insert("Heuristic", consider::HeuristicConstructor)?
+					.call(())?;
 				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
 					let parameters = heuristics.get("parameters")?;
@@ -496,34 +498,32 @@ impl Manager {
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
 			) {
-				let caster = next_character.clone();
 				let parameters = scripts.runtime.create_table()?;
 				for (k, v) in &spell.parameters {
 					let k = k.as_ref();
 					match v {
 						spell::Parameter::Integer(v) => parameters.set(k, *v)?,
 						spell::Parameter::Expression(v) => {
-							parameters.set(k, u32::evalv(v, &*caster.borrow()))?
+							parameters.set(k, u32::evalv(v, &*next_character.borrow()))?
 						}
 					}
 				}
 
-				let environment = scripts.runtime.create_table()?;
-				environment.set("parameters", parameters)?;
-				// Maybe these should be members of the spell?
-				environment.set("level", spell.level)?;
-				environment.set("affinity", spell.affinity(&caster.borrow()))?;
-				environment.set("caster", caster)?;
-				environment.set("Heuristic", consider::HeuristicConstructor)?;
-				environment.set(
-					"nearby_characters",
-					scripts
-						.runtime
-						.create_table_from(self.characters.iter().cloned().enumerate())?,
-				)?;
-
-				let spell_heuristics: mlua::Table =
-					scripts.sandbox(on_consider, environment)?.call(())?;
+				let spell_heuristics: mlua::Table = scripts
+					.sandbox(on_consider)?
+					.insert("parameters", parameters)?
+					.insert("caster", next_character.clone())?
+					.insert("Heuristic", consider::HeuristicConstructor)?
+					.insert(
+						"nearby_characters",
+						scripts
+							.runtime
+							.create_table_from(self.characters.iter().cloned().enumerate())?,
+					)?
+					// Maybe these should be members of the spell?
+					.insert("level", spell.level)?
+					.insert("affinity", spell.affinity(&next_character.borrow()))?
+					.call(())?;
 				for heuristics in spell_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
 					let parameters = heuristics.get("parameters")?;
@@ -545,16 +545,14 @@ impl Manager {
 		character: CharacterRef,
 		mut considerations: Vec<Consider<'lua>>,
 	) -> Result<character::Action<'lua>> {
-		let environment = scripts.runtime.create_table()?;
-		environment.set("user", character.clone())?;
-		let function = scripts.sandbox(&character.borrow().sheet.on_consider, environment)?;
-
-		let partial_considerations = scripts
-			.runtime
-			.create_sequence_from(considerations.iter().map(TaggedHeuristics::new))?;
-
-		Ok(function
-			.call::<_, Option<usize>>(partial_considerations)?
+		Ok(scripts
+			.sandbox(&character.borrow().sheet.on_consider)?
+			.insert("user", character.clone())?
+			.call::<Option<usize>>(
+				scripts
+					.runtime
+					.create_sequence_from(considerations.iter().map(TaggedHeuristics::new))?,
+			)?
 			.map(|index| considerations.remove(index - 1).action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
@@ -639,15 +637,15 @@ impl Manager {
 							}
 						}
 
-						let environment = scripts.runtime.create_table()?;
-						environment.set("parameters", parameters)?;
-						environment.set("caster", next_character.clone())?;
-						// Maybe these should be members of the spell?
-						environment.set("level", spell.level)?;
-						environment.set("affinity", affinity)?;
-
-						let function = scripts.sandbox(&spell.on_cast, environment)?;
-						Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
+						let value = scripts
+							.sandbox(&spell.on_cast)?
+							.insert("parameters", parameters)?
+							.insert("caster", next_character.clone())?
+							// Maybe these should be members of the spell?
+							.insert("level", spell.level)?
+							.insert("affinity", affinity)?
+							.call(())?;
+						Ok(TurnOutcome::from_lua(scripts.runtime, value)?)
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
@@ -682,15 +680,15 @@ impl Manager {
 			Some(parameters) => parameters,
 			None => scripts.runtime.create_table()?,
 		};
-		let environment = inherit_environment(scripts.runtime)?;
-		environment.set("user", user.clone())?;
-		environment.set("parameters", parameters)?;
-		environment.set("use_time", attack.use_time)?;
-		environment.set("magnitude", magnitude)?;
 
-		let function = scripts.function(&attack.on_use)?;
-		function.set_environment(environment)?;
-		Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
+		let value = scripts
+			.sandbox(&attack.on_use)?
+			.insert("user", user.clone())?
+			.insert("parameters", parameters)?
+			.insert("use_time", attack.use_time)?
+			.insert("magnitude", magnitude)?
+			.call(())?;
+		Ok(TurnOutcome::from_lua(scripts.runtime, value)?)
 	}
 
 	pub fn move_piece<'lua>(
@@ -734,12 +732,4 @@ impl Manager {
 			}
 		}
 	}
-}
-
-fn inherit_environment(lua: &mlua::Lua) -> Result<mlua::Table, mlua::Error> {
-	let environment = lua.create_table()?;
-	let environment_metatable = lua.create_table()?;
-	environment_metatable.set("__index", lua.globals())?;
-	environment.set_metatable(Some(environment_metatable));
-	Ok(environment)
 }
