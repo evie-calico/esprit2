@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use mlua::FromLuaMulti;
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
 use sdl2::video::WindowContext;
@@ -97,15 +98,8 @@ impl mlua::UserData for Manager<'_> {}
 
 pub struct Scripts<'lua> {
 	pub runtime: &'lua mlua::Lua,
+	sandbox_metatable: mlua::Table<'lua>,
 	scripts: Resource<mlua::Function<'lua>>,
-}
-
-impl<'lua> std::ops::Deref for Scripts<'lua> {
-	type Target = Resource<mlua::Function<'lua>>;
-
-	fn deref(&self) -> &Self::Target {
-		&self.scripts
-	}
 }
 
 fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
@@ -135,11 +129,8 @@ fn recurse<T>(
 						.parent()
 						.unwrap_or(Path::new(""))
 						.join(
-							#[allow(
-								clippy::unwrap_used,
-								reason = "file_prefix can only fail when used on directories"
-							)]
-							path.file_prefix().unwrap(),
+							path.file_prefix()
+								.expect("path should never be a directory"),
 						);
 					let reference = reference.to_str().ok_or(Error::InvalidKey)?;
 
@@ -314,13 +305,67 @@ impl<'texture> Manager<'texture> {
 	}
 }
 
+pub struct SandboxBuilder<'lua> {
+	function: &'lua mlua::Function<'lua>,
+	environment: mlua::Table<'lua>,
+}
+
+impl<'lua> SandboxBuilder<'lua> {
+	pub fn insert(
+		self,
+		key: impl mlua::IntoLua<'lua>,
+		value: impl mlua::IntoLua<'lua>,
+	) -> Result<Self> {
+		self.environment.set(key, value)?;
+		Ok(self)
+	}
+
+	pub fn call<R: FromLuaMulti<'lua>>(
+		self,
+		args: impl mlua::IntoLuaMulti<'lua>,
+	) -> mlua::Result<R> {
+		self.function.set_environment(self.environment)?;
+		self.function.call::<_, R>(args)
+	}
+}
+
 impl<'lua> Scripts<'lua> {
 	pub fn open(path: impl AsRef<Path>, lua: &'lua mlua::Lua) -> Result<Scripts<'lua>> {
 		Ok(Self {
 			runtime: lua,
+			sandbox_metatable: lua.create_table_from([("__index", lua.globals())])?,
 			scripts: register(path.as_ref(), &|path| {
-				Ok(lua.load(&fs::read_to_string(path)?).into_function()?)
+				Ok(lua
+					.load(&fs::read_to_string(path)?)
+					.set_name(path.to_string_lossy())
+					.into_function()?)
 			})?,
+		})
+	}
+
+	pub fn function(&'lua self, key: &str) -> Result<&'lua mlua::Function<'lua>> {
+		self.scripts.get(key)
+	}
+
+	pub fn sandbox(
+		&'lua self,
+		key: &str,
+		environment: mlua::Table<'lua>,
+	) -> Result<&mlua::Function<'lua>> {
+		let function = self.scripts.get(key)?;
+		environment.set_metatable(Some(self.sandbox_metatable.clone()));
+		function.set_environment(environment)?;
+		Ok(function)
+	}
+
+	pub fn sandbox_builder(&'lua self, key: &str) -> Result<SandboxBuilder<'lua>> {
+		let function = self.scripts.get(key)?;
+		let environment = self.runtime.create_table()?;
+		// This is cloning a reference, which is a lot cheaper than creating a new table.
+		environment.set_metatable(Some(self.sandbox_metatable.clone()));
+		Ok(SandboxBuilder {
+			function,
+			environment,
 		})
 	}
 }

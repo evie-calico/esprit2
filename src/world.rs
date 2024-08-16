@@ -463,16 +463,15 @@ impl Manager {
 		for attack in &next_character.borrow().attacks {
 			if let Some(on_consider) = &attack.on_consider {
 				let user = next_character.clone();
-				let environment = inherit_environment(scripts.runtime)?;
+				let environment = scripts.runtime.create_table()?;
 				environment.set("use_time", attack.use_time)?;
 				environment.set("magnitude", u32::evalv(&attack.magnitude, &*user.borrow()))?;
 				environment.set("user", user)?;
 				environment.set("nearby_characters", nearby_characters.clone())?;
 				environment.set("Heuristic", consider::HeuristicConstructor)?;
-				let function = scripts.get(on_consider)?;
-				function.set_environment(environment)?;
-				let mut attack_considerations: consider::AttackList =
-					function.call(consider::AttackList::new(attack.clone()))?;
+				let mut attack_considerations: consider::AttackList = scripts
+					.sandbox(on_consider, environment)?
+					.call(consider::AttackList::new(attack.clone()))?;
 				considerations.append(&mut attack_considerations.results);
 			}
 		}
@@ -494,14 +493,13 @@ impl Manager {
 					}
 				}
 
-				let environment = inherit_environment(scripts.runtime)?;
+				let environment = scripts.runtime.create_table()?;
 				environment.set("parameters", parameters)?;
 				// Maybe these should be members of the spell?
 				environment.set("level", spell.level)?;
 				environment.set("affinity", spell.affinity(&caster.borrow()))?;
 				environment.set("caster", caster)?;
 				environment.set("Heuristic", consider::HeuristicConstructor)?;
-
 				environment.set(
 					"nearby_characters",
 					scripts
@@ -509,10 +507,9 @@ impl Manager {
 						.create_table_from(self.characters.iter().cloned().enumerate())?,
 				)?;
 
-				let function = scripts.get(on_consider)?;
-				function.set_environment(environment)?;
-				let mut spell_considerations: consider::SpellList =
-					function.call(consider::SpellList::new(spell.clone()))?;
+				let mut spell_considerations: consider::SpellList = scripts
+					.sandbox(on_consider, environment)?
+					.call(consider::SpellList::new(spell.clone()))?;
 				considerations.append(&mut spell_considerations.results);
 			}
 		}
@@ -527,10 +524,9 @@ impl Manager {
 		considerations: Vec<Consider>,
 	) -> Result<character::Action> {
 		let considerations = consider::Considerations::new(considerations);
-		let environment = inherit_environment(scripts.runtime)?;
+		let environment = scripts.runtime.create_table()?;
 		environment.set("user", character.clone())?;
-		let function = scripts.get(&character.borrow().sheet.on_consider)?;
-		function.set_environment(environment)?;
+		let function = scripts.sandbox(&character.borrow().sheet.on_consider, environment)?;
 
 		Ok(function
 			.call::<_, Option<Consider>>(considerations)?
@@ -621,15 +617,14 @@ impl Manager {
 							}
 						}
 
-						let environment = inherit_environment(scripts.runtime)?;
+						let environment = scripts.runtime.create_table()?;
 						environment.set("parameters", parameters)?;
 						environment.set("caster", next_character.clone())?;
 						// Maybe these should be members of the spell?
 						environment.set("level", spell.level)?;
 						environment.set("affinity", affinity)?;
 
-						let function = scripts.get(&spell.on_cast)?;
-						function.set_environment(environment)?;
+						let function = scripts.sandbox(&spell.on_cast, environment)?;
 						Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
 					}
 					spell::Castable::NotEnoughSP => {
@@ -671,7 +666,7 @@ impl Manager {
 		environment.set("use_time", attack.use_time)?;
 		environment.set("magnitude", magnitude)?;
 
-		let function = scripts.get(&attack.on_use)?;
+		let function = scripts.function(&attack.on_use)?;
 		function.set_environment(environment)?;
 		Ok(TurnOutcome::from_lua(scripts.runtime, function.call(())?)?)
 	}
