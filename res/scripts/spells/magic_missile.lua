@@ -1,18 +1,21 @@
 require("combat")
 
 return coroutine.create(function()
-	if parameters.target == nil then
-		parameters.target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+	-- Prompt user for arguments if they have not been provided
+	if arguments == nil then
+		arguments = {
+			target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range})
+		}
 	end
 
-	if alliance_check(caster, parameters.target) and not alliance_prompt() then return end
+	if alliance_check(caster, arguments.target) and not alliance_prompt() then return end
 
 	local damage, pierce_failed = apply_damage_with_pierce(
 		parameters.pierce_threshold,
-		affinity:magnitude(parameters.magnitude) - parameters.target.stats.resistance
+		affinity:magnitude(parameters.magnitude) - arguments.target.stats.resistance
 	)
 
-	parameters.target.hp = parameters.target.hp - damage
+	arguments.target.hp = arguments.target.hp - damage
 	caster.sp = caster.sp - level
 
 	local damage_messages = {
@@ -42,7 +45,7 @@ return coroutine.create(function()
 	}
 
 	function pick(table)
-		return parameters.target:replace_prefixed_nouns(
+		return arguments.target:replace_prefixed_nouns(
 			"target_",
 			caster:replace_prefixed_nouns(
 				"self_",

@@ -483,10 +483,10 @@ impl Manager {
 					.call(())?;
 				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
-					let parameters = heuristics.get("parameters")?;
+					let arguments = heuristics.get("arguments")?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Attack(attack.clone(), Some(parameters)),
+						action: character::Action::Attack(attack.clone(), Some(arguments)),
 						heuristics,
 					})
 				}
@@ -498,20 +498,12 @@ impl Manager {
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
 			) {
-				let parameters = scripts.runtime.create_table()?;
-				for (k, v) in &spell.parameters {
-					let k = k.as_ref();
-					match v {
-						spell::Parameter::Integer(v) => parameters.set(k, *v)?,
-						spell::Parameter::Expression(v) => {
-							parameters.set(k, u32::evalv(v, &*next_character.borrow()))?
-						}
-					}
-				}
-
 				let spell_heuristics: mlua::Table = scripts
 					.sandbox(on_consider)?
-					.insert("parameters", parameters)?
+					.insert(
+						"parameters",
+						spell.parameter_table(scripts, &*next_character.borrow())?,
+					)?
 					.insert("caster", next_character.clone())?
 					.insert("Heuristic", consider::HeuristicConstructor)?
 					.insert(
@@ -526,10 +518,10 @@ impl Manager {
 					.call(())?;
 				for heuristics in spell_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
-					let parameters = heuristics.get("parameters")?;
+					let arguments = heuristics.get("arguments")?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Cast(spell.clone(), Some(parameters)),
+						action: character::Action::Cast(spell.clone(), Some(arguments)),
 						heuristics,
 					})
 				}
@@ -614,32 +606,22 @@ impl Manager {
 					}
 				}
 			}
-			character::Action::Attack(attack, parameters) => {
-				Ok(self.attack_piece(scripts, attack, next_character, parameters)?)
+			character::Action::Attack(attack, arguments) => {
+				Ok(self.attack_piece(scripts, attack, next_character, arguments)?)
 			}
-			character::Action::Cast(spell, parameters) => {
+			character::Action::Cast(spell, arguments) => {
 				let castable = spell.castable_by(&next_character.borrow());
 				match castable {
 					spell::Castable::Yes => {
 						let affinity = spell.affinity(&next_character.borrow());
 
-						let parameters = match parameters {
-							Some(parameters) => parameters,
-							None => scripts.runtime.create_table()?,
-						};
-						for (k, v) in &spell.parameters {
-							let k = k.as_ref();
-							match v {
-								spell::Parameter::Integer(v) => parameters.set(k, *v)?,
-								spell::Parameter::Expression(v) => {
-									parameters.set(k, u32::evalv(v, &*next_character.borrow()))?
-								}
-							}
-						}
-
 						let value = scripts
 							.sandbox(&spell.on_cast)?
-							.insert("parameters", parameters)?
+							.insert("arguments", arguments)?
+							.insert(
+								"parameters",
+								spell.parameter_table(scripts, &*next_character.borrow())?,
+							)?
 							.insert("caster", next_character.clone())?
 							// Maybe these should be members of the spell?
 							.insert("level", spell.level)?
@@ -671,20 +653,15 @@ impl Manager {
 		scripts: &'lua resource::Scripts,
 		attack: Rc<Attack>,
 		user: &CharacterRef,
-		parameters: Option<mlua::Table<'lua>>,
+		arguments: Option<mlua::Table<'lua>>,
 	) -> Result<TurnOutcome<'lua>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
-		let parameters = match parameters {
-			Some(parameters) => parameters,
-			None => scripts.runtime.create_table()?,
-		};
-
 		let value = scripts
 			.sandbox(&attack.on_use)?
 			.insert("user", user.clone())?
-			.insert("parameters", parameters)?
+			.insert("arguments", arguments)?
 			.insert("use_time", attack.use_time)?
 			.insert("magnitude", magnitude)?
 			.call(())?;

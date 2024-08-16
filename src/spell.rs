@@ -167,4 +167,20 @@ impl Spell {
 			}
 		}
 	}
+
+	pub fn parameter_table<'lua>(
+		&self,
+		scripts: &'lua resource::Scripts,
+		eval_vars: &impl expression::Variables,
+	) -> mlua::Result<mlua::Table<'lua>> {
+		scripts
+			.runtime
+			.create_table_from(self.parameters.iter().map(|(k, v)| {
+				let k = k.as_ref();
+				match v {
+					spell::Parameter::Integer(v) => (k, *v),
+					spell::Parameter::Expression(v) => (k, i32::evalv(v, eval_vars)),
+				}
+			}))
+	}
 }

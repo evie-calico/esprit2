@@ -5,7 +5,7 @@ local considerations = {}
 for i, character in ipairs(nearby_characters) do
 	if not alliance_check(user, character) then
 		table.insert(considerations, {
-			parameters = { target = character },
+			arguments = { target = character },
 			heuristics = {
 				Heuristic:damage(
 					character,
