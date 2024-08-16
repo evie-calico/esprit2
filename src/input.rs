@@ -49,6 +49,7 @@ pub enum Response {
 	Exit,
 	Fullscreen,
 	Debug,
+	Act(character::Action),
 }
 
 pub fn controllable_character(
@@ -110,23 +111,21 @@ pub fn controllable_character(
 									let default_attack =
 										next_character.borrow().attacks.first().cloned();
 									if let Some(default_attack) = default_attack {
-										next_character.borrow_mut().next_action =
-											Some(character::Action::Attack(
-												default_attack,
-												Some(
-													scripts
-														.runtime
-														.create_table_from([(
-															"target",
-															potential_target.clone(),
-														)])?
-														.into_owned(),
-												),
-											))
+										return Ok(Some(Response::Act(character::Action::Attack(
+											default_attack,
+											Some(
+												scripts
+													.runtime
+													.create_table_from([(
+														"target",
+														potential_target.clone(),
+													)])?
+													.into_owned(),
+											),
+										))));
 									}
 								} else {
-									next_character.borrow_mut().next_action =
-										Some(character::Action::Move(x, y));
+									return Ok(Some(Response::Act(character::Action::Move(x, y))));
 								}
 							}
 						}
@@ -177,7 +176,7 @@ pub fn controllable_character(
 								next_character.clone(),
 								considerations,
 							)?;
-							next_character.borrow_mut().next_action = Some(action);
+							return Ok(Some(Response::Act(action)));
 						}
 					}
 					Mode::Attack => {
@@ -186,15 +185,15 @@ pub fn controllable_character(
 						}
 
 						// TODO: just make an array of keys in the options file or something.
-						let mut next_character = next_character.borrow_mut();
+						let next_character = next_character.borrow();
 						let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 						if (0..=26).contains(&selected_index)
 							&& (selected_index as usize) < next_character.spells.len()
 						{
-							next_character.next_action = Some(character::Action::Attack(
+							return Ok(Some(Response::Act(character::Action::Attack(
 								next_character.attacks[selected_index as usize].clone(),
 								None,
-							))
+							))));
 						}
 						*mode = Mode::Normal;
 					}
@@ -204,15 +203,15 @@ pub fn controllable_character(
 						}
 
 						// TODO: just make an array of keys in the options file or something.
-						let mut next_character = next_character.borrow_mut();
+						let next_character = next_character.borrow();
 						let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 						if (0..=26).contains(&selected_index)
 							&& (selected_index as usize) < next_character.spells.len()
 						{
-							next_character.next_action = Some(character::Action::Cast(
+							return Ok(Some(Response::Act(character::Action::Cast(
 								next_character.spells[selected_index as usize].clone(),
 								None,
-							))
+							))));
 						}
 						*mode = Mode::Normal;
 					}

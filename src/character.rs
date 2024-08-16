@@ -173,11 +173,6 @@ pub struct Piece {
 	pub action_delay: Aut,
 	pub player_controlled: bool,
 	pub alliance: Alliance,
-
-	// Temporary associated storage
-	// TODO: Does this even need to be a field?
-	#[serde(skip)]
-	pub next_action: Option<Action>,
 }
 
 impl expression::Variables for Piece {
@@ -215,7 +210,6 @@ impl Piece {
 			spells,
 			x: 0,
 			y: 0,
-			next_action: None,
 			action_delay: 0,
 			player_controlled: false,
 			alliance: Alliance::default(),

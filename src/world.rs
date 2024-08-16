@@ -192,14 +192,14 @@ impl Manager {
 
 	pub fn update<'lua>(
 		&mut self,
-		action_request: Option<ActionRequest<'lua>>,
+		action: PartialAction<'lua>,
 		scripts: &'lua resource::Scripts,
 		input_mode: &mut input::Mode,
 	) -> Result<Option<ActionRequest<'lua>>> {
-		let outcome = match (action_request, input_mode.clone()) {
+		let outcome = match (action, input_mode.clone()) {
 			// Handle cursor submission
 			(
-				Some(ActionRequest::BeginCursor { callback, .. }),
+				PartialAction::Request(ActionRequest::BeginCursor { callback, .. }),
 				input::Mode::Cursor {
 					position: (x, y),
 					submitted: true,
@@ -217,18 +217,18 @@ impl Manager {
 			}
 			// An unsubmitted cursor yields the same action request.
 			(
-				request @ Some(ActionRequest::BeginCursor { .. }),
+				PartialAction::Request(request @ ActionRequest::BeginCursor { .. }),
 				input::Mode::Cursor {
 					submitted: false, ..
 				},
 			) => {
-				return Ok(request);
+				return Ok(Some(request));
 			}
 			// If cursor mode is cancelled in any way, the callback will be destroyed.
-			(Some(ActionRequest::BeginCursor { .. }), _) => TurnOutcome::Yield,
+			(PartialAction::Request(ActionRequest::BeginCursor { .. }), _) => TurnOutcome::Yield,
 			// Prompt with submitted response
 			(
-				Some(ActionRequest::ShowPrompt { callback, .. }),
+				PartialAction::Request(ActionRequest::ShowPrompt { callback, .. }),
 				input::Mode::Prompt {
 					response: Some(response),
 					..
@@ -236,13 +236,13 @@ impl Manager {
 			) => TurnOutcome::poll(scripts.runtime, callback, response)?,
 			// Prompt with unsubmitted response
 			(
-				request @ Some(ActionRequest::ShowPrompt { .. }),
+				PartialAction::Request(request @ ActionRequest::ShowPrompt { .. }),
 				input::Mode::Prompt { response: None, .. },
-			) => return Ok(request),
+			) => return Ok(Some(request)),
 			// Prompt outside of prompt mode (this is different from answering no!).
-			(Some(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
+			(PartialAction::Request(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
 			// If there is no pending request, pop a turn off the character queue.
-			(None, _) => self.next_turn(scripts)?,
+			(PartialAction::Action(action), _) => self.next_turn(scripts, action)?,
 		};
 
 		let player_controlled = self.next_character().borrow().player_controlled;
@@ -356,6 +356,11 @@ impl Manager {
 		}
 		Ok(())
 	}
+}
+
+pub enum PartialAction<'lua> {
+	Action(character::Action),
+	Request(ActionRequest<'lua>),
 }
 
 /// Used to "escape" the world and request extra information, such as inputs.
@@ -537,12 +542,9 @@ impl Manager {
 	pub fn next_turn<'lua>(
 		&mut self,
 		scripts: &'lua resource::Scripts,
+		action: character::Action,
 	) -> Result<TurnOutcome<'lua>> {
 		let next_character = self.next_character();
-
-		let Some(action) = next_character.borrow_mut().next_action.take() else {
-			return Ok(TurnOutcome::Yield);
-		};
 
 		let delay = next_character.borrow().action_delay;
 		// The delay represents how many auts must pass until this character's next action.

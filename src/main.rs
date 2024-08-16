@@ -4,6 +4,7 @@ use sdl2::rect::Rect;
 use std::process::exit;
 use std::{fs, io};
 use tracing::{error, info, warn};
+use world::PartialAction;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -135,7 +136,7 @@ pub fn main() {
 	let mut cloudy_wave = draw::CloudyWave::default();
 
 	let mut input_mode = input::Mode::Normal;
-	let mut action_request = None;
+	let mut partial_action = None;
 	let mut fps = 60.0;
 	let mut fps_timer = 0.0;
 	let mut debug = false;
@@ -166,6 +167,9 @@ pub fn main() {
 						}
 					}
 					Ok(Some(input::Response::Debug)) => debug ^= true,
+					Ok(Some(input::Response::Act(action))) => {
+						partial_action = Some(PartialAction::Action(action))
+					}
 					Ok(None) => (),
 					Err(msg) => {
 						error!("world input processing returned an error: {msg}");
@@ -176,7 +180,7 @@ pub fn main() {
 				let action = world_manager
 					.consider_action(&scripts, next_character, considerations)
 					.unwrap();
-				world_manager.next_character().borrow_mut().next_action = Some(action);
+				partial_action = Some(PartialAction::Action(action));
 			}
 		}
 		// Logic
@@ -194,11 +198,13 @@ pub fn main() {
 				i.draw_state.cloud.tick(delta);
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
-			match world_manager.update(action_request, &scripts, &mut input_mode) {
-				Ok(result) => action_request = result,
-				Err(msg) => {
-					error!("world manager update returned an error: {msg}");
-					action_request = None;
+			if let Some(inner_action) = partial_action {
+				match world_manager.update(inner_action, &scripts, &mut input_mode) {
+					Ok(result) => partial_action = result.map(PartialAction::Request),
+					Err(msg) => {
+						error!("world manager update returned an error: {msg}");
+						partial_action = None;
+					}
 				}
 			}
 			world_manager
