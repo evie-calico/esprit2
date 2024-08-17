@@ -113,7 +113,9 @@ pub fn menu(
 				&menu.typography.annotation,
 			);
 			menu.label(message);
-			menu.label("(y/n)");
+			menu.label(&format!("Yes: {}", &options.controls.yes));
+			menu.label(&format!("No: {}", &options.controls.no));
+			menu.label(&format!("Cancel: {}", options.controls.escape));
 		}
 		input::Mode::DirectionPrompt { message, .. } => {
 			menu.label_styled(

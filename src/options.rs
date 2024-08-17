@@ -113,6 +113,12 @@ impl Default for Colors {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Key(Keycode);
 
+impl Key {
+	pub fn new(key: Keycode) -> Self {
+		Self(key)
+	}
+}
+
 impl serde::Serialize for Key {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
@@ -165,6 +171,27 @@ pub struct Triggers(Vec<Key>);
 impl Triggers {
 	pub fn contains(&self, keycode: Keycode) -> bool {
 		self.0.iter().any(|x| x.0 == keycode)
+	}
+}
+
+impl std::fmt::Display for Triggers {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let mut triggers = self.0.iter();
+		if let Some(first) = triggers.next() {
+			write!(f, "{}", first.0.name())?;
+			for i in triggers {
+				write!(f, ", {}", i.0.name())?;
+			}
+		}
+		Ok(())
+	}
+}
+
+impl std::ops::Deref for Triggers {
+	type Target = Vec<Key>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
 	}
 }
 
