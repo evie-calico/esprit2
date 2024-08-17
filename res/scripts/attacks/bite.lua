@@ -4,7 +4,7 @@ return coroutine.create(function()
 	-- Prompt user for arguments if they have not been provided
 	if arguments == nil then
 		arguments = {
-			target = coroutine.yield({ type = "Cursor", x = user.x, y = user.y, range = 1 })
+			target = coroutine.yield({ type = "TargetCursor", x = user.x, y = user.y, range = 1 })
 		}
 	end
 

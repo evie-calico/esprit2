@@ -1,0 +1,22 @@
+name = "Crush"
+description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled."
+icon = "magic_missile"
+
+# This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
+energy = "Negative"
+harmony = "Chaos"
+
+level = 1
+
+on_cast = "spells/crush"
+# TODO: on_consider = "consider/spells/crush"
+
+[parameters]
+# Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
+magnitude = "magic + 2"
+pierce_threshold = 2
+range = 6 # How far away the crush can be centered
+radius = 4 # How large the area is
+displacement = 5 # How far targets are moved
+cast_time = 12
+

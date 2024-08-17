@@ -36,6 +36,7 @@ pub enum Mode {
 		origin: (i32, i32),
 		position: (i32, i32),
 		range: u32,
+		radius: Option<u32>,
 		submitted: bool,
 		state: CursorState,
 	},

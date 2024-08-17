@@ -79,7 +79,10 @@ pub fn cursor(
 	camera: &Camera,
 ) {
 	if let input::Mode::Cursor {
+		origin,
 		position: (x, y),
+		range,
+		radius,
 		state: input::CursorState { float, .. },
 		..
 	} = *input_mode
@@ -89,6 +92,27 @@ pub fn cursor(
 			TopRight,
 			BottomLeft,
 			BottomRight,
+		}
+
+		canvas.set_draw_color(Color::RED);
+		canvas
+			.draw_rect(Rect::new(
+				(origin.0 - range as i32) * ITILE_SIZE - camera.x,
+				(origin.1 - range as i32) * ITILE_SIZE - camera.y,
+				(range * 2 + 1) * TILE_SIZE,
+				(range * 2 + 1) * TILE_SIZE,
+			))
+			.unwrap();
+		if let Some(radius) = radius {
+			canvas.set_draw_color(Color::YELLOW);
+			canvas
+				.draw_rect(Rect::new(
+					(x - radius as i32) * ITILE_SIZE - camera.x,
+					(y - radius as i32) * ITILE_SIZE - camera.y,
+					(radius * 2 + 1) * TILE_SIZE,
+					(radius * 2 + 1) * TILE_SIZE,
+				))
+				.unwrap();
 		}
 
 		let cursor = resources.get_texture("cursor");

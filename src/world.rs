@@ -197,9 +197,9 @@ impl Manager {
 		input_mode: &mut input::Mode,
 	) -> Result<Option<ActionRequest<'lua>>> {
 		let outcome = match (action, input_mode.clone()) {
-			// Handle cursor submission
+			// Handle targetted cursor submission
 			(
-				PartialAction::Request(ActionRequest::BeginCursor { callback, .. }),
+				PartialAction::Request(ActionRequest::BeginTargetCursor { callback, .. }),
 				input::Mode::Cursor {
 					position: (x, y),
 					submitted: true,
@@ -207,7 +207,7 @@ impl Manager {
 				},
 			) => {
 				if let Some(character) = self.get_character_at(x, y) {
-					TurnOutcome::poll(scripts.runtime, callback, character.clone())?
+					TurnOutcome::poll(self, scripts.runtime, callback, character.clone())?
 				} else {
 					// If the cursor hasn't selected a character,
 					// cancel the request altogther.
@@ -215,17 +215,27 @@ impl Manager {
 					TurnOutcome::Yield
 				}
 			}
+			// Handle positional cursor submission
+			(
+				PartialAction::Request(ActionRequest::BeginCursor { callback, .. }),
+				input::Mode::Cursor {
+					position: (x, y),
+					submitted: true,
+					..
+				},
+			) => TurnOutcome::poll(self, scripts.runtime, callback, (x, y))?,
 			// An unsubmitted cursor yields the same action request.
 			(
-				PartialAction::Request(request @ ActionRequest::BeginCursor { .. }),
+				PartialAction::Request(
+					request @ (ActionRequest::BeginCursor { .. }
+					| ActionRequest::BeginTargetCursor { .. }),
+				),
 				input::Mode::Cursor {
 					submitted: false, ..
 				},
 			) => {
 				return Ok(Some(request));
 			}
-			// If cursor mode is cancelled in any way, the callback will be destroyed.
-			(PartialAction::Request(ActionRequest::BeginCursor { .. }), _) => TurnOutcome::Yield,
 			// Prompt with submitted response
 			(
 				PartialAction::Request(ActionRequest::ShowPrompt { callback, .. }),
@@ -233,14 +243,21 @@ impl Manager {
 					response: Some(response),
 					..
 				},
-			) => TurnOutcome::poll(scripts.runtime, callback, response)?,
+			) => TurnOutcome::poll(self, scripts.runtime, callback, response)?,
 			// Prompt with unsubmitted response
 			(
 				PartialAction::Request(request @ ActionRequest::ShowPrompt { .. }),
 				input::Mode::Prompt { response: None, .. },
 			) => return Ok(Some(request)),
-			// Prompt outside of prompt mode (this is different from answering no!).
-			(PartialAction::Request(ActionRequest::ShowPrompt { .. }), _) => TurnOutcome::Yield,
+			// If the input mode is invalid in any way, the callback will be destroyed.
+			(
+				PartialAction::Request(
+					ActionRequest::BeginCursor { .. }
+					| ActionRequest::BeginTargetCursor { .. }
+					| ActionRequest::ShowPrompt { .. },
+				),
+				_,
+			) => TurnOutcome::Yield,
 			// If there is no pending request, pop a turn off the character queue.
 			(PartialAction::Action(action), _) => self.next_turn(scripts, action)?,
 		};
@@ -281,11 +298,33 @@ impl Manager {
 			TurnOutcome::Request(request) => {
 				// Set up any new action requests.
 				match &request {
-					world::ActionRequest::BeginCursor { x, y, range, .. } => {
+					world::ActionRequest::BeginCursor {
+						x,
+						y,
+						range,
+						radius,
+						callback: _,
+					} => {
 						*input_mode = input::Mode::Cursor {
 							origin: (*x, *y),
 							position: (*x, *y),
 							range: *range,
+							radius: *radius,
+							submitted: false,
+							state: input::CursorState::default(),
+						};
+					}
+					world::ActionRequest::BeginTargetCursor {
+						x,
+						y,
+						range,
+						callback: _,
+					} => {
+						*input_mode = input::Mode::Cursor {
+							origin: (*x, *y),
+							position: (*x, *y),
+							range: *range,
+							radius: None,
 							submitted: false,
 							state: input::CursorState::default(),
 						};
@@ -365,8 +404,20 @@ pub enum PartialAction<'lua> {
 
 /// Used to "escape" the world and request extra information, such as inputs.
 pub enum ActionRequest<'lua> {
+	/// Returns a position to the callback.
+	///
 	/// This callback will be called in place of `pop_action` once a position is selected.
 	BeginCursor {
+		x: i32,
+		y: i32,
+		range: u32,
+		radius: Option<u32>,
+		callback: mlua::Thread<'lua>,
+	},
+	/// Returns a character piece to the callback.
+	///
+	/// This callback will be called in place of `pop_action` once a position is selected.
+	BeginTargetCursor {
 		x: i32,
 		y: i32,
 		range: u32,
@@ -379,9 +430,13 @@ pub enum ActionRequest<'lua> {
 }
 
 impl<'lua> TurnOutcome<'lua> {
-	fn from_lua(lua: &'lua mlua::Lua, value: mlua::Value<'lua>) -> mlua::Result<Self> {
+	fn from_lua(
+		world: &Manager,
+		lua: &'lua mlua::Lua,
+		value: mlua::Value<'lua>,
+	) -> mlua::Result<Self> {
 		match value {
-			mlua::Value::Thread(thread) => TurnOutcome::poll(lua, thread, ()),
+			mlua::Value::Thread(thread) => TurnOutcome::poll(world, lua, thread, ()),
 			mlua::Value::Nil => Ok(TurnOutcome::Yield),
 			mlua::Value::Integer(delay) => Ok(TurnOutcome::Action {
 				delay: delay as Aut,
@@ -391,39 +446,88 @@ impl<'lua> TurnOutcome<'lua> {
 	}
 
 	fn poll(
+		world: &Manager,
 		lua: &'lua mlua::Lua,
 		thread: mlua::Thread<'lua>,
 		args: impl mlua::IntoLuaMulti<'lua>,
 	) -> mlua::Result<Self> {
+		// Handle requests for extra information from the lua function.
+		// These may or may not be inputs.
 		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		#[serde(tag = "type")]
-		pub enum LuaActionRequest {
-			Cursor { x: i32, y: i32, range: u32 },
-			Prompt { message: String },
+		pub enum LuaRequest {
+			// World manager communication
+			Characters,
+			Tile {
+				x: i32,
+				y: i32,
+			},
+			// Input
+			TargetCursor {
+				x: i32,
+				y: i32,
+				range: u32,
+			},
+			Cursor {
+				x: i32,
+				y: i32,
+				range: u32,
+				radius: Option<u32>,
+			},
+			Prompt {
+				message: String,
+			},
 		}
 
-		let value = thread.resume(args)?;
-
-		// A resumable thread is expecting an action request response.
-		if thread.status() == mlua::ThreadStatus::Resumable {
-			Ok(match lua.from_value::<LuaActionRequest>(value)? {
-				LuaActionRequest::Cursor { x, y, range } => {
-					TurnOutcome::Request(ActionRequest::BeginCursor {
+		let mut value = thread.resume(args)?;
+		loop {
+			// A resumable thread is expecting an action request response.
+			if thread.status() == mlua::ThreadStatus::Resumable {
+				match lua.from_value::<LuaRequest>(value)? {
+					LuaRequest::Characters => {
+						value = thread
+							.resume(lua.create_sequence_from(world.characters.iter().cloned())?)?
+					}
+					LuaRequest::Tile { x, y } => {
+						let tile = world.current_floor.map.get(y, x).copied();
+						value = thread.resume(
+							tile.map(|x| lua.to_value(&x))
+								.transpose()?
+								.unwrap_or(mlua::Value::Nil),
+						)?;
+					}
+					LuaRequest::TargetCursor { x, y, range } => {
+						return Ok(TurnOutcome::Request(ActionRequest::BeginTargetCursor {
+							x,
+							y,
+							range,
+							callback: thread,
+						}));
+					}
+					LuaRequest::Cursor {
 						x,
 						y,
 						range,
-						callback: thread,
-					})
+						radius,
+					} => {
+						return Ok(TurnOutcome::Request(ActionRequest::BeginCursor {
+							x,
+							y,
+							range,
+							radius,
+							callback: thread,
+						}));
+					}
+					LuaRequest::Prompt { message } => {
+						return Ok(TurnOutcome::Request(ActionRequest::ShowPrompt {
+							message,
+							callback: thread,
+						}))
+					}
 				}
-				LuaActionRequest::Prompt { message } => {
-					TurnOutcome::Request(ActionRequest::ShowPrompt {
-						message,
-						callback: thread,
-					})
-				}
-			})
-		} else {
-			TurnOutcome::from_lua(lua, value)
+			} else {
+				return TurnOutcome::from_lua(world, lua, value);
+			}
 		}
 	}
 }
@@ -643,7 +747,7 @@ impl Manager {
 							.insert("level", spell.level)?
 							.insert("affinity", affinity)?
 							.call(())?;
-						Ok(TurnOutcome::from_lua(scripts.runtime, value)?)
+						Ok(TurnOutcome::from_lua(self, scripts.runtime, value)?)
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
@@ -681,7 +785,7 @@ impl Manager {
 			.insert("use_time", attack.use_time)?
 			.insert("magnitude", magnitude)?
 			.call(())?;
-		Ok(TurnOutcome::from_lua(scripts.runtime, value)?)
+		Ok(TurnOutcome::from_lua(self, scripts.runtime, value)?)
 	}
 
 	pub fn move_piece<'lua>(

@@ -1,5 +1,5 @@
 return coroutine.create(function()
-	local target = coroutine.yield({ type = "Cursor", x = caster.x, y = caster.y, range = parameters.range })
+	local target = coroutine.yield({ type = "TargetCursor", x = caster.x, y = caster.y, range = parameters.range })
 
 	local is_energy = coroutine.yield({ type = "Prompt", message = "Major (Y: Energy, N: Harmony)"})
 	local first_major
