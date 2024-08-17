@@ -1,6 +1,6 @@
 level = 1
 attacks = ["scratch", "bite"]
-spells = ["magic_missile", "debug/level_up", "debug/change_affinity"]
+spells = ["magic_missile", "debug/level_up", "debug/change_affinity", "swap"]
 speed = 12
 icon = "luvui"
 
