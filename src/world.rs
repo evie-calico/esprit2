@@ -249,12 +249,31 @@ impl Manager {
 				PartialAction::Request(request @ ActionRequest::ShowPrompt { .. }),
 				input::Mode::Prompt { response: None, .. },
 			) => return Ok(Some(request)),
+			// Direction prompt with submitted response
+			(
+				PartialAction::Request(ActionRequest::ShowDirectionPrompt { callback, .. }),
+				input::Mode::DirectionPrompt {
+					response: Some(response),
+					..
+				},
+			) => TurnOutcome::poll(
+				self,
+				scripts.runtime,
+				callback,
+				scripts.runtime.to_value(&response),
+			)?,
+			// Direction prompt with unsubmitted response
+			(
+				PartialAction::Request(request @ ActionRequest::ShowDirectionPrompt { .. }),
+				input::Mode::DirectionPrompt { response: None, .. },
+			) => return Ok(Some(request)),
 			// If the input mode is invalid in any way, the callback will be destroyed.
 			(
 				PartialAction::Request(
 					ActionRequest::BeginCursor { .. }
 					| ActionRequest::BeginTargetCursor { .. }
-					| ActionRequest::ShowPrompt { .. },
+					| ActionRequest::ShowPrompt { .. }
+					| ActionRequest::ShowDirectionPrompt { .. },
 				),
 				_,
 			) => TurnOutcome::Yield,
@@ -331,6 +350,12 @@ impl Manager {
 					}
 					world::ActionRequest::ShowPrompt { message, .. } => {
 						*input_mode = input::Mode::Prompt {
+							response: None,
+							message: message.clone(),
+						}
+					}
+					world::ActionRequest::ShowDirectionPrompt { message, .. } => {
+						*input_mode = input::Mode::DirectionPrompt {
 							response: None,
 							message: message.clone(),
 						}
@@ -427,6 +452,10 @@ pub enum ActionRequest<'lua> {
 		message: String,
 		callback: mlua::Thread<'lua>,
 	},
+	ShowDirectionPrompt {
+		message: String,
+		callback: mlua::Thread<'lua>,
+	},
 }
 
 impl<'lua> TurnOutcome<'lua> {
@@ -477,6 +506,9 @@ impl<'lua> TurnOutcome<'lua> {
 			Prompt {
 				message: String,
 			},
+			Direction {
+				message: String,
+			},
 		}
 
 		let mut value = thread.resume(args)?;
@@ -520,6 +552,12 @@ impl<'lua> TurnOutcome<'lua> {
 					}
 					LuaRequest::Prompt { message } => {
 						return Ok(TurnOutcome::Request(ActionRequest::ShowPrompt {
+							message,
+							callback: thread,
+						}))
+					}
+					LuaRequest::Direction { message } => {
+						return Ok(TurnOutcome::Request(ActionRequest::ShowDirectionPrompt {
 							message,
 							callback: thread,
 						}))

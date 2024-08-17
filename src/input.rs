@@ -44,6 +44,10 @@ pub enum Mode {
 		response: Option<bool>,
 		message: String,
 	},
+	DirectionPrompt {
+		response: Option<CardDir>,
+		message: String,
+	},
 }
 
 pub enum Response<'lua> {
@@ -67,6 +71,9 @@ pub fn controllable_character<'lua>(
 			submitted: true, ..
 		}
 		| input::Mode::Prompt {
+			response: Some(_), ..
+		}
+		| input::Mode::DirectionPrompt {
 			response: Some(_), ..
 		} => *mode = input::Mode::Normal,
 		_ => (),
@@ -259,6 +266,26 @@ pub fn controllable_character<'lua>(
 						}
 						if options.controls.no.contains(keycode) {
 							*response = Some(false);
+						}
+						if options.controls.escape.contains(keycode) {
+							*mode = Mode::Normal;
+						}
+					}
+					Mode::DirectionPrompt { response, .. } => {
+						if options.controls.left.contains(keycode) {
+							*response = Some(CardDir::Left);
+						}
+						if options.controls.right.contains(keycode) {
+							*response = Some(CardDir::Right);
+						}
+						if options.controls.up.contains(keycode) {
+							*response = Some(CardDir::Up);
+						}
+						if options.controls.down.contains(keycode) {
+							*response = Some(CardDir::Down);
+						}
+						if options.controls.escape.contains(keycode) {
+							*mode = Mode::Normal;
 						}
 					}
 				}

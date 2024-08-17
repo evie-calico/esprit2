@@ -115,6 +115,15 @@ pub fn menu(
 			menu.label(message);
 			menu.label("(y/n)");
 		}
+		input::Mode::DirectionPrompt { message, .. } => {
+			menu.label_styled(
+				"Direction Prompt",
+				options.ui.colors.cursor_mode,
+				&menu.typography.annotation,
+			);
+			menu.label(message);
+			menu.label("(hjkl)");
+		}
 	}
 }
 

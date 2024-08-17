@@ -12,12 +12,19 @@ return coroutine.create(function()
 		range = parameters.range,
 		radius = parameters.radius
 	}
+	local direction = coroutine.yield {
+		type = "Direction",
+		message = "Crush in which direction?"
+	}
 	for i, character in ipairs(characters) do
 		if math.abs(character.x - x) <= parameters.radius and math.abs(character.y - y) <= parameters.radius then
 			-- we'll start with a basic rightward movement.
 			for distance_traveled = 0, parameters.displacement do
-				local projected_x = character.x + 1
+				local projected_x = character.x
 				local projected_y = character.y
+				if direction == "Left" then projected_x = projected_x - 1 elseif direction == "Right" then projected_x = projected_x + 1 end
+				if direction == "Up" then projected_y = projected_y - 1 elseif direction == "Down" then projected_y = projected_y + 1 end
+
 				local tile = coroutine.yield { type = "Tile", x = projected_x, y = projected_y }
 				-- TODO: This is insufficient
 				if tile ~= nil and tile ~= "Wall" then

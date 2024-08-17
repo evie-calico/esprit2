@@ -72,6 +72,45 @@ const SQRT2_TURN: Aut = 17;
 type Color = (u8, u8, u8, u8);
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum DirectionType {
+	Cardinal,
+	Ordinal,
+}
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum CardDir {
+	Up,
+	Right,
+	Down,
+	Left,
+}
+
+impl CardDir {
+	pub fn all() -> impl Iterator<Item = Self> {
+		[CardDir::Up, CardDir::Right, CardDir::Down, CardDir::Left].into_iter()
+	}
+
+	pub fn as_offset(self) -> (i32, i32) {
+		match self {
+			CardDir::Up => (0, -1),
+			CardDir::Right => (1, 0),
+			CardDir::Down => (0, 1),
+			CardDir::Left => (-1, 0),
+		}
+	}
+
+	pub fn from_offset(x: i32, y: i32) -> Option<Self> {
+		match (x, y) {
+			(0, -1) => Some(CardDir::Up),
+			(1, 0) => Some(CardDir::Right),
+			(0, 1) => Some(CardDir::Down),
+			(-1, 0) => Some(CardDir::Left),
+			_ => None,
+		}
+	}
+}
+
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum OrdDir {
 	Up,
 	UpRight,
