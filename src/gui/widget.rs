@@ -113,9 +113,11 @@ pub fn menu(
 				&menu.typography.annotation,
 			);
 			menu.label(message);
-			menu.label(&format!("Yes: {}", &options.controls.yes));
-			menu.label(&format!("No: {}", &options.controls.no));
-			menu.label(&format!("Cancel: {}", options.controls.escape));
+			menu.margin_list([
+				("Yes: ", options.controls.yes.to_string().as_str()),
+				("No: ", options.controls.no.to_string().as_str()),
+				("Cancel: ", options.controls.escape.to_string().as_str()),
+			]);
 		}
 		input::Mode::DirectionPrompt { message, .. } => {
 			menu.label_styled(

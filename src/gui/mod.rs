@@ -109,6 +109,63 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(0, (lowest_child - self.y) as u32);
 	}
 
+	pub fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
+		let font = &self.typography.normal;
+		let color = self.typography.color;
+		let mut largest_margin = 0;
+		let mut cursor = 0;
+		for (margin, content) in list
+			.into_iter()
+			.map(|(margin, content)| {
+				let margin = font
+					.render(margin)
+					.blended(color)
+					.unwrap()
+					.as_texture(&self.font_texture_creator)
+					.unwrap();
+				let content = font
+					.render(content)
+					.blended(color)
+					.unwrap()
+					.as_texture(&self.font_texture_creator)
+					.unwrap();
+				largest_margin = margin.query().width.max(largest_margin);
+
+				(margin, content)
+			})
+			// This is silly looking but necessary to calculate the longest margin's width.
+			.collect::<Box<[_]>>()
+		{
+			let margin_q = margin.query();
+			self.canvas
+				.copy(
+					&margin,
+					None,
+					Rect::new(
+						self.x + largest_margin as i32 - margin_q.width as i32,
+						self.y + cursor,
+						margin_q.width,
+						margin_q.height,
+					),
+				)
+				.unwrap();
+			let content_q = content.query();
+			self.canvas
+				.copy(
+					&content,
+					None,
+					Rect::new(
+						self.x + largest_margin as i32,
+						self.y + cursor,
+						content_q.width,
+						content_q.height,
+					),
+				)
+				.unwrap();
+			cursor += margin_q.height.max(content_q.height) as i32;
+		}
+	}
+
 	pub fn progress_bar(
 		&mut self,
 		progress: f32,
