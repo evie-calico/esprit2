@@ -98,12 +98,6 @@ pub struct Spell {
 	/// This is also the cost of the spell.
 	pub level: u8,
 
-	/// If set, defines how close characters must be to be considered by the spell.
-	///
-	/// This is distinct from the range parameter that a spell may have.
-	// TODO: Should it be? Consider using the consideration script results for player input too.
-	pub consideration_range: Option<u32>,
-
 	/// Script to execute upon casting the spell.
 	pub on_cast: resource::Id,
 	/// Script to return all possible spell actions.
@@ -111,6 +105,10 @@ pub struct Spell {
 	/// Returns an array of `consider::Consideration`s for each possible usage of the spell.
 	/// For an attack, this means potential targets.
 	/// For a self-buff, this should roughly estimate the potential benefit of casting the spell.
+	///
+	/// When an on_consider script is about to be called, it's fed a list of characters that are potential targets for the spell.
+	/// If a spell parameter named "range" exists, the script will only be provided with characters within this range.
+	/// Otherwise, consideration scripts are expected to filter targets themselves.
 	pub on_consider: Option<resource::Id>,
 }
 

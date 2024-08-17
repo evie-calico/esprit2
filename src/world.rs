@@ -498,20 +498,36 @@ impl Manager {
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
 			) {
-				let spell_heuristics: mlua::Table = scripts
-					.sandbox(on_consider)?
-					.insert(
-						"parameters",
-						spell.parameter_table(scripts, &*next_character.borrow())?,
-					)?
-					.insert("caster", next_character.clone())?
-					.insert("Heuristic", consider::HeuristicConstructor)?
-					.insert(
-						"nearby_characters",
+				let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
+				let nearby_characters =
+					// You could make a very good argument that this sort of filtering is the script's job,
+					// but filtering a list of characters is a MUCH easier job for Rust than Lua,
+					// so I think it's worth handling this common case.
+					if let Some(range) = parameters.get::<_, Option<u32>>("range")? {
+						let (x, y) = {
+							let c = next_character.borrow();
+							(c.x, c.y)
+						};
+						scripts.runtime.create_sequence_from(
+							self.characters
+								.iter()
+								.filter(|c| {
+									(x - c.borrow().x).unsigned_abs() <= range
+										&& (y - c.borrow().y).unsigned_abs() <= range
+								})
+								.cloned(),
+						)?
+					} else {
 						scripts
 							.runtime
-							.create_table_from(self.characters.iter().cloned().enumerate())?,
-					)?
+							.create_sequence_from(self.characters.iter().cloned())?
+					};
+				let spell_heuristics: mlua::Table = scripts
+					.sandbox(on_consider)?
+					.insert("parameters", parameters)?
+					.insert("caster", next_character.clone())?
+					.insert("Heuristic", consider::HeuristicConstructor)?
+					.insert("nearby_characters", nearby_characters)?
 					// Maybe these should be members of the spell?
 					.insert("level", spell.level)?
 					.insert("affinity", spell.affinity(&next_character.borrow()))?

@@ -7,8 +7,6 @@ harmony = "Order"
 
 level = 1
 
-consideration_range = 5
-
 on_cast = "spells/magic_missile"
 on_consider = "consider/spells/magic_missile"
 
