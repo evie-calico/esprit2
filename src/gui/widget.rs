@@ -126,7 +126,12 @@ pub fn menu(
 				&menu.typography.annotation,
 			);
 			menu.label(message);
-			menu.label("(hjkl)");
+			menu.margin_list([
+				("Left: ", options.controls.left.to_string().as_str()),
+				("Up: ", options.controls.up.to_string().as_str()),
+				("Down: ", options.controls.down.to_string().as_str()),
+				("Right: ", options.controls.right.to_string().as_str()),
+			]);
 		}
 	}
 }
