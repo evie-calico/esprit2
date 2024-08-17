@@ -6,7 +6,7 @@ icon = "magic_missile"
 energy = "Negative"
 harmony = "Chaos"
 
-level = 1
+level = 2
 
 on_cast = "spells/crush"
 # TODO: on_consider = "consider/spells/crush"
