@@ -6,6 +6,12 @@ use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 
+#[derive(Clone, Default, Debug)]
+pub struct PartyReferenceDrawState {
+	pub cloud: draw::CloudState,
+	pub cloud_trail: draw::CloudTrail,
+}
+
 pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
 	light_texture: Texture<'texture>,
@@ -158,140 +164,158 @@ pub fn attack_menu(gui: &mut gui::Context, character: &character::Piece) {
 	}
 }
 
-pub fn pamphlet(
-	pamphlet: &mut gui::Context,
-	world_manager: &world::Manager,
-	resources: &resource::Manager<'_>,
-	soul_jar: &mut SoulJar<'_>,
-) {
-	struct MemberPosition {
-		x: i32,
-		y: i32,
-		flipped: bool,
+pub struct Pamphlet {
+	pub party_member_clouds: Vec<PartyReferenceDrawState>,
+}
+
+impl Pamphlet {
+	pub fn new() -> Self {
+		Self {
+			party_member_clouds: vec![
+				PartyReferenceDrawState::default(),
+				PartyReferenceDrawState::default(),
+				PartyReferenceDrawState::default(),
+				PartyReferenceDrawState::default(),
+			],
+		}
 	}
-	let member_layout = [
-		MemberPosition {
-			x: -30,
-			y: -30,
-			flipped: false,
-		},
-		MemberPosition {
-			x: -40,
-			y: 0,
-			flipped: true,
-		},
-	];
 
-	pamphlet.advance(0, 32);
+	pub fn draw(
+		&self,
+		pamphlet: &mut gui::Context,
+		world_manager: &world::Manager,
+		resources: &resource::Manager<'_>,
+		soul_jar: &mut SoulJar<'_>,
+	) {
+		struct MemberPosition {
+			x: i32,
+			y: i32,
+			flipped: bool,
+		}
+		let member_layout = [
+			MemberPosition {
+				x: -30,
+				y: -30,
+				flipped: false,
+			},
+			MemberPosition {
+				x: -40,
+				y: 0,
+				flipped: true,
+			},
+		];
 
-	// Draw party stats
-	for (character_chunk, layout_chunk) in
-		world_manager.party.chunks(2).zip(member_layout.chunks(2))
-	{
-		let mut character_windows = [None, None];
-		for ((character_id, window), layout) in character_chunk
-			.iter()
-			.zip(character_windows.iter_mut())
-			.zip(layout_chunk)
+		pamphlet.advance(0, 32);
+
+		// Draw party stats
+		for ((character_chunk, layout_chunk), cloud_chunk) in world_manager
+			.party
+			.chunks(2)
+			.zip(member_layout.chunks(2))
+			.zip(self.party_member_clouds.chunks(2))
 		{
-			*window = Some(|player_window: &mut gui::Context| {
-				let rect = player_window.rect;
-				player_window.relocate(Rect::new(
-					rect.x + layout.x,
-					rect.y + layout.y,
-					rect.width(),
-					rect.height(),
-				));
-				let piece = character_id.piece.borrow();
-				let texture = resources.get_texture("luvui_sleep");
-				character_thinking(
-					character_id,
-					player_window,
-					texture,
-					layout.flipped,
-					|player_window| {
-						character_info(player_window, &piece);
-						character_buffs(player_window, &piece, resources);
-					},
-				);
-			});
-		}
-		pamphlet.hsplit(&mut character_windows);
-	}
-	pamphlet.advance(0, 10);
-
-	let mut inventory_fn = |pamphlet: &mut gui::Context| {
-		pamphlet.label("Inventory");
-		let mut items = world_manager.inventory.iter().peekable();
-		while items.peek().is_some() {
-			let textures_per_row = pamphlet.rect.width() / (32 + 8);
-			pamphlet.horizontal();
-			for _ in 0..textures_per_row {
-				if let Some(item_name) = items.next() {
-					pamphlet.htexture(resources.get_texture(item_name), 32);
-					pamphlet.advance(8, 0);
-				}
+			let mut character_windows = [None, None];
+			for (((character_id, window), layout), cloud) in character_chunk
+				.iter()
+				.zip(character_windows.iter_mut())
+				.zip(layout_chunk)
+				.zip(cloud_chunk)
+			{
+				*window = Some(|player_window: &mut gui::Context| {
+					let rect = player_window.rect;
+					player_window.relocate(Rect::new(
+						rect.x + layout.x,
+						rect.y + layout.y,
+						rect.width(),
+						rect.height(),
+					));
+					let piece = character_id.piece.borrow();
+					let texture = resources.get_texture("luvui_sleep");
+					character_thinking(
+						cloud,
+						character_id.accent_color,
+						player_window,
+						texture,
+						layout.flipped,
+						|player_window| {
+							character_info(player_window, &piece);
+							character_buffs(player_window, &piece, resources);
+						},
+					);
+				});
 			}
-			pamphlet.vertical();
-			pamphlet.advance(8, 8);
+			pamphlet.hsplit(&mut character_windows);
 		}
-	};
-	let mut souls_fn = |pamphlet: &mut gui::Context| {
-		const SOUL_SIZE: u32 = 50;
-		pamphlet.label("Souls");
+		pamphlet.advance(0, 10);
 
-		let bx = pamphlet.x as f32;
-		let by = pamphlet.y as f32;
-		let display_size = pamphlet.rect.width();
+		let mut inventory_fn = |pamphlet: &mut gui::Context| {
+			pamphlet.label("Inventory");
+			let mut items = world_manager.inventory.iter().peekable();
+			while items.peek().is_some() {
+				let textures_per_row = pamphlet.rect.width() / (32 + 8);
+				pamphlet.horizontal();
+				for _ in 0..textures_per_row {
+					if let Some(item_name) = items.next() {
+						pamphlet.htexture(resources.get_texture(item_name), 32);
+						pamphlet.advance(8, 0);
+					}
+				}
+				pamphlet.vertical();
+				pamphlet.advance(8, 8);
+			}
+		};
+		let mut souls_fn = |pamphlet: &mut gui::Context| {
+			const SOUL_SIZE: u32 = 50;
+			pamphlet.label("Souls");
 
-		for soul in &soul_jar.souls {
-			let display_size = (display_size - SOUL_SIZE) as f32;
-			let ox = soul.x * display_size;
-			let oy = soul.y * display_size;
-			soul_jar
-				.light_texture
-				.set_color_mod(soul.color.0, soul.color.1, soul.color.2);
-			pamphlet
-				.canvas
-				.copy(
-					&soul_jar.light_texture,
-					None,
-					Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
-				)
-				.unwrap();
-		}
-		pamphlet.advance(0, display_size);
-	};
-	pamphlet.hsplit(&mut [
-		Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
-		Some(&mut souls_fn),
-	]);
+			let bx = pamphlet.x as f32;
+			let by = pamphlet.y as f32;
+			let display_size = pamphlet.rect.width();
+
+			for soul in &soul_jar.souls {
+				let display_size = (display_size - SOUL_SIZE) as f32;
+				let ox = soul.x * display_size;
+				let oy = soul.y * display_size;
+				soul_jar
+					.light_texture
+					.set_color_mod(soul.color.0, soul.color.1, soul.color.2);
+				pamphlet
+					.canvas
+					.copy(
+						&soul_jar.light_texture,
+						None,
+						Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
+					)
+					.unwrap();
+			}
+			pamphlet.advance(0, display_size);
+		};
+		pamphlet.hsplit(&mut [
+			Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
+			Some(&mut souls_fn),
+		]);
+	}
 }
 
 fn character_thinking(
-	character_id: &world::PartyReference,
+	draw_state: &PartyReferenceDrawState,
+	accent_color: Color,
 	player_window: &mut gui::Context<'_, '_, '_>,
 	texture: &Texture,
 	flipped: bool,
 	f: impl FnOnce(&mut gui::Context),
 ) {
-	on_cloud(
-		&character_id.draw_state.cloud,
-		20,
-		character_id.accent_color,
-		player_window,
-		f,
-	);
+	on_cloud(&draw_state.cloud, 20, accent_color, player_window, f);
 	let center =
 		player_window.x + player_window.rect.width() as i32 * if flipped { 1 } else { 2 } / 3;
 	let corner = player_window.x + player_window.rect.width() as i32 * 9 / 10;
-	character_id.draw_state.cloud_trail.draw(
+	draw_state.cloud_trail.draw(
 		player_window.canvas,
 		if flipped { 8 } else { 4 },
 		Point::new(center, player_window.y + 10),
 		Point::new(corner, player_window.y - 25),
 		15.0,
-		character_id.accent_color.into(),
+		accent_color.into(),
 	);
 	let query = texture.query();
 	let width = query.width * 4;

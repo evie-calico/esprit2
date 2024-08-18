@@ -37,22 +37,12 @@ impl Default for Level {
 	}
 }
 
-/// Anything not strictly tied to the party reference's "logic",
-/// but still associated with its rendering
-#[derive(Clone, Default, Debug)]
-pub struct PartyReferenceDrawState {
-	pub cloud: draw::CloudState,
-	pub cloud_trail: draw::CloudTrail,
-}
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
 	pub piece: CharacterRef,
 	/// Displayed on the pamphlet.
 	pub accent_color: Color,
-	#[serde(skip)]
-	pub draw_state: PartyReferenceDrawState,
 }
 
 impl PartyReference {
@@ -60,7 +50,6 @@ impl PartyReference {
 		Self {
 			piece,
 			accent_color,
-			draw_state: PartyReferenceDrawState::default(),
 		}
 	}
 }

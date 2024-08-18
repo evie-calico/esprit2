@@ -144,6 +144,7 @@ pub fn main() {
 	// the same effect can be seen if a computer is put to sleep and then woken up.
 	soul_jar.tick(5.0);
 	let mut cloudy_wave = draw::CloudyWave::default();
+	let mut pamphlet = gui::widget::Pamphlet::new();
 
 	let mut input_mode = input::Mode::Normal;
 	let mut partial_action = None;
@@ -205,9 +206,9 @@ pub fn main() {
 				fps = (fps + 1.0 / delta) / 2.0;
 			}
 
-			for i in &mut world_manager.party {
-				i.draw_state.cloud.tick(delta);
-				i.draw_state.cloud_trail.tick(delta / 4.0);
+			for i in &mut pamphlet.party_member_clouds {
+				i.cloud.tick(delta);
+				i.cloud_trail.tick(delta / 4.0);
 			}
 			if let Some(inner_action) = partial_action {
 				match world_manager.update(inner_action, &scripts, &console, &mut input_mode) {
@@ -340,7 +341,7 @@ pub fn main() {
 			);
 
 			// Draw pamphlet
-			let mut pamphlet = gui::Context::new(
+			let mut pamphlet_ctx = gui::Context::new(
 				&mut canvas,
 				&typography,
 				Rect::new(
@@ -352,13 +353,13 @@ pub fn main() {
 			);
 
 			cloudy_wave.draw(
-				pamphlet.canvas,
-				pamphlet.rect,
+				pamphlet_ctx.canvas,
+				pamphlet_ctx.rect,
 				20,
 				Color::RGB(0x08, 0x0f, 0x25),
 			);
 
-			gui::widget::pamphlet(&mut pamphlet, &world_manager, &resources, &mut soul_jar);
+			pamphlet.draw(&mut pamphlet_ctx, &world_manager, &resources, &mut soul_jar);
 
 			canvas.present();
 		}
