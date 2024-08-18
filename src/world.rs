@@ -20,8 +20,6 @@ pub struct Manager {
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
 	pub party: Vec<PartyReference>,
 	pub inventory: Vec<String>,
-	#[serde(skip)]
-	pub console: Console,
 }
 
 /// Contains information about what should generate on each floor.
@@ -84,8 +82,6 @@ impl Manager {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
 		resource_manager: &resource::Manager,
-		lua: &mlua::Lua,
-		options: &Options,
 	) -> Result<Self> {
 		let mut party = Vec::new();
 		let mut characters = VecDeque::new();
@@ -107,12 +103,6 @@ impl Manager {
 			characters.push_front(character);
 			player_controlled = false;
 		}
-
-		let console = Console::new(options.ui.colors.console.clone());
-
-		lua.globals().set("Console", console.handle.clone())?;
-		lua.globals()
-			.set("Status", resource_manager.statuses_handle())?;
 
 		Ok(Manager {
 			location: world::Location {
@@ -147,22 +137,18 @@ impl Manager {
 				"items/water_chestnut".into(),
 				"items/watermelon".into(),
 			],
-
-			console,
 		})
 	}
 
-	pub fn new_floor(&mut self, resources: &resource::Manager) -> Result<()> {
+	pub fn new_floor(&mut self, resources: &resource::Manager, console: &Console) -> Result<()> {
 		self.location.floor += 1;
-		self.console
-			.print_important(format!("Entering floor {}", self.location.floor));
+		console.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
 
 		self.characters
 			.retain(|x| self.party.iter().any(|y| x.as_ptr() == y.piece.as_ptr()));
 
-		self.console
-			.print_unimportant("You take some time to rest...".into());
+		console.print_unimportant("You take some time to rest...".into());
 		for i in &self.characters {
 			let mut i = i.borrow_mut();
 			// Reset positions
@@ -175,7 +161,7 @@ impl Manager {
 			while i.sheet.experience >= 100 {
 				i.sheet.experience -= 100;
 				i.sheet.level = i.sheet.level.saturating_add(1);
-				self.console.print_special(
+				console.print_special(
 					format!("{{Address}}'s level increased to {}!", i.sheet.level)
 						.replace_nouns(&i.sheet.nouns),
 				);
@@ -194,6 +180,7 @@ impl Manager {
 		&mut self,
 		action: PartialAction<'lua>,
 		scripts: &'lua resource::Scripts,
+		console: &Console,
 		input_mode: &mut input::Mode,
 	) -> Result<Option<ActionRequest<'lua>>> {
 		let outcome = match (action, input_mode.clone()) {
@@ -278,7 +265,7 @@ impl Manager {
 				_,
 			) => TurnOutcome::Yield,
 			// If there is no pending request, pop a turn off the character queue.
-			(PartialAction::Action(action), _) => self.next_turn(scripts, action)?,
+			(PartialAction::Action(action), _) => self.next_turn(console, scripts, action)?,
 		};
 
 		let player_controlled = self.next_character().borrow().player_controlled;
@@ -672,7 +659,6 @@ impl Manager {
 					.sandbox(on_consider)?
 					.insert("Parameters", parameters)?
 					.insert("User", next_character.clone())?
-					.insert("Heuristic", consider::HeuristicConstructor)?
 					// Maybe these should be members of the spell?
 					.insert("Level", spell.level)?
 					.insert("Affinity", spell.affinity(&next_character.borrow()))?
@@ -712,6 +698,7 @@ impl Manager {
 
 	pub fn next_turn<'lua>(
 		&mut self,
+		console: &Console,
 		scripts: &'lua resource::Scripts,
 		action: character::Action<'lua>,
 	) -> Result<TurnOutcome<'lua>> {
@@ -737,7 +724,7 @@ impl Manager {
 				};
 				// For distances of 1 tile, don't bother using a dijkstra map.
 				if let Some(direction) = OrdDir::from_offset(target_x - x, target_y - y) {
-					self.move_piece(next_character, direction)
+					self.move_piece(next_character, direction, console)
 				} else {
 					let mut dijkstra = astar::DijkstraMap::target(
 						self.current_floor.map.cols(),
@@ -761,7 +748,7 @@ impl Manager {
 						});
 					}
 					if let Some(direction) = dijkstra.step(x, y) {
-						self.move_piece(next_character, direction)
+						self.move_piece(next_character, direction, console)
 					} else {
 						Ok(TurnOutcome::Yield)
 					}
@@ -794,14 +781,14 @@ impl Manager {
 						let message =
 							format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
-						self.console.print_system(message);
+						console.print_system(message);
 						Ok(TurnOutcome::Yield)
 					}
 					spell::Castable::UncastableAffinity => {
 						let message =
 							format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
-						self.console.print_system(message);
+						console.print_system(message);
 						Ok(TurnOutcome::Yield)
 					}
 				}
@@ -833,6 +820,7 @@ impl Manager {
 		&self,
 		character: &CharacterRef,
 		dir: OrdDir,
+		console: &Console,
 	) -> Result<TurnOutcome<'lua>> {
 		use crate::floor::Tile;
 
@@ -860,12 +848,11 @@ impl Manager {
 				Ok(TurnOutcome::Action { delay })
 			}
 			Some(Tile::Wall) => {
-				self.console
-					.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
+				console.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
 				Ok(TurnOutcome::Yield)
 			}
 			None => {
-				self.console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
+				console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				Ok(TurnOutcome::Yield)
 			}
 		}

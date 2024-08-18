@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
-use crate::prelude::*;
+use crate::gui;
+use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
@@ -34,6 +35,7 @@ pub fn menu(
 	options: &Options,
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
+	console: &Console,
 	resources: &resource::Manager<'_>,
 ) {
 	for (i, color) in [(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)]
@@ -65,7 +67,7 @@ pub fn menu(
 				options.ui.colors.normal_mode,
 				&menu.typography.annotation,
 			);
-			world_manager.console.draw(menu);
+			menu.console(console);
 		}
 		input::Mode::Attack => {
 			menu.label_styled(
@@ -103,7 +105,7 @@ pub fn menu(
 					Some(&mut buff_fn),
 				]);
 			} else {
-				world_manager.console.draw(menu);
+				menu.console(console);
 			}
 		}
 		input::Mode::Prompt { message, .. } => {

@@ -57,10 +57,12 @@ pub enum Response<'lua> {
 	Act(character::Action<'lua>),
 }
 
+#[allow(clippy::too_many_arguments)] // The alternative is to inline this.
 pub fn controllable_character<'lua>(
 	event_pump: &mut sdl2::EventPump,
 	next_character: world::CharacterRef,
 	world_manager: &mut world::Manager,
+	console: &Console,
 	resources: &resource::Manager,
 	scripts: &'lua resource::Scripts,
 	mode: &mut Mode,
@@ -149,27 +151,23 @@ pub fn controllable_character<'lua>(
 						if options.controls.underfoot.contains(keycode) {
 							match world_manager.current_floor.map.get(y, x) {
 								Some(floor::Tile::Floor) => {
-									world_manager.console.print_unimportant(
+									console.print_unimportant(
 										"There's nothing on the ground here.".into(),
 									);
 								}
 								Some(floor::Tile::Exit) => {
-									world_manager.new_floor(resources)?;
+									world_manager.new_floor(resources, console)?;
 								}
 								None => {
-									world_manager
-										.console
-										.print_unimportant("That's the void.".into());
+									console.print_unimportant("That's the void.".into());
 								}
 								Some(floor::Tile::Wall) => (),
 							}
 						}
 
 						if options.controls.talk.contains(keycode) {
-							world_manager.console.say("Luvui".into(), "Meow!".into());
-							world_manager
-								.console
-								.say("Aris".into(), "I am a kitty :3".into());
+							console.say("Luvui".into(), "Meow!".into());
+							console.say("Aris".into(), "I am a kitty :3".into());
 						}
 
 						if options.controls.autocombat.contains(keycode) {

@@ -1,3 +1,7 @@
+#![feature(anonymous_lifetime_in_impl_trait)]
+
+mod gui;
+
 use esprit2::prelude::*;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
@@ -57,26 +61,6 @@ pub fn main() {
 			exit(1);
 		}
 	};
-	let lua = mlua::Lua::new();
-	lua.globals()
-		.get::<&str, mlua::Table>("package")
-		.unwrap()
-		.set(
-			"path",
-			options::resource_directory()
-				.join("scripts/?.lua")
-				.to_str()
-				.unwrap(),
-		)
-		.unwrap();
-	let scripts =
-		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
-			Ok(scripts) => scripts,
-			Err(msg) => {
-				error!("failed to open scripts directory: {msg}");
-				exit(1);
-			}
-		};
 	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {
 		// This is `info` because it's actually very expected for first-time players.
@@ -97,6 +81,33 @@ pub fn main() {
 		}
 		options
 	});
+	let mut console = Console::new(options.ui.colors.console.clone());
+	let lua = mlua::Lua::new();
+	lua.globals()
+		.get::<&str, mlua::Table>("package")
+		.unwrap()
+		.set(
+			"path",
+			options::resource_directory()
+				.join("scripts/?.lua")
+				.to_str()
+				.unwrap(),
+		)
+		.unwrap();
+	lua.globals()
+		.set("Console", console.handle.clone())
+		.unwrap();
+	lua.globals()
+		.set("Status", resources.statuses_handle())
+		.unwrap();
+	let scripts =
+		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
+			Ok(scripts) => scripts,
+			Err(msg) => {
+				error!("failed to open scripts directory: {msg}");
+				exit(1);
+			}
+		};
 	// Create a piece for the player, and register it with the world manager.
 	let party_blueprint = [
 		world::PartyReferenceBase {
@@ -108,12 +119,11 @@ pub fn main() {
 			accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 		},
 	];
-	let mut world_manager =
-		world::Manager::new(party_blueprint.into_iter(), &resources, &lua, &options)
-			.unwrap_or_else(|msg| {
-				error!("failed to initialize world manager: {msg}");
-				exit(1);
-			});
+	let mut world_manager = world::Manager::new(party_blueprint.into_iter(), &resources)
+		.unwrap_or_else(|msg| {
+			error!("failed to initialize world manager: {msg}");
+			exit(1);
+		});
 	world_manager.generate_floor(
 		"default seed",
 		&vault::Set {
@@ -149,6 +159,7 @@ pub fn main() {
 					&mut event_pump,
 					next_character,
 					&mut world_manager,
+					&console,
 					&resources,
 					&scripts,
 					&mut input_mode,
@@ -199,7 +210,7 @@ pub fn main() {
 				i.draw_state.cloud_trail.tick(delta / 4.0);
 			}
 			if let Some(inner_action) = partial_action {
-				match world_manager.update(inner_action, &scripts, &mut input_mode) {
+				match world_manager.update(inner_action, &scripts, &console, &mut input_mode) {
 					Ok(result) => partial_action = result.map(PartialAction::Request),
 					Err(msg) => {
 						error!("world manager update returned an error: {msg}");
@@ -210,7 +221,7 @@ pub fn main() {
 			world_manager
 				.characters
 				.retain(|character| character.borrow().hp > 0);
-			world_manager.console.update(delta);
+			console.update(delta);
 			soul_jar.tick(delta as f32);
 			cloudy_wave.tick(delta);
 			if let input::Mode::Cursor { state, .. } = &mut input_mode {
@@ -319,7 +330,14 @@ pub fn main() {
 					options.ui.console_height,
 				),
 			);
-			gui::widget::menu(&mut menu, &options, &input_mode, &world_manager, &resources);
+			gui::widget::menu(
+				&mut menu,
+				&options,
+				&input_mode,
+				&world_manager,
+				&console,
+				&resources,
+			);
 
 			// Draw pamphlet
 			let mut pamphlet = gui::Context::new(

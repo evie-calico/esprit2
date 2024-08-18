@@ -516,24 +516,3 @@ impl expression::Variables for Stats {
 		}
 	}
 }
-
-const HEART_COLOR: Color = (96, 67, 18, 255);
-const SOUL_COLOR: Color = (128, 128, 128, 255);
-const POWER_COLOR: Color = (255, 11, 64, 255);
-const DEFENSE_COLOR: Color = (222, 120, 64, 255);
-const MAGIC_COLOR: Color = (59, 115, 255, 255);
-const RESISTANCE_COLOR: Color = (222, 64, 255, 255);
-
-impl gui::VariableColors for Stats {
-	fn get(s: &str) -> Option<Color> {
-		match s {
-			"heart" => Some(HEART_COLOR),
-			"soul" => Some(SOUL_COLOR),
-			"power" => Some(POWER_COLOR),
-			"defense" => Some(DEFENSE_COLOR),
-			"magic" => Some(MAGIC_COLOR),
-			"resistance" => Some(RESISTANCE_COLOR),
-			_ => None,
-		}
-	}
-}

@@ -23,7 +23,6 @@ pub mod console;
 pub mod draw;
 pub mod expression;
 pub mod floor;
-pub mod gui;
 pub mod input;
 pub mod item;
 pub mod nouns;
@@ -62,18 +61,18 @@ pub enum Error {
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Arbitrary Unit of Time.
-type Aut = u32;
+pub type Aut = u32;
 /// The length of a "turn".
 ///
 /// This is arbitrary, but it effectively makes Auts a fixed-point fraction,
 /// which is useful for dividing by common values like 2, 3, 4, and 6.
 // 12 is divisible by lots of nice numbers!
-const TURN: Aut = 12;
+pub const TURN: Aut = 12;
 /// For diagonal movement.
 /// sqrt(2) * 12 = 16.9705627485, which we round to 17.
-const SQRT2_TURN: Aut = 17;
+pub const SQRT2_TURN: Aut = 17;
 
-type Color = (u8, u8, u8, u8);
+pub type Color = (u8, u8, u8, u8);
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum DirectionType {

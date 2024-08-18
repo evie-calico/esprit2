@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
 use crate::prelude::*;
+use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
 use sdl2::ttf::Font;
@@ -8,6 +9,8 @@ use sdl2::video::{Window, WindowContext};
 use std::ops::Range;
 
 pub mod widget;
+
+const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
 pub struct Context<'canvas, 'ttf_module, 'rwops> {
 	pub canvas: &'canvas mut Canvas<Window>,
@@ -361,6 +364,121 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 			.unwrap();
 		self.advance(width, height)
 	}
+
+	pub fn console(&mut self, console: &Console) {
+		let canvas = &mut self.canvas;
+		let rect = Rect::new(
+			self.x,
+			self.y,
+			(self.rect.right() - self.x) as u32,
+			(self.rect.bottom() - self.y) as u32,
+		);
+		let font_texture_creator = canvas.texture_creator();
+		canvas.set_clip_rect(rect);
+
+		let mut cursor = rect.y + (rect.height() as i32);
+
+		let text = |message, color: Color| {
+			let texture = self
+				.typography
+				.normal
+				.render(message)
+				.blended(color)
+				.unwrap()
+				.as_texture(&font_texture_creator)
+				.unwrap();
+			let TextureQuery { width, height, .. } = texture.query();
+			(texture, width, height)
+		};
+		for message in console.history.iter().rev() {
+			match &message.printer {
+				console::MessagePrinter::Console(color) => {
+					let (font_texture, width, height) = text(&message.text, *color);
+					cursor -= height as i32;
+					canvas
+						.copy(
+							&font_texture,
+							None,
+							Rect::new(rect.x, cursor, width, height),
+						)
+						.unwrap();
+				}
+				console::MessagePrinter::Dialogue { speaker, progress } => {
+					let (font_texture, text_width, height) = text(speaker, (0, 0, 0, 255));
+					let width = text_width.max(MINIMUM_NAMEPLATE_WIDTH);
+					let margin = ((width - text_width) / 2) as i32;
+					canvas
+						.rounded_box(
+							rect.x as i16,
+							cursor as i16,
+							(rect.x + (width as i32)) as i16,
+							(cursor - (height as i32) + 2) as i16,
+							5,
+							console.colors.normal,
+						)
+						.unwrap();
+					cursor -= height as i32;
+					canvas
+						.copy(
+							&font_texture,
+							None,
+							Rect::new(rect.x + margin, cursor, text_width, height),
+						)
+						.unwrap();
+
+					// Save width of nameplate.
+					let last_width = width as i32;
+
+					let shown_characters = message.text.len().min((*progress as usize) + 1);
+					let (font_texture, width, height) =
+						text(&message.text[0..shown_characters], console.colors.normal);
+					canvas
+						.copy(
+							&font_texture,
+							None,
+							Rect::new(rect.x + last_width + 10, cursor, width, height),
+						)
+						.unwrap();
+				}
+				console::MessagePrinter::Combat(log) => {
+					let color = if log.is_weak() {
+						console.colors.unimportant
+					} else {
+						console.colors.normal
+					};
+					let (texture, width, height) = text(&message.text, color);
+					cursor -= height as i32;
+					canvas
+						.copy(&texture, None, Rect::new(rect.x, cursor, width, height))
+						.unwrap();
+					let last_width = width as i32;
+					let info = format!("({log})");
+					let texture = self
+						.typography
+						.annotation
+						.render(&info)
+						.blended(console.colors.combat)
+						.unwrap()
+						.as_texture(&font_texture_creator)
+						.unwrap();
+					let TextureQuery { width, height, .. } = texture.query();
+					canvas
+						.copy(
+							&texture,
+							None,
+							Rect::new(rect.x + last_width + 10, cursor, width, height),
+						)
+						.unwrap();
+				}
+			}
+
+			if cursor < rect.y {
+				break;
+			}
+		}
+
+		canvas.set_clip_rect(None);
+	}
 }
 
 pub trait VariableColors {
@@ -370,5 +488,25 @@ pub trait VariableColors {
 impl VariableColors for () {
 	fn get(_s: &str) -> Option<Color> {
 		None
+	}
+}
+
+impl VariableColors for esprit2::character::Stats {
+	fn get(s: &str) -> Option<Color> {
+		const HEART_COLOR: Color = (96, 67, 18, 255);
+		const SOUL_COLOR: Color = (128, 128, 128, 255);
+		const POWER_COLOR: Color = (255, 11, 64, 255);
+		const DEFENSE_COLOR: Color = (222, 120, 64, 255);
+		const MAGIC_COLOR: Color = (59, 115, 255, 255);
+		const RESISTANCE_COLOR: Color = (222, 64, 255, 255);
+		match s {
+			"heart" => Some(HEART_COLOR),
+			"soul" => Some(SOUL_COLOR),
+			"power" => Some(POWER_COLOR),
+			"defense" => Some(DEFENSE_COLOR),
+			"magic" => Some(MAGIC_COLOR),
+			"resistance" => Some(RESISTANCE_COLOR),
+			_ => None,
+		}
 	}
 }

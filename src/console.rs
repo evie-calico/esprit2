@@ -1,19 +1,14 @@
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
 use paste::paste;
-use sdl2::gfx::primitives::DrawRenderer;
-use sdl2::rect::Rect;
-use sdl2::render::TextureQuery;
 use std::collections::VecDeque;
 use std::sync::{mpsc, Arc};
-
-const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
 #[derive(Debug)]
 pub struct Console {
 	pub handle: Handle,
 	message_reciever: mpsc::Receiver<Message>,
-	history: Vec<Message>,
+	pub history: Vec<Message>,
 	in_progress: VecDeque<usize>,
 }
 
@@ -40,8 +35,8 @@ pub enum MessagePrinter {
 
 #[derive(Clone, Debug)]
 pub struct Message {
-	text: String,
-	printer: MessagePrinter,
+	pub text: String,
+	pub printer: MessagePrinter,
 }
 
 macro_rules! console_colored_print {
@@ -232,121 +227,5 @@ impl Console {
 		}) {
 			self.in_progress.pop_front();
 		}
-	}
-
-	#[allow(clippy::unwrap_used, reason = "SDL")]
-	pub fn draw(&self, gui: &mut gui::Context) {
-		let canvas = &mut gui.canvas;
-		let rect = Rect::new(
-			gui.x,
-			gui.y,
-			(gui.rect.right() - gui.x) as u32,
-			(gui.rect.bottom() - gui.y) as u32,
-		);
-		let font_texture_creator = canvas.texture_creator();
-		canvas.set_clip_rect(rect);
-
-		let mut cursor = rect.y + (rect.height() as i32);
-
-		let text = |message, color: Color| {
-			let texture = gui
-				.typography
-				.normal
-				.render(message)
-				.blended(color)
-				.unwrap()
-				.as_texture(&font_texture_creator)
-				.unwrap();
-			let TextureQuery { width, height, .. } = texture.query();
-			(texture, width, height)
-		};
-		for message in self.history.iter().rev() {
-			match &message.printer {
-				MessagePrinter::Console(color) => {
-					let (font_texture, width, height) = text(&message.text, *color);
-					cursor -= height as i32;
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x, cursor, width, height),
-						)
-						.unwrap();
-				}
-				MessagePrinter::Dialogue { speaker, progress } => {
-					let (font_texture, text_width, height) = text(speaker, (0, 0, 0, 255));
-					let width = text_width.max(MINIMUM_NAMEPLATE_WIDTH);
-					let margin = ((width - text_width) / 2) as i32;
-					canvas
-						.rounded_box(
-							rect.x as i16,
-							cursor as i16,
-							(rect.x + (width as i32)) as i16,
-							(cursor - (height as i32) + 2) as i16,
-							5,
-							self.colors.normal,
-						)
-						.unwrap();
-					cursor -= height as i32;
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x + margin, cursor, text_width, height),
-						)
-						.unwrap();
-
-					// Save width of nameplate.
-					let last_width = width as i32;
-
-					let shown_characters = message.text.len().min((*progress as usize) + 1);
-					let (font_texture, width, height) =
-						text(&message.text[0..shown_characters], self.colors.normal);
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x + last_width + 10, cursor, width, height),
-						)
-						.unwrap();
-				}
-				MessagePrinter::Combat(log) => {
-					let color = if log.is_weak() {
-						self.colors.unimportant
-					} else {
-						self.colors.normal
-					};
-					let (texture, width, height) = text(&message.text, color);
-					cursor -= height as i32;
-					canvas
-						.copy(&texture, None, Rect::new(rect.x, cursor, width, height))
-						.unwrap();
-					let last_width = width as i32;
-					let info = format!("({log})");
-					let texture = gui
-						.typography
-						.annotation
-						.render(&info)
-						.blended(self.colors.combat)
-						.unwrap()
-						.as_texture(&font_texture_creator)
-						.unwrap();
-					let TextureQuery { width, height, .. } = texture.query();
-					canvas
-						.copy(
-							&texture,
-							None,
-							Rect::new(rect.x + last_width + 10, cursor, width, height),
-						)
-						.unwrap();
-				}
-			}
-
-			if cursor < rect.y {
-				break;
-			}
-		}
-
-		canvas.set_clip_rect(None);
 	}
 }
