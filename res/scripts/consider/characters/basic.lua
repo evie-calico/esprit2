@@ -1,15 +1,14 @@
 local considerations = ...
-local scores = {}
 
 local risk_averse = math.random(3) ~= 3
 
-function correct_risk(score, risky)
+local function correct_risk(score, risky)
 	if risky then if risk_averse then return -score else return 0 end end
 	return score
 end
 
-function damage_score(heuristic)
-	local damages_ally = heuristic.target.alliance == user.alliance
+local function damage_score(heuristic)
+	local damages_ally = heuristic.target.alliance == User.alliance
 	local score = heuristic.amount
 	if heuristic.target.hp - heuristic.amount <= 0 then
 		-- huge emphasis on killing
@@ -18,18 +17,18 @@ function damage_score(heuristic)
 	return correct_risk(score, damages_ally)
 end
 
-function debuff_score(heuristic)
-	local damages_ally = heuristic.target.alliance == user.alliance
+local function debuff_score(heuristic)
+	local damages_ally = heuristic.target.alliance == User.alliance
 	return correct_risk(
 		heuristic.amount * 2, -- give debuffs some extra weight
 		damages_ally
 	)
 end
 
-function sum_heuristics(consider, weight)
+local function sum_heuristics(consider, weight)
 	if weight == nil then weight = 1 end
 	local score = 0
-	for i, heuristic in ipairs(consider.heuristics) do
+	for _, heuristic in ipairs(consider.heuristics) do
 		if heuristic:damage() then
 			score = score + damage_score(heuristic) * weight
 		elseif heuristic:debuff() then
@@ -49,7 +48,7 @@ end
 
 local highest
 
-for i, x in ipairs(scores) do
+for _, x in ipairs(scores) do
 	if highest == nil or x.score > highest.score then
 		highest = x
 	end

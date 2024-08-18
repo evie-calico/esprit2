@@ -1,15 +1,17 @@
-require("combat")
+---@module "lib.consider.spell"
+local combat = require "combat"
+local world = require "world"
 
 local considerations = {}
 
-for i, character in ipairs(nearby_characters) do
-	if not alliance_check(caster, character) then
+for _, character in ipairs(world.characters { Within = Parameters.range }) do
+	if not combat.alliance_check(User, character) then
 		table.insert(considerations, {
 			arguments = { target = character },
 			heuristics = {
 				Heuristic:damage(
 					character,
-					affinity:magnitude(parameters.magnitude) - character.stats.resistance
+					Affinity:magnitude(Parameters.magnitude) - character.stats.resistance
 				)
 			}
 		})

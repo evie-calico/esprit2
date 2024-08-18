@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use mlua::FromLuaMulti;
+use mlua::{FromLua, FromLuaMulti};
 use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
 use sdl2::video::WindowContext;
@@ -306,6 +306,7 @@ impl<'texture> Manager<'texture> {
 }
 
 pub struct SandboxBuilder<'lua> {
+	runtime: &'lua mlua::Lua,
 	function: &'lua mlua::Function<'lua>,
 	environment: mlua::Table<'lua>,
 }
@@ -320,12 +321,30 @@ impl<'lua> SandboxBuilder<'lua> {
 		Ok(self)
 	}
 
+	pub fn thread(self) -> mlua::Result<mlua::Thread<'lua>> {
+		self.function.set_environment(self.environment)?;
+		self.runtime.create_thread(self.function.clone())
+	}
+
 	pub fn call<R: FromLuaMulti<'lua>>(
 		self,
 		args: impl mlua::IntoLuaMulti<'lua>,
 	) -> mlua::Result<R> {
 		self.function.set_environment(self.environment)?;
 		self.function.call::<_, R>(args)
+	}
+
+	pub fn world<R: FromLua<'lua>>(
+		self,
+		world: &world::Manager,
+		args: impl mlua::IntoLuaMulti<'lua>,
+	) -> Result<R> {
+		self.function.set_environment(self.environment)?;
+		let thread = self.runtime.create_thread(self.function.clone())?;
+		match world::ThreadOutcome::poll(world, self.runtime, thread, args)? {
+			world::ThreadOutcome::Value(value) => Ok(R::from_lua(value, self.runtime)?),
+			world::ThreadOutcome::Request(_) => Err(crate::Error::IllegalActionRequest),
+		}
 	}
 }
 
@@ -353,6 +372,7 @@ impl<'lua> Scripts<'lua> {
 		// This is cloning a reference, which is a lot cheaper than creating a new table.
 		environment.set_metatable(Some(self.sandbox_metatable.clone()));
 		Ok(SandboxBuilder {
+			runtime: self.runtime,
 			function,
 			environment,
 		})

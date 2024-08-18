@@ -1,0 +1,6 @@
+{
+    "workspace.library": [
+        "res/scripts/lib/globals.lua",
+        "res/scripts/lib/userdata.lua"
+    ],
+}

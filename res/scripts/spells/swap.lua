@@ -1,38 +1,40 @@
-return coroutine.create(function()
-	-- Prompt user for arguments if they have not been provided
-	if arguments == nil then
-		arguments = {
-			target = coroutine.yield({ type = "TargetCursor", x = caster.x, y = caster.y, range = parameters.range})
-		}
-	end
+---@module "lib.spell"
+local combat = require "combat"
+local world = require "world"
 
-	caster.sp = caster.sp - level
+-- Prompt user for arguments if they have not been provided
+if Arguments == nil then
+	Arguments = {
+		target = world.target(User.x, User.y, Parameters.range)
+	}
+end
 
-	function format(s)
-		return arguments.target:replace_prefixed_nouns(
-			"target_",
-			caster:replace_prefixed_nouns(
-				"self_",
-				s
-			)
+User.sp = User.sp - Level
+
+local function format(s)
+	return Arguments.target:replace_prefixed_nouns(
+		"target_",
+		User:replace_prefixed_nouns(
+			"self_",
+			s
 		)
-	end
+	)
+end
 
-	if not alliance_check(caster, arguments.target)
-		and affinity:magnitude(parameters.magnitude) - arguments.target.stats.resistance <= 0
-	then
-		local log = { type = "Miss" }
-		Console:combat_log(format("{target_Address} resisted {self_address}'s swap."), log)
-	else
-		local cx, cy = caster.x, caster.y
-		caster.x = arguments.target.x
-		caster.y = arguments.target.y
-		arguments.target.x = cx
-		arguments.target.y = cy
+if not combat.alliance_check(User, Arguments.target)
+	and Affinity:magnitude(Parameters.magnitude) - Arguments.target.stats.resistance <= 0
+then
+	local log = { type = "Miss" }
+	Console:combat_log(format("{target_Address} resisted {self_address}'s swap."), log)
+else
+	local cx, cy = User.x, User.y
+	User.x = Arguments.target.x
+	User.y = Arguments.target.y
+	Arguments.target.x = cx
+	Arguments.target.y = cy
 
-		local log = { type = "Success" }
-		Console:combat_log(format("{self_Address} swapped positions with {target_address}."), log)
-	end
+	local log = { type = "Success" }
+	Console:combat_log(format("{self_Address} swapped positions with {target_address}."), log)
+end
 
-	return parameters.cast_time
-end)
+return Parameters.cast_time
