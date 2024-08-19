@@ -143,9 +143,9 @@ pub fn main() {
 			error!("failed to initialize world manager: {msg}");
 			exit(1);
 		});
-	let mut serializer = rkyv::ser::serializers::AllocSerializer::<256>::default();
+	let mut serializer = rkyv::ser::serializers::AllocSerializer::<1024>::default();
 	serializer
-		.serialize_value(&*world_manager.characters.front().unwrap().borrow())
+		.serialize_value(&*world_manager.characters.get(1).unwrap().borrow())
 		.unwrap();
 	let buf = serializer.into_serializer().into_inner();
 	println!("buf is {} bytes", buf.len());
@@ -214,7 +214,7 @@ pub fn main() {
 					}
 				}
 			} else {
-				let considerations = world_manager.consider_turn(&scripts).unwrap();
+				let considerations = world_manager.consider_turn(&resources, &scripts).unwrap();
 				let action = world_manager
 					.consider_action(&scripts, next_character, considerations)
 					.unwrap();
@@ -369,6 +369,7 @@ pub fn main() {
 				&input_mode,
 				&world_manager,
 				&console,
+				&resources,
 				&textures,
 			);
 

@@ -43,6 +43,7 @@ pub fn menu(
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 	console: &Console,
+	resources: &resource::Manager,
 	textures: &texture::Manager,
 ) {
 	for (i, color) in [(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)]
@@ -82,7 +83,7 @@ pub fn menu(
 				options.ui.colors.cast_mode,
 				&menu.typography.annotation,
 			);
-			attack_menu(menu, &world_manager.next_character().borrow());
+			attack_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
 		input::Mode::Cast => {
 			menu.label_styled(
@@ -90,7 +91,7 @@ pub fn menu(
 				options.ui.colors.cast_mode,
 				&menu.typography.annotation,
 			);
-			spell_menu(menu, &world_manager.next_character().borrow());
+			spell_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
 		input::Mode::Cursor {
 			position: (x, y), ..
@@ -145,8 +146,22 @@ pub fn menu(
 	}
 }
 
-pub fn spell_menu(gui: &mut gui::Context, character: &character::Piece) {
-	for (spell, letter) in character.spells.iter().zip('a'..='z') {
+pub fn spell_menu(
+	gui: &mut gui::Context,
+	character: &character::Piece,
+	resources: &resource::Manager,
+) {
+	for (spell, letter) in character
+		.sheet
+		.spells
+		.iter()
+		.map(|k| resources.get_spell(k))
+		.zip('a'..='z')
+	{
+		let Ok(spell) = spell else {
+			gui.label("<Missing Spell>");
+			continue;
+		};
 		let color = match spell.castable_by(character) {
 			spell::Castable::Yes => gui.typography.color,
 			spell::Castable::NotEnoughSP => (255, 0, 0, 255),
@@ -159,8 +174,22 @@ pub fn spell_menu(gui: &mut gui::Context, character: &character::Piece) {
 	}
 }
 
-pub fn attack_menu(gui: &mut gui::Context, character: &character::Piece) {
-	for (attack, letter) in character.attacks.iter().zip('a'..='z') {
+pub fn attack_menu(
+	gui: &mut gui::Context,
+	character: &character::Piece,
+	resources: &resource::Manager,
+) {
+	for (attack, letter) in character
+		.sheet
+		.attacks
+		.iter()
+		.map(|k| resources.get_attack(k))
+		.zip('a'..='z')
+	{
+		let Ok(attack) = attack else {
+			gui.label("<Missing Attack>");
+			continue;
+		};
 		gui.label(&format!("({letter}) {}", attack.name));
 	}
 }

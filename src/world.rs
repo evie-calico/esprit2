@@ -86,7 +86,7 @@ impl Manager {
 			let character = CharacterRef::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
-				..character::Piece::new(sheet.clone(), resource_manager)?
+				..character::Piece::new(sheet.clone())
 			});
 			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push_front(character);
@@ -212,7 +212,7 @@ impl Manager {
 				let piece = character::Piece {
 					x: x + xoff,
 					y: y + yoff,
-					..character::Piece::new(resources.get_sheet(sheet_name)?.clone(), resources)?
+					..character::Piece::new(resources.get_sheet(sheet_name)?.clone())
 				};
 				self.characters.push_front(character::Ref::new(piece));
 			}
@@ -417,6 +417,7 @@ impl<'lua> ThreadOutcome<'lua> {
 impl Manager {
 	pub fn consider_turn<'lua>(
 		&mut self,
+		resources: &resource::Manager,
 		scripts: &'lua resource::Scripts,
 	) -> Result<Vec<Consider<'lua>>> {
 		let next_character = self.next_character();
@@ -437,7 +438,14 @@ impl Manager {
 			})
 		}
 
-		for attack in &next_character.borrow().attacks {
+		for attack in next_character
+			.borrow()
+			.sheet
+			.attacks
+			.iter()
+			.map(|k| resources.get_attack(k))
+		{
+			let attack = attack?;
 			if let Some(on_consider) = &attack.on_consider {
 				let attack_heuristics: mlua::Table = scripts
 					.sandbox(on_consider)?
@@ -461,7 +469,14 @@ impl Manager {
 			}
 		}
 
-		for spell in &next_character.borrow().spells {
+		for spell in next_character
+			.borrow()
+			.sheet
+			.spells
+			.iter()
+			.map(|k| resources.get_spell(k))
+		{
+			let spell = spell?;
 			if let (spell::Castable::Yes, Some(on_consider)) = (
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,

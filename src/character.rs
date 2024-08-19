@@ -174,8 +174,6 @@ pub struct Piece {
 	pub sp: i32,
 
 	pub statuses: HashMap<Box<str>, Status>,
-	pub attacks: Vec<Rc<Attack>>,
-	pub spells: Vec<Rc<Spell>>,
 
 	pub x: i32,
 	pub y: i32,
@@ -195,34 +193,22 @@ impl expression::Variables for Piece {
 }
 
 impl Piece {
-	pub fn new(sheet: Sheet, resources: &resource::Manager) -> Result<Self> {
+	pub fn new(sheet: Sheet) -> Self {
 		let stats = sheet.stats();
 		let hp = stats.heart as i32;
 		let sp = stats.soul as i32;
-		let attacks = sheet
-			.attacks
-			.iter()
-			.map(|x| resources.get_attack(x).cloned())
-			.collect::<Result<_>>()?;
-		let spells = sheet
-			.spells
-			.iter()
-			.map(|x| resources.get_spell(x).cloned())
-			.collect::<Result<_>>()?;
 
-		Ok(Self {
+		Self {
 			sheet,
 			hp,
 			sp,
 			statuses: HashMap::new(),
-			attacks,
-			spells,
 			x: 0,
 			y: 0,
 			action_delay: 0,
 			player_controlled: false,
 			alliance: Alliance::default(),
-		})
+		}
 	}
 
 	pub fn new_turn(&mut self) {
@@ -233,8 +219,8 @@ impl Piece {
 
 	pub fn rest(&mut self) {
 		let stats = self.stats();
-		self.restore_hp(stats.heart / 2);
-		self.restore_sp(stats.soul);
+		self.restore_hp(stats.heart as u32 / 2);
+		self.restore_sp(stats.soul as u32);
 		// Remove any status effects lasting until the next rest.
 		self.statuses
 			.retain(|_, status| !matches!(status.duration, status::Duration::Rest));
@@ -375,7 +361,7 @@ mod sheet {
 		pub nouns: Nouns,
 
 		#[alua(get)]
-		pub level: u32,
+		pub level: u16,
 		#[alua(get)]
 		#[serde(default)] // There's no reason for most sheets to care about this.
 		pub experience: u32,
@@ -444,28 +430,28 @@ pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]
 	#[alua(get)]
-	pub heart: u32,
+	pub heart: u16,
 	/// Magic, or SP; Soul Points
 	#[serde(default)]
 	#[alua(get)]
-	pub soul: u32,
+	pub soul: u16,
 	/// Bonus damage applied to physical attacks.
 	#[serde(default)]
 	#[alua(get)]
-	pub power: u32,
+	pub power: u16,
 	/// Damage reduction when recieving physical attacks.
 	#[serde(default)]
 	#[alua(get)]
-	pub defense: u32,
+	pub defense: u16,
 	/// Bonus damage applied to magical attacks.
 	#[serde(default)]
 	#[alua(get)]
-	pub magic: u32,
+	pub magic: u16,
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
 	#[serde(default)]
 	#[alua(get)]
-	pub resistance: u32,
+	pub resistance: u16,
 }
 
 impl std::ops::Add for Stats {
@@ -498,10 +484,10 @@ impl std::ops::Sub for Stats {
 	}
 }
 
-impl std::ops::Mul<u32> for Stats {
+impl std::ops::Mul<u16> for Stats {
 	type Output = Stats;
 
-	fn mul(self, rhs: u32) -> Self {
+	fn mul(self, rhs: u16) -> Self {
 		Stats {
 			heart: self.heart * rhs,
 			soul: self.soul * rhs,
@@ -528,10 +514,10 @@ impl std::ops::Mul for Stats {
 	}
 }
 
-impl std::ops::Div<u32> for Stats {
+impl std::ops::Div<u16> for Stats {
 	type Output = Stats;
 
-	fn div(self, rhs: u32) -> Self {
+	fn div(self, rhs: u16) -> Self {
 		Stats {
 			heart: self.heart / rhs,
 			soul: self.soul / rhs,

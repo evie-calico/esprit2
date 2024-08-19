@@ -119,11 +119,15 @@ pub fn controllable_character<'lua>(
 								};
 								if let Some(potential_target) = world_manager.get_character_at(x, y)
 								{
-									let default_attack =
-										next_character.borrow().attacks.first().cloned();
+									let default_attack = next_character
+										.borrow()
+										.sheet
+										.attacks
+										.first()
+										.map(|k| resources.get_attack(k));
 									if let Some(default_attack) = default_attack {
 										return Ok(Some(Response::Act(character::Action::Attack(
-											default_attack,
+											default_attack?.clone(),
 											Some(scripts.runtime.create_table_from([(
 												"target",
 												potential_target.clone(),
@@ -172,7 +176,7 @@ pub fn controllable_character<'lua>(
 						}
 
 						if options.controls.autocombat.contains(keycode) {
-							let considerations = world_manager.consider_turn(scripts)?;
+							let considerations = world_manager.consider_turn(resources, scripts)?;
 							let action = world_manager.consider_action(
 								scripts,
 								next_character.clone(),
@@ -190,10 +194,14 @@ pub fn controllable_character<'lua>(
 						let next_character = next_character.borrow();
 						let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 						if (0..=26).contains(&selected_index)
-							&& (selected_index as usize) < next_character.spells.len()
+							&& (selected_index as usize) < next_character.sheet.attacks.len()
 						{
 							return Ok(Some(Response::Act(character::Action::Attack(
-								next_character.attacks[selected_index as usize].clone(),
+								resources
+									.get_attack(
+										&next_character.sheet.attacks[selected_index as usize],
+									)?
+									.clone(),
 								None,
 							))));
 						}
@@ -208,10 +216,14 @@ pub fn controllable_character<'lua>(
 						let next_character = next_character.borrow();
 						let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 						if (0..=26).contains(&selected_index)
-							&& (selected_index as usize) < next_character.spells.len()
+							&& (selected_index as usize) < next_character.sheet.spells.len()
 						{
 							return Ok(Some(Response::Act(character::Action::Cast(
-								next_character.spells[selected_index as usize].clone(),
+								resources
+									.get_spell(
+										&next_character.sheet.spells[selected_index as usize],
+									)?
+									.clone(),
 								None,
 							))));
 						}
