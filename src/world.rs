@@ -505,6 +505,7 @@ impl Manager {
 					.sandbox(on_consider)?
 					.insert("Parameters", parameters)?
 					.insert("User", next_character.clone())?
+					.insert("Heuristic", consider::HeuristicConstructor)?
 					// Maybe these should be members of the spell?
 					.insert("Level", spell.level)?
 					.insert("Affinity", spell.affinity(&next_character.borrow()))?

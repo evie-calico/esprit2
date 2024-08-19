@@ -34,7 +34,7 @@ return {
     end,
 
 	--- Request all currently loaded character pieces.
-	---@param query CharacterQuery
+	---@param query CharacterQuery | nil
     ---@return [Piece]
 	characters = function (query)
     	return coroutine.yield({ type = "Characters", query = query})
