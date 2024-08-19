@@ -139,11 +139,23 @@ where
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-pub struct Ref(#[with(InlineRefCell)] RefCell<character::Piece>);
+struct InnerRef(#[with(InlineRefCell)] RefCell<character::Piece>);
+
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	mlua::FromLua,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+pub struct Ref(Rc<InnerRef>);
 
 impl Ref {
 	pub fn new(character: character::Piece) -> Self {
-		Self(RefCell::new(character))
+		Self(Rc::new(InnerRef(RefCell::new(character))))
 	}
 }
 
@@ -151,13 +163,7 @@ impl std::ops::Deref for Ref {
 	type Target = RefCell<character::Piece>;
 
 	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl std::ops::DerefMut for Ref {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
+		&self.0 .0
 	}
 }
 

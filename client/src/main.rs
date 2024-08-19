@@ -11,7 +11,6 @@ use esprit2::prelude::*;
 use esprit2::world::{ActionRequest, TurnOutcome};
 use mlua::LuaSerdeExt;
 use options::Options;
-use rkyv::ser::Serializer;
 use sdl2::rect::Rect;
 use std::process::exit;
 use std::{fs, io};
@@ -101,7 +100,15 @@ pub fn main() {
 		options
 	});
 	let mut console = Console::new(options.ui.colors.console.clone());
-	let lua = mlua::Lua::new();
+
+	// Ideally I'd disable all libraries except for package, but make them accessible to `require`.
+	// However, this would require enabling unsafe mode, to allow loading C modules.
+	let lua = mlua::Lua::new_with(
+		// COROUTINE is always loaded for luajit
+		mlua::StdLib::PACKAGE | mlua::StdLib::TABLE | mlua::StdLib::MATH,
+		mlua::LuaOptions::new(),
+	)
+	.unwrap();
 	lua.globals()
 		.get::<&str, mlua::Table>("package")
 		.unwrap()
@@ -119,6 +126,7 @@ pub fn main() {
 	lua.globals()
 		.set("Status", resources.statuses_handle())
 		.unwrap();
+
 	let scripts =
 		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
 			Ok(scripts) => scripts,
