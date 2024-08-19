@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
 use crate::options::Options;
-use crate::{draw, gui, input};
+use crate::{draw, gui, input, texture};
 use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
@@ -19,14 +19,14 @@ pub struct SoulJar<'texture> {
 }
 
 impl<'texture> SoulJar<'texture> {
-	pub fn new(resources: &'texture resource::Manager<'_>) -> Result<Self> {
+	pub fn new(textures: &'texture texture::Manager) -> Result<Self> {
 		let mut rng = rand::thread_rng();
 		let souls = (0..=9)
 			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
 			.collect();
 		Ok(Self {
 			souls,
-			light_texture: resources.get_owned_texture("light")?,
+			light_texture: textures.open("light")?,
 		})
 	}
 
@@ -43,7 +43,7 @@ pub fn menu(
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
 	console: &Console,
-	resources: &resource::Manager<'_>,
+	textures: &texture::Manager,
 ) {
 	for (i, color) in [(0x14, 0x17, 0x14), (0xE3, 0xBD, 0xEF), (0x14, 0x17, 0x14)]
 		.into_iter()
@@ -105,7 +105,7 @@ pub fn menu(
 					character_info(menu, &selected_character.borrow());
 				};
 				let mut buff_fn = |menu: &mut gui::Context| {
-					character_buffs(menu, &selected_character.borrow(), resources);
+					character_buffs(menu, &selected_character.borrow(), textures);
 				};
 				menu.hsplit(&mut [
 					Some((&mut character_fn) as &mut dyn FnMut(&mut gui::Context)),
@@ -185,7 +185,7 @@ impl Pamphlet {
 		&self,
 		pamphlet: &mut gui::Context,
 		world_manager: &world::Manager,
-		resources: &resource::Manager<'_>,
+		textures: &texture::Manager,
 		soul_jar: &mut SoulJar<'_>,
 	) {
 		struct MemberPosition {
@@ -231,7 +231,7 @@ impl Pamphlet {
 						rect.height(),
 					));
 					let piece = character_id.piece.borrow();
-					let texture = resources.get_texture("luvui_sleep");
+					let texture = textures.get("luvui_sleep");
 					character_thinking(
 						cloud,
 						character_id.accent_color,
@@ -240,7 +240,7 @@ impl Pamphlet {
 						layout.flipped,
 						|player_window| {
 							character_info(player_window, &piece);
-							character_buffs(player_window, &piece, resources);
+							character_buffs(player_window, &piece, textures);
 						},
 					);
 				});
@@ -257,7 +257,7 @@ impl Pamphlet {
 				pamphlet.horizontal();
 				for _ in 0..textures_per_row {
 					if let Some(item_name) = items.next() {
-						pamphlet.htexture(resources.get_texture(item_name), 32);
+						pamphlet.htexture(textures.get(item_name), 32);
 						pamphlet.advance(8, 0);
 					}
 				}
@@ -481,18 +481,14 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 	player_window.hsplit(&mut magical_stats);
 }
 
-fn character_buffs(
-	gui: &mut gui::Context<'_, '_, '_>,
-	piece: &character::Piece,
-	resources: &resource::Manager<'_>,
-) {
+fn character_buffs(gui: &mut gui::Context, piece: &character::Piece, textures: &texture::Manager) {
 	let mut statuses = piece.statuses.values().peekable();
 	while statuses.peek().is_some() {
 		let textures_per_row = gui.rect.width() / (32 + 8);
 		gui.horizontal();
 		for _ in 0..textures_per_row {
 			if let Some(status) = statuses.next() {
-				gui.htexture(resources.get_texture(&status.icon), 32);
+				gui.htexture(textures.get(&status.icon), 32);
 				gui.advance(8, 0);
 			}
 		}

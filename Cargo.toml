@@ -15,7 +15,7 @@ mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize", "vendor
 pest = "2.7.10"
 pest_derive = "2.7.10"
 
-# Serialiation
+# Serialization
 serde = { version = "1.0.196", features = ["derive", "rc"] }
 toml = "0.8.10"
 
@@ -25,6 +25,7 @@ tracing = "0.1.40"
 
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
 paste = "1.0.14" # Useful for proc macros
-grid = { version = "0.14.0", features = ["serde"] } # Container for the tilemap
 rand = "0.8.5"
-sdl2 = { version = "0.37.0", features = ["image", "ttf", "gfx"] }
+
+# TODO: remove me
+grid = { version = "0.14.0", features = ["serde"] } # Container for the tilemap

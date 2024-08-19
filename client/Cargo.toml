@@ -7,7 +7,7 @@ edition = "2021"
 esprit2.path = "../"
 mlua = "0.9.9"
 rand = "0.8.5"
-sdl2 = "0.37.0"
+sdl2 = { version = "0.37.0", features = ["image", "ttf", "gfx"] }
 serde = "1.0.208"
 thiserror = "1.0.63"
 toml = "0.8.19"

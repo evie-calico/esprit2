@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
 use crate::input;
+use crate::texture;
 use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -76,7 +77,7 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, came
 pub fn cursor(
 	canvas: &mut Canvas<Window>,
 	input_mode: &input::Mode,
-	resources: &resource::Manager<'_>,
+	textures: &texture::Manager,
 	camera: &Camera,
 ) {
 	if let input::Mode::Cursor {
@@ -116,7 +117,7 @@ pub fn cursor(
 				.unwrap();
 		}
 
-		let cursor = resources.get_texture("cursor");
+		let cursor = textures.get("cursor");
 		let cursor_info = cursor.query();
 		let cursor_width = cursor_info.width;
 		let cursor_height = cursor_info.height;
@@ -161,13 +162,13 @@ pub fn cursor(
 pub fn characters(
 	canvas: &mut Canvas<Window>,
 	world_manager: &world::Manager,
-	resources: &resource::Manager<'_>,
+	textures: &texture::Manager,
 	camera: &Camera,
 ) {
 	for character in world_manager.characters.iter().map(|x| x.borrow()) {
 		canvas
 			.copy(
-				resources.get_texture(&character.sheet.icon),
+				textures.get(&character.sheet.icon),
 				Some(Rect::new(0, 0, PIECE_SIZE, PIECE_SIZE)),
 				Some(Rect::new(
 					character.x * ITILE_SIZE - camera.x - (IPIECE_SIZE - ITILE_SIZE) / 2,

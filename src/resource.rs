@@ -1,9 +1,5 @@
 use crate::prelude::*;
 use mlua::{FromLua, FromLuaMulti};
-use sdl2::image::LoadTexture;
-use sdl2::render::{Texture, TextureCreator};
-use sdl2::video::WindowContext;
-use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -54,33 +50,13 @@ impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
 	}
 }
 
-/// Handles lazy loading of textures into memory and video memory.
-#[derive(Default)]
-struct TextureInfo<'texture> {
-	path: PathBuf,
-
-	/// This is populated upon calling `get_texture`.
-	texture: OnceCell<Texture<'texture>>,
-	/// Unlike `texture`, this keeps a copy of the texture in memory,
-	/// so that further owned instances can be constructed as needed.
-	/// This isn't always necessary since usually owned textures are only
-	/// for modulation, but it can persist across scene changes unlike owned textures,
-	/// which avoids an uneccessary disk read.
-	image: OnceCell<Vec<u8>>,
-
-	/// Silence further error messages if any errors occur.
-	had_error: Cell<bool>,
-}
-
 /// Manages all resource loading in a central, abstracted structure.
 ///
 /// The primary benefit of using this structure is that it abstracts
 /// the path and extension used to load any given asset.
 /// `resource::Manager` can also cache certain resources to avoid repeated disk reads,
 /// meaning outside code doesn't need to store permanent references to resources.
-pub struct Manager<'texture> {
-	texture_creator: &'texture TextureCreator<WindowContext>,
-
+pub struct Manager {
 	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
 	attacks: Resource<Rc<Attack>>,
 	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
@@ -88,13 +64,10 @@ pub struct Manager<'texture> {
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
 	sheets: Resource<character::Sheet>,
 	statuses: Rc<Resource<Status>>,
-	textures: Resource<TextureInfo<'texture>>,
 	vaults: Resource<Vault>,
-
-	missing_texture: Texture<'texture>,
 }
 
-impl mlua::UserData for Manager<'_> {}
+impl mlua::UserData for Manager {}
 
 pub struct Scripts<'lua> {
 	pub runtime: &'lua mlua::Lua,
@@ -102,7 +75,7 @@ pub struct Scripts<'lua> {
 	scripts: Resource<mlua::Function<'lua>>,
 }
 
-fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
+pub fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
 	let mut container = Resource::new();
 	recurse(&mut container, directory, directory, loader)?;
 	Ok(container)
@@ -152,17 +125,14 @@ fn recurse<T>(
 	Ok(())
 }
 
-impl<'texture> Manager<'texture> {
+impl Manager {
 	/// Collect known resources into a new resource manager.
 	///
 	/// # Errors
 	///
 	/// Returns an error if ANYTHING fails to be read/parsed.
 	/// This is probably undesirable and should be moved to logging/diagnostics.
-	pub fn open(
-		path: impl AsRef<Path>,
-		texture_creator: &'texture TextureCreator<WindowContext>,
-	) -> Result<Manager<'texture>> {
+	pub fn open(path: impl AsRef<Path>) -> Result<Manager> {
 		let path = path.as_ref();
 
 		let sheets = register(&path.join("sheets"), &|path| {
@@ -182,31 +152,14 @@ impl<'texture> Manager<'texture> {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let textures = register(&path.join("textures"), &|path| {
-			Ok(TextureInfo {
-				path: path.to_path_buf(),
-				..Default::default()
-			})
-		})?;
-
 		let vaults = register(&path.join("vaults"), &|path| Vault::open(path))?;
 
-		// Include a missing texture placeholder, rather than returning an Option.
-		let missing_texture = texture_creator
-			.load_texture_bytes(include_bytes!("res/missing_texture.png"))
-			.map_err(crate::Error::Sdl)?;
-
 		Ok(Self {
-			texture_creator,
-
 			attacks,
 			spells,
 			sheets,
 			statuses,
-			textures,
 			vaults,
-
-			missing_texture,
 		})
 	}
 
@@ -248,51 +201,6 @@ impl<'texture> Manager<'texture> {
 	/// Returns an error if the spell could not be found.
 	pub fn get_spell(&self, key: &str) -> Result<&Rc<Spell>> {
 		self.spells.get(key)
-	}
-
-	/// Return the given texture.
-	/// If the texture cannot be found, returns the missing texture placeholder.
-	pub fn get_texture(&self, key: &str) -> &Texture {
-		let Ok(texture_info) = self.textures.get(key) else {
-			return &self.missing_texture;
-		};
-		texture_info
-			.texture
-			.get_or_try_init(|| self.texture_creator.load_texture(&texture_info.path))
-			.unwrap_or_else(|msg| {
-				if !texture_info.had_error.get() {
-					eprintln!(
-						"failed to load {key} ({}): {msg}",
-						texture_info.path.display()
-					);
-					texture_info.had_error.set(true);
-				}
-				&self.missing_texture
-			})
-	}
-
-	/// `Manager` *must* be immutable to function,
-	/// but sometimes sdl expects you to have ownership over a texture.
-	/// In these situations, `get_owned_texture` can be used to create an owned instance of a texture.
-	/// This *does* allocate more VRAM every time it's called.
-	/// It should *not* be called in a loop or on every frame.
-	///
-	/// The resource manager is still serving a function here:
-	/// keys are abstracted, and the image data is saved in memory instead of vram,
-	/// meaning that repeated calls to this function will not incur a disk read.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the texture could not be found, loaded, or parsed.
-	pub fn get_owned_texture(&self, key: &str) -> Result<Texture> {
-		let texture_info = self.textures.get(key)?;
-
-		let image = texture_info
-			.image
-			.get_or_try_init(|| fs::read(&texture_info.path))?;
-		self.texture_creator
-			.load_texture_bytes(image)
-			.map_err(crate::Error::Sdl)
 	}
 
 	/// Return the given vault.

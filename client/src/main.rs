@@ -1,9 +1,10 @@
-#![feature(anonymous_lifetime_in_impl_trait)]
+#![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
 
 pub mod draw;
 pub mod gui;
 pub mod input;
 pub mod options;
+pub mod texture;
 pub mod typography;
 
 use esprit2::prelude::*;
@@ -61,7 +62,17 @@ pub fn main() {
 	tracing_subscriber::fmt::init();
 
 	// Game initialization.
-	let resources = match resource::Manager::open(options::resource_directory(), &texture_creator) {
+	let resources = match resource::Manager::open(options::resource_directory()) {
+		Ok(resources) => resources,
+		Err(msg) => {
+			error!("failed to open resource directory: {msg}");
+			exit(1);
+		}
+	};
+	let textures = match texture::Manager::new(
+		options::resource_directory().join("textures/"),
+		&texture_creator,
+	) {
 		Ok(resources) => resources,
 		Err(msg) => {
 			error!("failed to open resource directory: {msg}");
@@ -143,7 +154,7 @@ pub fn main() {
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
-	let mut soul_jar = gui::widget::SoulJar::new(&resources).unwrap_or_else(|msg| {
+	let mut soul_jar = gui::widget::SoulJar::new(&textures).unwrap_or_else(|msg| {
 		error!("failed to initialize soul jar: {msg}");
 		exit(1);
 	});
@@ -278,8 +289,8 @@ pub fn main() {
 					canvas.set_draw_color((20, 20, 20));
 					canvas.clear();
 					draw::tilemap(canvas, &world_manager, &camera);
-					draw::characters(canvas, &world_manager, &resources, &camera);
-					draw::cursor(canvas, &input_mode, &resources, &camera);
+					draw::characters(canvas, &world_manager, &textures, &camera);
+					draw::cursor(canvas, &input_mode, &textures, &camera);
 				})
 				.unwrap();
 
@@ -350,7 +361,7 @@ pub fn main() {
 				&input_mode,
 				&world_manager,
 				&console,
-				&resources,
+				&textures,
 			);
 
 			// Draw pamphlet
@@ -372,7 +383,7 @@ pub fn main() {
 				(0x08, 0x0f, 0x25).into(),
 			);
 
-			pamphlet.draw(&mut pamphlet_ctx, &world_manager, &resources, &mut soul_jar);
+			pamphlet.draw(&mut pamphlet_ctx, &world_manager, &textures, &mut soul_jar);
 
 			canvas.present();
 		}
