@@ -143,13 +143,6 @@ pub fn main() {
 			error!("failed to initialize world manager: {msg}");
 			exit(1);
 		});
-	let mut serializer = rkyv::ser::serializers::AllocSerializer::<1024>::default();
-	serializer
-		.serialize_value(&*world_manager.characters.get(1).unwrap().borrow())
-		.unwrap();
-	let buf = serializer.into_serializer().into_inner();
-	println!("buf is {} bytes", buf.len());
-	println!("{buf:?}");
 	world_manager.generate_floor(
 		"default seed",
 		&vault::Set {
@@ -159,6 +152,11 @@ pub fn main() {
 		},
 		&resources,
 	);
+	let mut serializer = rkyv::ser::serializers::AllocSerializer::<1024>::default();
+	serializer.serialize_value(&world_manager).unwrap();
+	let buf = serializer.into_serializer().into_inner();
+	println!("buf is {} bytes", buf.len());
+	println!("{buf:?}");
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 

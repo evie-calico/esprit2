@@ -8,7 +8,9 @@ use std::rc::Rc;
 pub use character::Ref as CharacterRef;
 
 /// This struct contains all information that is relevant during gameplay.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Debug, serde::Serialize, serde::Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+)]
 pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
@@ -37,7 +39,15 @@ impl Default for Level {
 	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
 	pub piece: CharacterRef,
@@ -60,7 +70,15 @@ pub struct PartyReferenceBase {
 	pub accent_color: Color,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Location {
 	/// Which level is currently loaded.
 	pub level: String,
@@ -186,8 +204,9 @@ impl Manager {
 		}
 		let mut rng = rand::rngs::StdRng::from_seed(seed_slice);
 		for _ in 0..set.density {
-			let x = rng.gen_range(0..self.current_floor.map.cols() as i32);
-			let y = rng.gen_range(0..self.current_floor.map.rows() as i32);
+			let x = rng.gen_range(0..self.current_floor.width as i32);
+			let y =
+				rng.gen_range(0..(self.current_floor.map.len() / self.current_floor.width) as i32);
 			match set.vaults.choose(&mut rng).map(|k| {
 				resources
 					.get_vault(k)
@@ -365,7 +384,7 @@ impl<'lua> ThreadOutcome<'lua> {
 						}
 					}
 					LuaRequest::Tile { x, y } => {
-						let tile = world.current_floor.map.get(y, x).copied();
+						let tile = world.current_floor.get(x as usize, y as usize);
 						value = thread.resume(
 							tile.map(|x| lua.to_value(&x))
 								.transpose()?
@@ -554,8 +573,8 @@ impl Manager {
 					self.move_piece(next_character, direction, console)
 				} else {
 					let mut dijkstra = astar::DijkstraMap::target(
-						self.current_floor.map.cols(),
-						self.current_floor.map.rows(),
+						self.current_floor.width(),
+						self.current_floor.height(),
 						&[(target_x, target_y)],
 					);
 					if let Ok(x) = x.try_into()
@@ -568,7 +587,7 @@ impl Manager {
 							{
 								return astar::IMPASSABLE;
 							}
-							match self.current_floor.map.get(y, x) {
+							match self.current_floor.get(x, y) {
 								Some(floor::Tile::Floor) | Some(floor::Tile::Exit) => base + 1,
 								Some(floor::Tile::Wall) | None => astar::IMPASSABLE,
 							}
@@ -666,7 +685,7 @@ impl Manager {
 			)
 		};
 
-		let tile = self.current_floor.map.get(y, x);
+		let tile = self.current_floor.get(x as usize, y as usize);
 		match tile {
 			Some(Tile::Floor) | Some(Tile::Exit) => {
 				let mut character = character.borrow_mut();

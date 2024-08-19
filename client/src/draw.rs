@@ -49,27 +49,25 @@ impl Camera {
 
 pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, camera: &Camera) {
 	canvas.set_draw_color(Color::WHITE);
-	for (x, col) in world_manager.current_floor.map.iter_cols().enumerate() {
-		for (y, tile) in col.enumerate() {
-			match tile {
-				floor::Tile::Floor => (),
-				floor::Tile::Wall => canvas
-					.fill_rect(Rect::new(
-						(x as i32) * ITILE_SIZE - camera.x,
-						(y as i32) * ITILE_SIZE - camera.y,
-						TILE_SIZE,
-						TILE_SIZE,
-					))
-					.unwrap(),
-				floor::Tile::Exit => canvas
-					.draw_rect(Rect::new(
-						(x as i32) * ITILE_SIZE + 2 - camera.x,
-						(y as i32) * ITILE_SIZE + 2 - camera.y,
-						TILE_SIZE - 4,
-						TILE_SIZE - 4,
-					))
-					.unwrap(),
-			}
+	for (x, y, tile) in world_manager.current_floor.iter() {
+		match tile {
+			floor::Tile::Floor => (),
+			floor::Tile::Wall => canvas
+				.fill_rect(Rect::new(
+					(x as i32) * ITILE_SIZE - camera.x,
+					(y as i32) * ITILE_SIZE - camera.y,
+					TILE_SIZE,
+					TILE_SIZE,
+				))
+				.unwrap(),
+			floor::Tile::Exit => canvas
+				.draw_rect(Rect::new(
+					(x as i32) * ITILE_SIZE + 2 - camera.x,
+					(y as i32) * ITILE_SIZE + 2 - camera.y,
+					TILE_SIZE - 4,
+					TILE_SIZE - 4,
+				))
+				.unwrap(),
 		}
 	}
 }

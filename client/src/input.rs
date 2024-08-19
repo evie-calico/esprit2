@@ -154,7 +154,7 @@ pub fn controllable_character<'lua>(
 						};
 
 						if options.controls.underfoot.contains(keycode) {
-							match world_manager.current_floor.map.get(y, x) {
+							match world_manager.current_floor.get(x as usize, y as usize) {
 								Some(floor::Tile::Floor) => {
 									console.print_unimportant(
 										"There's nothing on the ground here.".into(),

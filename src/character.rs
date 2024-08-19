@@ -86,17 +86,69 @@ pub fn inflict(
 	Ok(())
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
-pub struct Ref(Rc<RefCell<character::Piece>>);
+use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
+
+pub struct InlineRefCell;
+
+impl<F: rkyv::Archive> ArchiveWith<RefCell<F>> for InlineRefCell {
+	type Archived = F::Archived;
+	type Resolver = F::Resolver;
+
+	#[inline]
+	unsafe fn resolve_with(
+		field: &RefCell<F>,
+		pos: usize,
+		resolver: Self::Resolver,
+		out: *mut Self::Archived,
+	) {
+		(*field.borrow()).resolve(pos, resolver, out);
+	}
+}
+
+impl<F: rkyv::Serialize<S>, S: rkyv::Fallible + ?Sized> SerializeWith<RefCell<F>, S>
+	for InlineRefCell
+{
+	#[inline]
+	fn serialize_with(field: &RefCell<F>, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
+		(*field.borrow()).serialize(serializer)
+	}
+}
+
+impl<F: rkyv::Archive, D: rkyv::Fallible + ?Sized> DeserializeWith<F::Archived, RefCell<F>, D>
+	for InlineRefCell
+where
+	F::Archived: rkyv::Deserialize<F, D>,
+{
+	#[inline]
+	fn deserialize_with(field: &F::Archived, deserializer: &mut D) -> Result<RefCell<F>, D::Error> {
+		use rkyv::Deserialize;
+		match field.deserialize(deserializer) {
+			Ok(val) => Ok(RefCell::new(val)),
+			Err(a) => Err(a),
+		}
+	}
+}
+
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	mlua::FromLua,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+pub struct Ref(#[with(InlineRefCell)] RefCell<character::Piece>);
 
 impl Ref {
 	pub fn new(character: character::Piece) -> Self {
-		Self(Rc::new(RefCell::new(character)))
+		Self(RefCell::new(character))
 	}
 }
 
 impl std::ops::Deref for Ref {
-	type Target = Rc<RefCell<character::Piece>>;
+	type Target = RefCell<character::Piece>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.0

@@ -27,6 +27,3 @@ tracing = "0.1.40"
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
 paste = "1.0.14" # Useful for proc macros
 rand = "0.8.5"
-
-# TODO: remove me
-grid = { version = "0.14.0", features = ["serde"] } # Container for the tilemap

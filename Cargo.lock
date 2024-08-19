@@ -256,7 +256,6 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "alua",
- "grid",
  "mlua",
  "paste",
  "pest",
@@ -300,15 +299,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
-]
-
-[[package]]
-name = "grid"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be136d9dacc2a13cc70bb6c8f902b414fb2641f8db1314637c6b7933411a8f82"
-dependencies = [
- "serde",
 ]
 
 [[package]]
