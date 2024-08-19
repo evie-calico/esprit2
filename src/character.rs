@@ -158,7 +158,15 @@ impl mlua::UserData for Ref {
 	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Piece {
 	pub sheet: Sheet,
 
@@ -290,7 +298,19 @@ pub enum Action<'lua> {
 	Cast(Rc<Spell>, Option<mlua::Table<'lua>>),
 }
 
-#[derive(Copy, PartialEq, Eq, Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Copy,
+	PartialEq,
+	Eq,
+	Clone,
+	Debug,
+	Default,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 #[repr(u32)]
 pub enum Alliance {
 	Friendly,
@@ -337,10 +357,19 @@ mod sheet {
 		bonuses
 	}
 
-	#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+	#[derive(
+		Clone,
+		Debug,
+		serde::Serialize,
+		serde::Deserialize,
+		alua::UserData,
+		rkyv::Archive,
+		rkyv::Serialize,
+		rkyv::Deserialize,
+	)]
 	#[alua(method = stats)]
 	pub struct Sheet {
-		pub icon: String,
+		pub icon: resource::Id,
 		/// Note that this includes the character's name.
 		#[alua(get)]
 		pub nouns: Nouns,
@@ -363,9 +392,9 @@ mod sheet {
 		pub speed: Aut,
 
 		#[alua(get)]
-		pub attacks: Vec<String>,
+		pub attacks: Vec<resource::Id>,
 		#[alua(get)]
-		pub spells: Vec<String>,
+		pub spells: Vec<resource::Id>,
 
 		/// Script to decide on an action from a list of considerations
 		pub on_consider: resource::Id,
@@ -399,7 +428,18 @@ impl expression::Variables for Sheet {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	serde::Serialize,
+	serde::Deserialize,
+	alua::UserData,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]

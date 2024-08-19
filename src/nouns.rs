@@ -3,7 +3,16 @@ use std::sync::{Arc, LazyLock};
 
 /// For dynamically addressing a character.
 /// This should encompass almost every (dynamic) way of addressing someone or something.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	alua::UserData,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Nouns {
 	/// This is an `Arc<str>` rather than a `String` because it's very common to
 	/// store a reference to a character's name (see `Console`).
@@ -15,7 +24,16 @@ pub struct Nouns {
 	pub pronouns: Pronouns,
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	Default,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub enum Pronouns {
 	Female,
 	Male,

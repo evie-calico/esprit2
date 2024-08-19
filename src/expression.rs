@@ -5,7 +5,7 @@ use tracing::error;
 
 pub type Integer = i64;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum Operation {
 	Integer(Integer),
 	Variable(usize, usize),
@@ -80,7 +80,7 @@ impl Variables for Integer {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Expression {
 	pub source: String,
 	pub root: Operation,

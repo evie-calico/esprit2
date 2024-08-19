@@ -11,6 +11,7 @@ use esprit2::prelude::*;
 use esprit2::world::{ActionRequest, TurnOutcome};
 use mlua::LuaSerdeExt;
 use options::Options;
+use rkyv::ser::Serializer;
 use sdl2::rect::Rect;
 use std::process::exit;
 use std::{fs, io};
@@ -142,6 +143,13 @@ pub fn main() {
 			error!("failed to initialize world manager: {msg}");
 			exit(1);
 		});
+	let mut serializer = rkyv::ser::serializers::AllocSerializer::<256>::default();
+	serializer
+		.serialize_value(&*world_manager.characters.front().unwrap().borrow())
+		.unwrap();
+	let buf = serializer.into_serializer().into_inner();
+	println!("buf is {} bytes", buf.len());
+	println!("{buf:?}");
 	world_manager.generate_floor(
 		"default seed",
 		&vault::Set {

@@ -1,7 +1,18 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Copy,
+	Clone,
+	Debug,
+	Eq,
+	PartialEq,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub enum Energy {
 	/// Positive energy, like heat.
 	Positive,
@@ -9,7 +20,18 @@ pub enum Energy {
 	Negative,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Copy,
+	Clone,
+	Debug,
+	Eq,
+	PartialEq,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub enum Harmony {
 	/// Spells with unconventional, unpredictable effects.
 	Chaos,
@@ -20,7 +42,16 @@ pub enum Harmony {
 /// A character's magical skills.
 ///
 /// Only skill from each axis may be chosen, and the minor skill is optional.
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Copy,
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 // This gives the Skillset a cool toml representation.
 #[serde(untagged)]
 pub enum Skillset {
@@ -70,14 +101,30 @@ impl mlua::UserData for Affinity {
 	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 #[serde(untagged)]
 pub enum Parameter {
 	Integer(i32),
 	Expression(Expression),
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Spell {
 	pub name: String,
 	pub description: String,

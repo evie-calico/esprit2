@@ -3,19 +3,36 @@ use mlua::LuaSerdeExt;
 use std::cell::Cell;
 use tracing::{error, warn};
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub enum Duration {
 	Rest,
 	Turn,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
-	on_debuff: Box<str>,
+	on_debuff: resource::Id,
 
 	#[serde(skip)]
+	#[with(rkyv::with::Unsafe)]
 	cache: Cell<Option<(u32, character::Stats)>>,
 }
 
@@ -44,13 +61,29 @@ impl Debuff {
 	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub enum Effect {
 	StaticDebuff(character::Stats),
 	Debuff(Debuff),
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
 pub struct Status {
 	pub name: String,
 	pub icon: String,
