@@ -152,11 +152,6 @@ pub fn main() {
 		},
 		&resources,
 	);
-	let mut serializer = rkyv::ser::serializers::AllocSerializer::<1024>::default();
-	serializer.serialize_value(&world_manager).unwrap();
-	let buf = serializer.into_serializer().into_inner();
-	println!("buf is {} bytes", buf.len());
-	println!("{buf:?}");
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
