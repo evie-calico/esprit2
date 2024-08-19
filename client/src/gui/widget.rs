@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
-use crate::gui;
+use crate::options::Options;
+use crate::{draw, gui, input};
 use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
@@ -294,6 +295,12 @@ impl Pamphlet {
 			Some((&mut inventory_fn) as &mut dyn FnMut(&mut gui::Context)),
 			Some(&mut souls_fn),
 		]);
+	}
+}
+
+impl Default for Pamphlet {
+	fn default() -> Self {
+		Self::new()
 	}
 }
 

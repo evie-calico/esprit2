@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
-use crate::prelude::*;
+use crate::input;
+use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::pixels::Color;

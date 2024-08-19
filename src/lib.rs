@@ -20,18 +20,14 @@ pub mod character;
 pub mod combat;
 pub mod consider;
 pub mod console;
-pub mod draw;
 pub mod expression;
 pub mod floor;
-pub mod input;
 pub mod item;
 pub mod nouns;
-pub mod options;
 pub mod resource;
 pub mod soul;
 pub mod spell;
 pub mod status;
-pub mod typography;
 pub mod vault;
 pub mod world;
 
@@ -179,11 +175,9 @@ pub mod prelude {
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
-	pub use options::Options;
 	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use status::Status;
-	pub use typography::Typography;
 	pub use vault::Vault;
 
 	// Export common traits

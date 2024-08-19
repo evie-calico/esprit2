@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use crate::options::Options;
+use esprit2::prelude::*;
 use sdl2::{event::Event, keyboard::Keycode};
 use tracing::warn;
 
@@ -69,15 +70,15 @@ pub fn controllable_character<'lua>(
 	options: &Options,
 ) -> Result<Option<Response<'lua>>> {
 	match mode {
-		input::Mode::Cursor {
+		Mode::Cursor {
 			submitted: true, ..
 		}
-		| input::Mode::Prompt {
+		| Mode::Prompt {
 			response: Some(_), ..
 		}
-		| input::Mode::DirectionPrompt {
+		| Mode::DirectionPrompt {
 			response: Some(_), ..
-		} => *mode = input::Mode::Normal,
+		} => *mode = Mode::Normal,
 		_ => (),
 	}
 

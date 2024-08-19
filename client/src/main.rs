@@ -1,13 +1,20 @@
 #![feature(anonymous_lifetime_in_impl_trait)]
 
-mod gui;
+pub mod draw;
+pub mod gui;
+pub mod input;
+pub mod options;
+pub mod typography;
 
 use esprit2::prelude::*;
-use sdl2::pixels::Color;
+use esprit2::world::{ActionRequest, TurnOutcome};
+use mlua::LuaSerdeExt;
+use options::Options;
 use sdl2::rect::Rect;
 use std::process::exit;
 use std::{fs, io};
 use tracing::{error, info, warn};
+use typography::Typography;
 use world::PartialAction;
 
 fn update_delta(
@@ -211,7 +218,13 @@ pub fn main() {
 				i.cloud_trail.tick(delta / 4.0);
 			}
 			if let Some(inner_action) = partial_action {
-				match world_manager.update(inner_action, &scripts, &console, &mut input_mode) {
+				match update_world(
+					&mut world_manager,
+					&scripts,
+					&console,
+					&mut input_mode,
+					inner_action,
+				) {
 					Ok(result) => partial_action = result.map(PartialAction::Request),
 					Err(msg) => {
 						error!("world manager update returned an error: {msg}");
@@ -235,7 +248,7 @@ pub fn main() {
 			let window_size = canvas.window().size();
 
 			// Clear the screen.
-			canvas.set_draw_color(Color::RGB(20, 20, 20));
+			canvas.set_draw_color((20, 20, 20));
 			canvas.clear();
 			canvas.set_viewport(Rect::new(0, 0, window_size.0, window_size.1));
 
@@ -262,7 +275,7 @@ pub fn main() {
 
 			canvas
 				.with_texture_canvas(&mut world_texture, |canvas| {
-					canvas.set_draw_color(Color::RGB(20, 20, 20));
+					canvas.set_draw_color((20, 20, 20));
 					canvas.clear();
 					draw::tilemap(canvas, &world_manager, &camera);
 					draw::characters(canvas, &world_manager, &resources, &camera);
@@ -356,12 +369,189 @@ pub fn main() {
 				pamphlet_ctx.canvas,
 				pamphlet_ctx.rect,
 				20,
-				Color::RGB(0x08, 0x0f, 0x25),
+				(0x08, 0x0f, 0x25).into(),
 			);
 
 			pamphlet.draw(&mut pamphlet_ctx, &world_manager, &resources, &mut soul_jar);
 
 			canvas.present();
+		}
+	}
+}
+
+fn update_world<'lua>(
+	this: &mut world::Manager,
+	scripts: &'lua resource::Scripts,
+	console: &Console,
+	input_mode: &mut input::Mode,
+	inner_action: PartialAction<'lua>,
+) -> Result<Option<world::ActionRequest<'lua>>, Error> {
+	let outcome = match (inner_action, input_mode.clone()) {
+		// Handle targetted cursor submission
+		(
+			PartialAction::Request(ActionRequest::BeginTargetCursor { callback, .. }),
+			input::Mode::Cursor {
+				position: (x, y),
+				submitted: true,
+				..
+			},
+		) => {
+			if let Some(character) = this.get_character_at(x, y) {
+				TurnOutcome::poll(this, scripts.runtime, callback, character.clone())?
+			} else {
+				// If the cursor hasn't selected a character,
+				// cancel the request altogther.
+				// This destroys the lua callback.
+				TurnOutcome::Yield
+			}
+		}
+		// Handle positional cursor submission
+		(
+			PartialAction::Request(ActionRequest::BeginCursor { callback, .. }),
+			input::Mode::Cursor {
+				position: (x, y),
+				submitted: true,
+				..
+			},
+		) => TurnOutcome::poll(this, scripts.runtime, callback, (x, y))?,
+		// An unsubmitted cursor yields the same action request.
+		(
+			PartialAction::Request(
+				request @ (ActionRequest::BeginCursor { .. }
+				| ActionRequest::BeginTargetCursor { .. }),
+			),
+			input::Mode::Cursor {
+				submitted: false, ..
+			},
+		) => {
+			return Ok(Some(request));
+		}
+		// Prompt with submitted response
+		(
+			PartialAction::Request(ActionRequest::ShowPrompt { callback, .. }),
+			input::Mode::Prompt {
+				response: Some(response),
+				..
+			},
+		) => TurnOutcome::poll(this, scripts.runtime, callback, response)?,
+		// Prompt with unsubmitted response
+		(
+			PartialAction::Request(request @ ActionRequest::ShowPrompt { .. }),
+			input::Mode::Prompt { response: None, .. },
+		) => return Ok(Some(request)),
+		// Direction prompt with submitted response
+		(
+			PartialAction::Request(ActionRequest::ShowDirectionPrompt { callback, .. }),
+			input::Mode::DirectionPrompt {
+				response: Some(response),
+				..
+			},
+		) => TurnOutcome::poll(
+			this,
+			scripts.runtime,
+			callback,
+			scripts.runtime.to_value(&response),
+		)?,
+		// Direction prompt with unsubmitted response
+		(
+			PartialAction::Request(request @ ActionRequest::ShowDirectionPrompt { .. }),
+			input::Mode::DirectionPrompt { response: None, .. },
+		) => return Ok(Some(request)),
+		// If the input mode is invalid in any way, the callback will be destroyed.
+		(
+			PartialAction::Request(
+				ActionRequest::BeginCursor { .. }
+				| ActionRequest::BeginTargetCursor { .. }
+				| ActionRequest::ShowPrompt { .. }
+				| ActionRequest::ShowDirectionPrompt { .. },
+			),
+			_,
+		) => TurnOutcome::Yield,
+		// If there is no pending request, pop a turn off the character queue.
+		(PartialAction::Action(action), _) => this.next_turn(console, scripts, action)?,
+	};
+
+	let player_controlled = this.next_character().borrow().player_controlled;
+	let mut apply_delay = |delay| {
+		#[allow(
+			clippy::unwrap_used,
+			reason = "next_turn already indexes the first element"
+		)]
+		let character = this.characters.pop_front().unwrap();
+		character.borrow_mut().action_delay = delay;
+		// Insert the character into the queue,
+		// immediately before the first character to have a higher action delay.
+		// This assumes that the queue is sorted.
+		this.characters.insert(
+			this.characters
+				.iter()
+				.enumerate()
+				.find(|x| x.1.borrow().action_delay > delay)
+				.map(|x| x.0)
+				.unwrap_or(this.characters.len()),
+			character,
+		);
+	};
+
+	match outcome {
+		TurnOutcome::Yield => {
+			if !player_controlled {
+				apply_delay(TURN);
+			}
+			Ok(None)
+		}
+		TurnOutcome::Action { delay } => {
+			apply_delay(delay);
+			Ok(None)
+		}
+		TurnOutcome::Request(request) => {
+			// Set up any new action requests.
+			match &request {
+				world::ActionRequest::BeginCursor {
+					x,
+					y,
+					range,
+					radius,
+					callback: _,
+				} => {
+					*input_mode = input::Mode::Cursor {
+						origin: (*x, *y),
+						position: (*x, *y),
+						range: *range,
+						radius: *radius,
+						submitted: false,
+						state: input::CursorState::default(),
+					};
+				}
+				world::ActionRequest::BeginTargetCursor {
+					x,
+					y,
+					range,
+					callback: _,
+				} => {
+					*input_mode = input::Mode::Cursor {
+						origin: (*x, *y),
+						position: (*x, *y),
+						range: *range,
+						radius: None,
+						submitted: false,
+						state: input::CursorState::default(),
+					};
+				}
+				world::ActionRequest::ShowPrompt { message, .. } => {
+					*input_mode = input::Mode::Prompt {
+						response: None,
+						message: message.clone(),
+					}
+				}
+				world::ActionRequest::ShowDirectionPrompt { message, .. } => {
+					*input_mode = input::Mode::DirectionPrompt {
+						response: None,
+						message: message.clone(),
+					}
+				}
+			}
+			Ok(Some(request))
 		}
 	}
 }
