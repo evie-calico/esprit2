@@ -4,11 +4,7 @@ local world = require "world"
 
 local considerations = {}
 
-for _, character in ipairs(world.characters { Within = {
-	x = User.x,
-	y = User.y,
-	range = Parameters.range,
-}}) do
+for _, character in ipairs(world.characters_within(User.x, User.y, Parameters.range)) do
 	if not combat.alliance_check(User, character) then
 		table.insert(considerations, {
 			arguments = { target = character },
