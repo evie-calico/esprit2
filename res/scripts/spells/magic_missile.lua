@@ -46,13 +46,7 @@ local unskilled_messages = {
 }
 
 local function pick(table)
-	return Arguments.target:replace_prefixed_nouns(
-		"target_",
-		User:replace_prefixed_nouns(
-			"self_",
-			table[math.random(#table)]
-		)
-	)
+	return combat.format(User, Arguments.target, table[math.random(#table)])
 end
 
 -- Avoid showing unskilled messages too often;

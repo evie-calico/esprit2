@@ -72,18 +72,18 @@ pub struct HeuristicConstructor;
 
 impl mlua::UserData for HeuristicConstructor {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_method(
+		methods.add_function(
 			"damage",
-			|_, _, (target, amount): (world::CharacterRef, mlua::Integer)| {
+			|_, (target, amount): (world::CharacterRef, mlua::Integer)| {
 				Ok(Heuristic::Damage {
 					target,
 					amount: amount.try_into().unwrap_or_default(),
 				})
 			},
 		);
-		methods.add_method(
+		methods.add_function(
 			"debuff",
-			|_, _, (target, amount): (world::CharacterRef, u32)| {
+			|_, (target, amount): (world::CharacterRef, u32)| {
 				Ok(Heuristic::Debuff { target, amount })
 			},
 		);

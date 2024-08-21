@@ -9,7 +9,7 @@ for _, character in ipairs(world.characters_within(User.x, User.y, Parameters.ra
 		table.insert(considerations, {
 			arguments = { target = character },
 			heuristics = {
-				Heuristic:damage(
+				Heuristic.damage(
 					character,
 					Affinity:magnitude(Parameters.magnitude) - character.stats.resistance
 				)

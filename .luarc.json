@@ -3,4 +3,7 @@
         "res/scripts/lib/globals.lua",
         "res/scripts/lib/userdata.lua"
     ],
+    "format.defaultConfig": {
+        "indent_style": "tab",
+    }
 }

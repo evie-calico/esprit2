@@ -9,12 +9,12 @@ for _, character in ipairs(world.characters_within(User.x, User.y, 1)) do
 		table.insert(considerations, {
 			arguments = { target = character },
 			heuristics = {
-				Heuristic:damage(
+				Heuristic.damage(
 					character,
 					Magnitude - character.stats.defense
 				),
 				-- Estimate the drawback of close combat
-				Heuristic:debuff(User, 2)
+				Heuristic.debuff(User, 2)
 			}
 		})
 	end

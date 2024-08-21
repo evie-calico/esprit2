@@ -101,14 +101,7 @@ pub fn main() {
 	});
 	let mut console = Console::new(options.ui.colors.console.clone());
 
-	// Ideally I'd disable all libraries except for package, but make them accessible to `require`.
-	// However, this would require enabling unsafe mode, to allow loading C modules.
-	let lua = mlua::Lua::new_with(
-		// COROUTINE is always loaded for luajit
-		mlua::StdLib::PACKAGE | mlua::StdLib::TABLE | mlua::StdLib::MATH,
-		mlua::LuaOptions::new(),
-	)
-	.unwrap();
+	let lua = mlua::Lua::new();
 	lua.globals()
 		.get::<&str, mlua::Table>("package")
 		.unwrap()

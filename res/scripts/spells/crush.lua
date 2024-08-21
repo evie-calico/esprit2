@@ -9,14 +9,46 @@ local characters = world.characters()
 local x, y = world.cursor(User.x, User.y, Parameters.range, Parameters.radius)
 local direction = world.direction("Crush in which direction?")
 
+local cast_messages = {
+	"{Address} gestures for gravity to shift",
+}
+local damage_messages = {
+	"{Address} is crushed against the wall",
+	"{Address}'s body strikes the sides of the dungeon",
+}
+local neutral_messages = {
+	"{Address} is caught in the pull of gravity",
+	"The sway of gravity draws {address} in",
+}
+-- Shown when damage <= 0
+local failure_messages = {
+	"{Address} resisted being squished",
+	-- This will be correct for all pronouns except "it", which will appear as "itsself".
+	-- TODO: Enemies use object pronouns; fix this.
+	"{Address} gently braces {them}self against the wall",
+	"{Address} slides down the wall, hitting the ground unscatched",
+}
+
+Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), { type = "Success" });
+
 for _, character in ipairs(characters) do
 	if math.abs(character.x - x) <= Parameters.radius and math.abs(character.y - y) <= Parameters.radius then
 		-- we'll start with a basic rightward movement.
-		for distance_traveled = 0, Parameters.displacement do
+		for distance_traveled = 0, Affinity:magnitude(Parameters.displacement) do
 			local projected_x = character.x
 			local projected_y = character.y
-			if direction == "Left" then projected_x = projected_x - 1 elseif direction == "Right" then projected_x = projected_x + 1 end
-			if direction == "Up" then projected_y = projected_y - 1 elseif direction == "Down" then projected_y = projected_y + 1 end
+			if direction == "Left" then
+				projected_x = projected_x - 1
+			elseif direction == "Right" then
+				projected_x =
+					projected_x + 1
+			end
+			if direction == "Up" then
+				projected_y = projected_y - 1
+			elseif direction == "Down" then
+				projected_y =
+					projected_y + 1
+			end
 
 			local tile = world.tile(projected_x, projected_y)
 			-- TODO: This is insufficient
@@ -33,21 +65,26 @@ for _, character in ipairs(characters) do
 				if damage > 0 then
 					character.hp = character.hp - damage
 					Console:combat_log(
-						character.sheet.nouns.name.." was crushed!",
+						character:replace_nouns(damage_messages[math.random(#damage_messages)]),
 						{ type = "Hit", damage = damage }
 					)
 				else
 					Console:combat_log(
-						character.sheet.nouns.name.." resisted being squished.",
+						character:replace_nouns(failure_messages[math.random(#failure_messages)]),
 						{ type = pierce_failed and "Glance" or "Miss" }
 					)
 				end
 
-				break
+				-- Skip printing a neutral message
+				goto printed
 			end
 		end
-	end
 
+		-- This print has to happen here because it should only be shown if the character never hit a wall.
+		Console:print(character:replace_nouns(neutral_messages[math.random(#neutral_messages)]))
+
+		::printed::
+	end
 end
 
 User.sp = User.sp - Level
