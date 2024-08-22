@@ -2,23 +2,20 @@
 local combat = require "combat"
 local world = require "world"
 
--- Prompt User for Arguments if they have not been provided
-if Arguments == nil then
-	Arguments = {
-		target = world.target(User.x, User.y, 1)
-	}
-end
+local target = world.character_at(Arguments.target.x, Arguments.target.y)
+if target == nil then return end
 
-if combat.alliance_check(User, Arguments.target) and not combat.alliance_prompt() then return end
+-- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission
+-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-local damage, pierce_failed = combat.apply_damage_with_pierce(1, Magnitude - Arguments.target.stats.defense)
+local damage, pierce_failed = combat.apply_damage_with_pierce(1, Magnitude - target.stats.defense)
 
-Arguments.target.hp = Arguments.target.hp - damage
+target.hp = target.hp - damage
 if damage > 0 or pierce_failed then
 	-- Apply a small bleeding effect even if damage is 0
 	-- to help weaker characters overcome their glancing blows
 	-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
-	Arguments.target:inflict("bleed", 5 + damage);
+	target:inflict("bleed", 5 + damage);
 end
 
 local damage_messages = {
@@ -39,7 +36,7 @@ local failure_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, Arguments.target, table[math.random(#table)])
+	return combat.format(User, target, table[math.random(#table)])
 end
 
 if pierce_failed then

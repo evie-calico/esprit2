@@ -2,22 +2,19 @@
 local combat = require "combat"
 local world = require "world"
 
--- Prompt User for Arguments if they have not been provided
-if Arguments == nil then
-	Arguments = {
-		target = world.target(User.x, User.y, 1)
-	}
-end
+local target = world.character_at(Arguments.target.x, Arguments.target.y)
+if target == nil then return end
 
-if combat.alliance_check(User, Arguments.target) and not combat.alliance_prompt() then return end
+-- TODO: see scratch.lua for info
+-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 -- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-local damage, pierce_failed = combat.apply_damage_with_pierce(4, Magnitude - Arguments.target.stats.defense)
+local damage, pierce_failed = combat.apply_damage_with_pierce(4, Magnitude - target.stats.defense)
 
 -- Biting requires you to get closer to the enemy, lowering your physical defense.
 User:inflict("close_combat")
 
-Arguments.target.hp = Arguments.target.hp - damage
+target.hp = target.hp - damage
 
 local damage_messages = {
 	"{self_Address} bites {target_address}",
@@ -35,7 +32,7 @@ local failure_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, Arguments.target, table[math.random(#table)])
+	return combat.format(User, target, table[math.random(#table)])
 end
 
 if pierce_failed then

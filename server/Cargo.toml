@@ -1,14 +1,12 @@
 [package]
-name = "esprit2-client"
+name = "esprit2-server"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 esprit2.path = "../"
-esprit2-server.path = "../server"
 mlua = "0.9.9"
 rand = "0.8.5"
-sdl2 = { version = "0.37.0", features = ["image", "ttf", "gfx"] }
 serde = "1.0.208"
 thiserror = "1.0.63"
 toml = "0.8.19"

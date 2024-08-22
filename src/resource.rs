@@ -213,13 +213,13 @@ impl Manager {
 	}
 }
 
-pub struct SandboxBuilder<'lua> {
+pub struct SandboxBuilder<'lua, 'scripts> {
 	runtime: &'lua mlua::Lua,
-	function: &'lua mlua::Function<'lua>,
+	function: &'scripts mlua::Function<'lua>,
 	environment: mlua::Table<'lua>,
 }
 
-impl<'lua> SandboxBuilder<'lua> {
+impl<'lua, 'scripts> SandboxBuilder<'lua, 'scripts> {
 	pub fn insert(
 		self,
 		key: impl mlua::IntoLua<'lua>,
@@ -249,10 +249,7 @@ impl<'lua> SandboxBuilder<'lua> {
 	) -> Result<R> {
 		self.function.set_environment(self.environment)?;
 		let thread = self.runtime.create_thread(self.function.clone())?;
-		match world::ThreadOutcome::poll(world, self.runtime, thread, args)? {
-			world::ThreadOutcome::Value(value) => Ok(R::from_lua(value, self.runtime)?),
-			world::ThreadOutcome::Request(_) => Err(crate::Error::IllegalActionRequest),
-		}
+		Ok(world.poll(self.runtime, thread, args)?)
 	}
 }
 
@@ -270,11 +267,11 @@ impl<'lua> Scripts<'lua> {
 		})
 	}
 
-	pub fn function(&'lua self, key: &str) -> Result<&'lua mlua::Function<'lua>> {
+	pub fn function(&self, key: &str) -> Result<&mlua::Function<'lua>> {
 		self.scripts.get(key)
 	}
 
-	pub fn sandbox(&'lua self, key: &str) -> Result<SandboxBuilder<'lua>> {
+	pub fn sandbox<'scripts>(&'scripts self, key: &str) -> Result<SandboxBuilder<'lua, 'scripts>> {
 		let function = self.scripts.get(key)?;
 		let environment = self.runtime.create_table()?;
 		// This is cloning a reference, which is a lot cheaper than creating a new table.

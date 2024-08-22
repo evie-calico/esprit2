@@ -91,8 +91,8 @@ impl mlua::UserData for HeuristicConstructor {
 }
 
 #[derive(Clone, Debug)]
-pub struct Consider<'lua> {
-	pub action: character::Action<'lua>,
+pub struct Consider {
+	pub action: character::Action,
 	pub heuristics: Vec<Heuristic>,
 }
 

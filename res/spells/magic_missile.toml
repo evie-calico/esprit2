@@ -8,6 +8,7 @@ harmony = "Order"
 level = 1
 
 on_cast = "spells/magic_missile"
+on_input = "input/single_target"
 on_consider = "consider/spells/magic_missile"
 
 [parameters]

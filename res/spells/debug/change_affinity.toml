@@ -8,6 +8,7 @@ harmony = "Order"
 level = 0
 
 on_cast = "spells/debug/change_affinity"
+on_input = "input/debug/change_affinity"
 
 [parameters]
 range = 5

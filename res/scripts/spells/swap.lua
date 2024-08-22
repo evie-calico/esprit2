@@ -2,30 +2,26 @@
 local combat = require "combat"
 local world = require "world"
 
--- Prompt user for arguments if they have not been provided
-if Arguments == nil then
-	Arguments = {
-		target = world.target(User.x, User.y, Parameters.range)
-	}
-end
+local target = world.character_at(Arguments.target.x, Arguments.target.y)
+if target == nil then return end
 
 User.sp = User.sp - Level
 
-if not combat.alliance_check(User, Arguments.target)
-	and Affinity:magnitude(Parameters.magnitude) - Arguments.target.stats.resistance <= 0
+if not combat.alliance_check(User, target)
+	and Affinity:magnitude(Parameters.magnitude) - target.stats.resistance <= 0
 then
 	local log = { type = "Miss" }
-	Console:combat_log(combat.format(User, Arguments.target, "{target_Address} resisted {self_address}'s swap."), log)
+	Console:combat_log(combat.format(User, target, "{target_Address} resisted {self_address}'s swap."), log)
 else
 	local cx, cy = User.x, User.y
-	User.x = Arguments.target.x
-	User.y = Arguments.target.y
-	Arguments.target.x = cx
-	Arguments.target.y = cy
+	User.x = target.x
+	User.y = target.y
+	target.x = cx
+	target.y = cy
 
 	local log = { type = "Success" }
 	Console:combat_log(
-		combat.format(User, Arguments.target, "{self_Address} swapped positions with {target_address}."),
+		combat.format(User, target, "{self_Address} swapped positions with {target_address}."),
 		log
 	)
 end

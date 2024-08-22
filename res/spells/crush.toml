@@ -10,6 +10,7 @@ level = 2
 
 on_cast = "spells/crush"
 # TODO: on_consider = "consider/spells/crush"
+on_input = "input/crush"
 
 [parameters]
 # Distance adds to this, so it's effectively magic + 2 + 2d(displacement)

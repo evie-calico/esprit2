@@ -139,22 +139,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "esprit2",
- "mlua",
- "rand",
- "rkyv",
- "sdl2",
- "serde",
- "thiserror",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -266,6 +250,38 @@ dependencies = [
  "thiserror",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "esprit2-client"
+version = "0.1.0"
+dependencies = [
+ "esprit2",
+ "esprit2-server",
+ "mlua",
+ "rand",
+ "rkyv",
+ "sdl2",
+ "serde",
+ "thiserror",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "esprit2-server"
+version = "0.1.0"
+dependencies = [
+ "esprit2",
+ "mlua",
+ "rand",
+ "rkyv",
+ "serde",
+ "thiserror",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

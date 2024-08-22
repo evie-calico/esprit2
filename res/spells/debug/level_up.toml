@@ -8,6 +8,7 @@ harmony = "Order"
 level = 0
 
 on_cast = "spells/debug/level_up"
+on_input = "input/single_target"
 
 [parameters]
 range = 5

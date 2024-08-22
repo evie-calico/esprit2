@@ -2,5 +2,7 @@ name = "Scratch"
 description = "Causes a small amount of bleeding damage, which reduces defense."
 magnitude = "power + 4"
 use_time = 12
+
+on_input = "input/melee"
 on_use = "attacks/scratch"
 on_consider = "consider/attacks/scratch"

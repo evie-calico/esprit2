@@ -2,21 +2,18 @@
 local combat = require "combat";
 local world = require "world";
 
--- Prompt user for Arguments if they have not been provided
-if Arguments == nil then
-	Arguments = {
-		target = world.target(User.x, User.y, Parameters.range)
-	}
-end
+local target = world.character_at(Arguments.target.x, Arguments.target.y)
+if target == nil then return end
 
-if combat.alliance_check(User, Arguments.target) and not combat.alliance_prompt() then return end
+-- TODO: see scratch
+-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 local damage, pierce_failed = combat.apply_damage_with_pierce(
 	Parameters.pierce_threshold,
-	Affinity:magnitude(Parameters.magnitude) - Arguments.target.stats.resistance
+	Affinity:magnitude(Parameters.magnitude) - target.stats.resistance
 )
 
-Arguments.target.hp = Arguments.target.hp - damage
+target.hp = target.hp - damage
 User.sp = User.sp - Level
 
 local damage_messages = {
@@ -46,7 +43,7 @@ local unskilled_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, Arguments.target, table[math.random(#table)])
+	return combat.format(User, target, table[math.random(#table)])
 end
 
 -- Avoid showing unskilled messages too often;

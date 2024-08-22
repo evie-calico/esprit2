@@ -157,6 +157,7 @@ pub struct Spell {
 	/// If a spell parameter named "range" exists, the script will only be provided with characters within this range.
 	/// Otherwise, consideration scripts are expected to filter targets themselves.
 	pub on_consider: Option<resource::Id>,
+	pub on_input: resource::Id,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -215,7 +216,7 @@ impl Spell {
 
 	pub fn parameter_table<'lua>(
 		&self,
-		scripts: &'lua resource::Scripts,
+		scripts: &resource::Scripts<'lua>,
 		eval_vars: &impl expression::Variables,
 	) -> mlua::Result<mlua::Table<'lua>> {
 		scripts

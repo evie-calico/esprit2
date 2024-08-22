@@ -329,17 +329,30 @@ impl Piece {
 	}
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ActionArg {
+	Boolean(bool),
+	Integer(mlua::Integer),
+	Position { x: i32, y: i32 },
+	String(String),
+}
+
+// I'd rather this be a list of tuples but I don't wanna write lua conversion code right now.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
+
 /// Anything a character piece can "do".
 ///
 /// This is the only way that character logic or player input should communicate with pieces.
 /// The information here should be enough to perform the action, but in the event it isn't
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
 #[derive(Clone, Debug)]
-pub enum Action<'lua> {
+pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(Rc<Attack>, Option<mlua::Table<'lua>>),
-	Cast(Rc<Spell>, Option<mlua::Table<'lua>>),
+	Attack(Rc<Attack>, ActionArgs),
+	Cast(Rc<Spell>, ActionArgs),
 }
 
 #[derive(

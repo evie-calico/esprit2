@@ -240,205 +240,27 @@ impl Manager {
 	}
 }
 
-pub enum PartialAction<'lua> {
-	Action(character::Action<'lua>),
-	Request(ActionRequest<'lua>),
+pub enum PartialAction {
+	Action(character::Action),
+	Request(ActionRequest),
 }
 
 /// Used to "escape" the world and request extra information, such as inputs.
-pub enum ActionRequest<'lua> {
-	/// Returns a position to the callback.
-	///
-	/// This callback will be called in place of `pop_action` once a position is selected.
-	BeginCursor {
-		x: i32,
-		y: i32,
-		range: u32,
-		radius: Option<u32>,
-		callback: mlua::Thread<'lua>,
-	},
-	/// Returns a character piece to the callback.
-	///
-	/// This callback will be called in place of `pop_action` once a position is selected.
-	BeginTargetCursor {
-		x: i32,
-		y: i32,
-		range: u32,
-		callback: mlua::Thread<'lua>,
-	},
-	ShowPrompt {
-		message: String,
-		callback: mlua::Thread<'lua>,
-	},
-	ShowDirectionPrompt {
-		message: String,
-		callback: mlua::Thread<'lua>,
-	},
-}
+pub enum ActionRequest {}
 
-pub enum TurnOutcome<'lua> {
+pub enum TurnOutcome {
 	/// No pending action; waiting for player input.
 	Yield,
 	/// Successful result of an action.
 	Action { delay: Aut },
-	/// Request extra information for a pending action.
-	Request(ActionRequest<'lua>),
-}
-
-impl<'lua> TurnOutcome<'lua> {
-	pub fn poll(
-		world: &Manager,
-		lua: &'lua mlua::Lua,
-		thread: mlua::Thread<'lua>,
-		args: impl mlua::IntoLuaMulti<'lua>,
-	) -> mlua::Result<Self> {
-		match ThreadOutcome::poll(world, lua, thread, args)? {
-			ThreadOutcome::Value(value) => match value {
-				mlua::Value::Thread(thread) => TurnOutcome::poll(world, lua, thread, ()),
-				mlua::Value::Nil => Ok(TurnOutcome::Yield),
-				mlua::Value::Integer(delay) => Ok(TurnOutcome::Action {
-					delay: delay as Aut,
-				}),
-				_ => Err(mlua::Error::runtime("unexpected return value: {value:?}")),
-			},
-			ThreadOutcome::Request(request) => Ok(TurnOutcome::Request(request)),
-		}
-	}
-}
-
-pub enum ThreadOutcome<'lua> {
-	Value(mlua::Value<'lua>),
-	Request(ActionRequest<'lua>),
-}
-
-impl<'lua> ThreadOutcome<'lua> {
-	pub fn poll(
-		world: &Manager,
-		lua: &'lua mlua::Lua,
-		thread: mlua::Thread<'lua>,
-		args: impl mlua::IntoLuaMulti<'lua>,
-	) -> mlua::Result<Self> {
-		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-		pub enum CharacterQuery {
-			Within { x: i32, y: i32, range: u32 },
-		}
-
-		// Handle requests for extra information from the lua function.
-		// These may or may not be inputs.
-		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-		#[serde(tag = "type")]
-		pub enum LuaRequest {
-			// World manager communication
-			Characters {
-				query: Option<CharacterQuery>,
-			},
-			Tile {
-				x: i32,
-				y: i32,
-			},
-			// Input
-			TargetCursor {
-				x: i32,
-				y: i32,
-				range: u32,
-			},
-			Cursor {
-				x: i32,
-				y: i32,
-				range: u32,
-				radius: Option<u32>,
-			},
-			Prompt {
-				message: String,
-			},
-			Direction {
-				message: String,
-			},
-		}
-
-		let mut value = thread.resume(args)?;
-		loop {
-			// A resumable thread is expecting an action request response.
-			if thread.status() == mlua::ThreadStatus::Resumable {
-				match lua.from_value::<LuaRequest>(value)? {
-					LuaRequest::Characters { query } => {
-						value = match query {
-							Some(CharacterQuery::Within { x, y, range }) => thread.resume(
-								lua.create_sequence_from(
-									world
-										.characters
-										.iter()
-										.filter(|character| {
-											let character = character.borrow();
-											(character.x - x)
-												.unsigned_abs()
-												.max((character.y - y).unsigned_abs())
-												<= range
-										})
-										.cloned(),
-								)?,
-							)?,
-							None => thread.resume(
-								lua.create_sequence_from(world.characters.iter().cloned())?,
-							)?,
-						}
-					}
-					LuaRequest::Tile { x, y } => {
-						let tile = world.current_floor.get(x as usize, y as usize);
-						value = thread.resume(
-							tile.map(|x| lua.to_value(&x))
-								.transpose()?
-								.unwrap_or(mlua::Value::Nil),
-						)?;
-					}
-					LuaRequest::TargetCursor { x, y, range } => {
-						return Ok(ThreadOutcome::Request(ActionRequest::BeginTargetCursor {
-							x,
-							y,
-							range,
-							callback: thread,
-						}));
-					}
-					LuaRequest::Cursor {
-						x,
-						y,
-						range,
-						radius,
-					} => {
-						return Ok(ThreadOutcome::Request(ActionRequest::BeginCursor {
-							x,
-							y,
-							range,
-							radius,
-							callback: thread,
-						}));
-					}
-					LuaRequest::Prompt { message } => {
-						return Ok(ThreadOutcome::Request(ActionRequest::ShowPrompt {
-							message,
-							callback: thread,
-						}));
-					}
-					LuaRequest::Direction { message } => {
-						return Ok(ThreadOutcome::Request(ActionRequest::ShowDirectionPrompt {
-							message,
-							callback: thread,
-						}));
-					}
-				}
-			} else {
-				return Ok(ThreadOutcome::Value(value));
-			}
-		}
-	}
 }
 
 impl Manager {
-	pub fn consider_turn<'lua>(
-		&mut self,
+	pub fn consider_turn(
+		&self,
 		resources: &resource::Manager,
-		scripts: &'lua resource::Scripts,
-	) -> Result<Vec<Consider<'lua>>> {
+		scripts: &resource::Scripts,
+	) -> Result<Vec<Consider>> {
 		let next_character = self.next_character();
 
 		let mut considerations = Vec::new();
@@ -478,10 +300,10 @@ impl Manager {
 					.world(self, ())?;
 				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
-					let arguments = heuristics.get("arguments")?;
+					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Attack(attack.clone(), Some(arguments)),
+						action: character::Action::Attack(attack.clone(), arguments),
 						heuristics,
 					})
 				}
@@ -512,10 +334,10 @@ impl Manager {
 					.world(self, ())?;
 				for heuristics in spell_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
-					let arguments = heuristics.get("arguments")?;
+					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Cast(spell.clone(), Some(arguments)),
+						action: character::Action::Cast(spell.clone(), arguments),
 						heuristics,
 					})
 				}
@@ -525,12 +347,12 @@ impl Manager {
 		Ok(considerations)
 	}
 
-	pub fn consider_action<'lua>(
+	pub fn consider_action(
 		&self,
-		scripts: &'lua resource::Scripts,
+		scripts: &resource::Scripts,
 		character: CharacterRef,
-		mut considerations: Vec<Consider<'lua>>,
-	) -> Result<character::Action<'lua>> {
+		mut considerations: Vec<Consider>,
+	) -> Result<character::Action> {
 		Ok(scripts
 			.sandbox(&character.borrow().sheet.on_consider)?
 			.insert("User", character.clone())?
@@ -543,12 +365,12 @@ impl Manager {
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
-	pub fn next_turn<'lua>(
-		&mut self,
-		console: &Console,
-		scripts: &'lua resource::Scripts,
-		action: character::Action<'lua>,
-	) -> Result<TurnOutcome<'lua>> {
+	pub fn next_turn(
+		&self,
+		console: &console::Handle,
+		scripts: &resource::Scripts,
+		action: character::Action,
+	) -> Result<TurnOutcome> {
 		let next_character = self.next_character();
 
 		let delay = next_character.borrow().action_delay;
@@ -612,7 +434,7 @@ impl Manager {
 
 						let thread = scripts
 							.sandbox(&spell.on_cast)?
-							.insert("Arguments", arguments)?
+							.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
 							.insert(
 								"Parameters",
 								spell.parameter_table(scripts, &*next_character.borrow())?,
@@ -622,7 +444,10 @@ impl Manager {
 							.insert("Level", spell.level)?
 							.insert("Affinity", affinity)?
 							.thread()?;
-						Ok(TurnOutcome::poll(self, scripts.runtime, thread, ())?)
+						Ok(self
+							.poll::<Option<Aut>>(scripts.runtime, thread, ())?
+							.map(|delay| TurnOutcome::Action { delay })
+							.unwrap_or(TurnOutcome::Yield))
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
@@ -643,32 +468,35 @@ impl Manager {
 		}
 	}
 
-	pub fn attack_piece<'lua>(
+	pub fn attack_piece(
 		&self,
-		scripts: &'lua resource::Scripts,
+		scripts: &resource::Scripts,
 		attack: Rc<Attack>,
 		user: &CharacterRef,
-		arguments: Option<mlua::Table<'lua>>,
-	) -> Result<TurnOutcome<'lua>> {
+		arguments: character::ActionArgs,
+	) -> Result<TurnOutcome> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
 		let thread = scripts
 			.sandbox(&attack.on_use)?
 			.insert("User", user.clone())?
-			.insert("Arguments", arguments)?
+			.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
 			.insert("UseTime", attack.use_time)?
 			.insert("Magnitude", magnitude)?
 			.thread()?;
-		Ok(TurnOutcome::poll(self, scripts.runtime, thread, ())?)
+		Ok(self
+			.poll::<Option<Aut>>(scripts.runtime, thread, ())?
+			.map(|delay| TurnOutcome::Action { delay })
+			.unwrap_or(TurnOutcome::Yield))
 	}
 
-	pub fn move_piece<'lua>(
+	pub fn move_piece(
 		&self,
 		character: &CharacterRef,
 		dir: OrdDir,
-		console: &Console,
-	) -> Result<TurnOutcome<'lua>> {
+		console: &console::Handle,
+	) -> Result<TurnOutcome> {
 		use crate::floor::Tile;
 
 		let (x, y, delay) = {
@@ -701,6 +529,68 @@ impl Manager {
 			None => {
 				console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
 				Ok(TurnOutcome::Yield)
+			}
+		}
+	}
+
+	pub fn poll<'lua, T: mlua::FromLua<'lua>>(
+		&self,
+		lua: &'lua mlua::Lua,
+		thread: mlua::Thread<'lua>,
+		args: impl mlua::IntoLuaMulti<'lua>,
+	) -> mlua::Result<T> {
+		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+		pub enum CharacterQuery {
+			Within { x: i32, y: i32, range: u32 },
+		}
+
+		// Handle requests for extra information from the lua function.
+		// These may or may not be inputs.
+		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+		#[serde(tag = "type")]
+		pub enum LuaRequest {
+			// World manager communication
+			Characters { query: Option<CharacterQuery> },
+			Tile { x: i32, y: i32 },
+		}
+
+		let mut value = thread.resume(args)?;
+		loop {
+			// A resumable thread is expecting an action request response.
+			if thread.status() == mlua::ThreadStatus::Resumable {
+				match lua.from_value::<LuaRequest>(value)? {
+					LuaRequest::Characters { query } => {
+						value = match query {
+							Some(CharacterQuery::Within { x, y, range }) => thread.resume(
+								lua.create_sequence_from(
+									self.characters
+										.iter()
+										.filter(|character| {
+											let character = character.borrow();
+											(character.x - x)
+												.unsigned_abs()
+												.max((character.y - y).unsigned_abs())
+												<= range
+										})
+										.cloned(),
+								)?,
+							)?,
+							None => thread.resume(
+								lua.create_sequence_from(self.characters.iter().cloned())?,
+							)?,
+						}
+					}
+					LuaRequest::Tile { x, y } => {
+						let tile = self.current_floor.get(x as usize, y as usize);
+						value = thread.resume(
+							tile.map(|x| lua.to_value(&x))
+								.transpose()?
+								.unwrap_or(mlua::Value::Nil),
+						)?;
+					}
+				}
+			} else {
+				return T::from_lua(value, lua);
 			}
 		}
 	}

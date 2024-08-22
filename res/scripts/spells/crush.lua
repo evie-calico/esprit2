@@ -6,8 +6,6 @@ local world = require "world";
 -- (sort of like yielding a Cursor ActionRequest) with some sort of query language
 -- to filter entries on the rust side.
 local characters = world.characters()
-local x, y = world.cursor(User.x, User.y, Parameters.range, Parameters.radius)
-local direction = world.direction("Crush in which direction?")
 
 local cast_messages = {
 	"{Address} gestures for gravity to shift",
@@ -32,20 +30,20 @@ local failure_messages = {
 Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), { type = "Success" });
 
 for _, character in ipairs(characters) do
-	if math.abs(character.x - x) <= Parameters.radius and math.abs(character.y - y) <= Parameters.radius then
+	if math.abs(character.x - Arguments.target.x) <= Parameters.radius and math.abs(character.y - Arguments.target.y) <= Parameters.radius then
 		-- we'll start with a basic rightward movement.
 		for distance_traveled = 0, Affinity:magnitude(Parameters.displacement) do
 			local projected_x = character.x
 			local projected_y = character.y
-			if direction == "Left" then
+			if Arguments.direction == "Left" then
 				projected_x = projected_x - 1
-			elseif direction == "Right" then
+			elseif Arguments.direction == "Right" then
 				projected_x =
 					projected_x + 1
 			end
-			if direction == "Up" then
+			if Arguments.direction == "Up" then
 				projected_y = projected_y - 1
-			elseif direction == "Down" then
+			elseif Arguments.direction == "Down" then
 				projected_y =
 					projected_y + 1
 			end

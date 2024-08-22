@@ -17,7 +17,7 @@ const PIECE_SIZE: u32 = 16;
 const IPIECE_SIZE: i32 = PIECE_SIZE as i32;
 
 #[derive(Clone, Debug, Default)]
-pub struct Camera {
+pub(crate) struct Camera {
 	x: i32,
 	y: i32,
 	width: u32,
@@ -25,17 +25,17 @@ pub struct Camera {
 }
 
 impl Camera {
-	pub fn update_size(&mut self, width: u32, height: u32) {
+	pub(crate) fn update_size(&mut self, width: u32, height: u32) {
 		self.width = width;
 		self.height = height;
 	}
 
-	pub fn focus_character(&mut self, character: &character::Piece) {
+	pub(crate) fn focus_character(&mut self, character: &character::Piece) {
 		self.x = character.x * ITILE_SIZE - (self.width as i32 - ITILE_SIZE) / 2;
 		self.y = character.y * ITILE_SIZE - (self.height as i32 - ITILE_SIZE) / 2;
 	}
 
-	pub fn focus_character_with_cursor(
+	pub(crate) fn focus_character_with_cursor(
 		&mut self,
 		character: &character::Piece,
 		cursor: (i32, i32),
@@ -47,7 +47,11 @@ impl Camera {
 	}
 }
 
-pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, camera: &Camera) {
+pub(crate) fn tilemap(
+	canvas: &mut Canvas<Window>,
+	world_manager: &world::Manager,
+	camera: &Camera,
+) {
 	canvas.set_draw_color(Color::WHITE);
 	for (x, y, tile) in world_manager.current_floor.iter() {
 		match tile {
@@ -72,20 +76,20 @@ pub fn tilemap(canvas: &mut Canvas<Window>, world_manager: &world::Manager, came
 	}
 }
 
-pub fn cursor(
+pub(crate) fn cursor(
 	canvas: &mut Canvas<Window>,
 	input_mode: &input::Mode,
 	textures: &texture::Manager,
 	camera: &Camera,
 ) {
-	if let input::Mode::Cursor {
+	if let input::Mode::Cursor(input::Cursor {
 		origin,
 		position: (x, y),
 		range,
 		radius,
 		state: input::CursorState { float, .. },
 		..
-	} = *input_mode
+	}) = *input_mode
 	{
 		enum Side {
 			TopLeft,
@@ -157,7 +161,7 @@ pub fn cursor(
 	}
 }
 
-pub fn characters(
+pub(crate) fn characters(
 	canvas: &mut Canvas<Window>,
 	world_manager: &world::Manager,
 	textures: &texture::Manager,
@@ -180,7 +184,7 @@ pub fn characters(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct CloudState {
+pub(crate) struct CloudState {
 	timer: f64,
 	current_seed: u32,
 	next_seed: u32,
@@ -204,7 +208,7 @@ fn xorshift(mut x: u32) -> u32 {
 }
 
 impl CloudState {
-	pub fn tick(&mut self, delta: f64) {
+	pub(crate) fn tick(&mut self, delta: f64) {
 		self.timer += delta;
 		if self.timer > 1.0 {
 			self.current_seed = self.next_seed;
@@ -213,7 +217,7 @@ impl CloudState {
 		}
 	}
 
-	pub fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
+	pub(crate) fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
 		let bx = rect.x as i16;
 		let by = rect.y as i16;
 		let width = rect.width() as i16;
@@ -286,7 +290,7 @@ impl CloudState {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct CloudTrail {
+pub(crate) struct CloudTrail {
 	timer: f64,
 }
 
@@ -297,12 +301,12 @@ impl Default for CloudTrail {
 }
 
 impl CloudTrail {
-	pub fn tick(&mut self, delta: f64) {
+	pub(crate) fn tick(&mut self, delta: f64) {
 		self.timer += delta;
 		self.timer %= 1.0;
 	}
 
-	pub fn draw(
+	pub(crate) fn draw(
 		&self,
 		canvas: &mut Canvas<Window>,
 		density: u32,
@@ -324,17 +328,17 @@ impl CloudTrail {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct CloudyWave {
+pub(crate) struct CloudyWave {
 	timer: f64,
 }
 
 impl CloudyWave {
-	pub fn tick(&mut self, delta: f64) {
+	pub(crate) fn tick(&mut self, delta: f64) {
 		self.timer += delta;
 		self.timer %= TAU;
 	}
 
-	pub fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
+	pub(crate) fn draw(&self, canvas: &mut Canvas<Window>, rect: Rect, radius: i16, color: Color) {
 		let x = rect.x as f64;
 
 		for (i, y) in (rect.top()..=rect.bottom()).step_by(30).enumerate() {

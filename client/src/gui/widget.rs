@@ -8,18 +8,18 @@ use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 
 #[derive(Clone, Default, Debug)]
-pub struct PartyReferenceDrawState {
-	pub cloud: draw::CloudState,
-	pub cloud_trail: draw::CloudTrail,
+pub(crate) struct PartyReferenceDrawState {
+	pub(crate) cloud: draw::CloudState,
+	pub(crate) cloud_trail: draw::CloudTrail,
 }
 
-pub struct SoulJar<'texture> {
+pub(crate) struct SoulJar<'texture> {
 	souls: Vec<Soul>,
 	light_texture: Texture<'texture>,
 }
 
 impl<'texture> SoulJar<'texture> {
-	pub fn new(textures: &'texture texture::Manager) -> Result<Self> {
+	pub(crate) fn new(textures: &'texture texture::Manager) -> Result<Self> {
 		let mut rng = rand::thread_rng();
 		let souls = (0..=9)
 			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
@@ -30,14 +30,14 @@ impl<'texture> SoulJar<'texture> {
 		})
 	}
 
-	pub fn tick(&mut self, delta: f32) {
+	pub(crate) fn tick(&mut self, delta: f32) {
 		for i in &mut self.souls {
 			i.tick(delta);
 		}
 	}
 }
 
-pub fn menu(
+pub(crate) fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
 	input_mode: &input::Mode,
@@ -93,9 +93,9 @@ pub fn menu(
 			);
 			spell_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
-		input::Mode::Cursor {
+		input::Mode::Cursor(input::Cursor {
 			position: (x, y), ..
-		} => {
+		}) => {
 			menu.label_styled(
 				"Cursor",
 				options.ui.colors.cursor_mode,
@@ -116,7 +116,7 @@ pub fn menu(
 				menu.console(console);
 			}
 		}
-		input::Mode::Prompt { message, .. } => {
+		input::Mode::Prompt(input::Prompt { message, .. }) => {
 			menu.label_styled(
 				"Prompt",
 				options.ui.colors.cursor_mode,
@@ -129,7 +129,7 @@ pub fn menu(
 				("Cancel: ", options.controls.escape.to_string().as_str()),
 			]);
 		}
-		input::Mode::DirectionPrompt { message, .. } => {
+		input::Mode::DirectionPrompt(input::DirectionPrompt { message, .. }) => {
 			menu.label_styled(
 				"Direction Prompt",
 				options.ui.colors.cursor_mode,
@@ -146,7 +146,7 @@ pub fn menu(
 	}
 }
 
-pub fn spell_menu(
+pub(crate) fn spell_menu(
 	gui: &mut gui::Context,
 	character: &character::Piece,
 	resources: &resource::Manager,
@@ -174,7 +174,7 @@ pub fn spell_menu(
 	}
 }
 
-pub fn attack_menu(
+pub(crate) fn attack_menu(
 	gui: &mut gui::Context,
 	character: &character::Piece,
 	resources: &resource::Manager,
@@ -194,12 +194,12 @@ pub fn attack_menu(
 	}
 }
 
-pub struct Pamphlet {
-	pub party_member_clouds: Vec<PartyReferenceDrawState>,
+pub(crate) struct Pamphlet {
+	pub(crate) party_member_clouds: Vec<PartyReferenceDrawState>,
 }
 
 impl Pamphlet {
-	pub fn new() -> Self {
+	pub(crate) fn new() -> Self {
 		Self {
 			party_member_clouds: vec![
 				PartyReferenceDrawState::default(),
@@ -210,7 +210,7 @@ impl Pamphlet {
 		}
 	}
 
-	pub fn draw(
+	pub(crate) fn draw(
 		&self,
 		pamphlet: &mut gui::Context,
 		world_manager: &world::Manager,
@@ -371,7 +371,7 @@ fn character_thinking(
 	player_window.advance(0, 10 + height);
 }
 
-pub fn on_cloud(
+pub(crate) fn on_cloud(
 	cloud: &draw::CloudState,
 	radius: u32,
 	color: Color,

@@ -7,7 +7,7 @@ local considerations = {}
 for _, character in ipairs(world.characters_within(User.x, User.y, Parameters.range)) do
 	if not combat.alliance_check(User, character) then
 		table.insert(considerations, {
-			arguments = { target = character },
+			arguments = { target = { x = character.x, y = character.y } },
 			heuristics = {
 				Heuristic.damage(
 					character,
