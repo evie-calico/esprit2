@@ -240,21 +240,6 @@ impl Manager {
 	}
 }
 
-pub enum PartialAction {
-	Action(character::Action),
-	Request(ActionRequest),
-}
-
-/// Used to "escape" the world and request extra information, such as inputs.
-pub enum ActionRequest {}
-
-pub enum TurnOutcome {
-	/// No pending action; waiting for player input.
-	Yield,
-	/// Successful result of an action.
-	Action { delay: Aut },
-}
-
 impl Manager {
 	pub fn consider_turn(
 		&self,
@@ -296,7 +281,6 @@ impl Manager {
 						u32::evalv(&attack.magnitude, &*next_character.borrow()),
 					)?
 					.insert("User", next_character.clone())?
-					.insert("Heuristic", consider::HeuristicConstructor)?
 					.world(self, ())?;
 				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
 					let heuristics = heuristics?;
@@ -327,7 +311,6 @@ impl Manager {
 					.sandbox(on_consider)?
 					.insert("Parameters", parameters)?
 					.insert("User", next_character.clone())?
-					.insert("Heuristic", consider::HeuristicConstructor)?
 					// Maybe these should be members of the spell?
 					.insert("Level", spell.level)?
 					.insert("Affinity", spell.affinity(&next_character.borrow()))?
@@ -365,12 +348,14 @@ impl Manager {
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
+	/// # Returns
+	/// How much time the action took, if one occured.
 	pub fn next_turn(
 		&self,
 		console: &console::Handle,
 		scripts: &resource::Scripts,
 		action: character::Action,
-	) -> Result<TurnOutcome> {
+	) -> Result<Option<Aut>> {
 		let next_character = self.next_character();
 
 		let delay = next_character.borrow().action_delay;
@@ -385,7 +370,7 @@ impl Manager {
 		next_character.borrow_mut().new_turn();
 
 		match action {
-			character::Action::Wait(delay) => Ok(TurnOutcome::Action { delay }),
+			character::Action::Wait(delay) => Ok(Some(delay)),
 			character::Action::Move(target_x, target_y) => {
 				let (x, y) = {
 					let next_character = next_character.borrow();
@@ -419,7 +404,7 @@ impl Manager {
 					if let Some(direction) = dijkstra.step(x, y) {
 						self.move_piece(next_character, direction, console)
 					} else {
-						Ok(TurnOutcome::Yield)
+						Ok(None)
 					}
 				}
 			}
@@ -444,24 +429,21 @@ impl Manager {
 							.insert("Level", spell.level)?
 							.insert("Affinity", affinity)?
 							.thread()?;
-						Ok(self
-							.poll::<Option<Aut>>(scripts.runtime, thread, ())?
-							.map(|delay| TurnOutcome::Action { delay })
-							.unwrap_or(TurnOutcome::Yield))
+						Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, ())?)
 					}
 					spell::Castable::NotEnoughSP => {
 						let message =
 							format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
 						console.print_system(message);
-						Ok(TurnOutcome::Yield)
+						Ok(None)
 					}
 					spell::Castable::UncastableAffinity => {
 						let message =
 							format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
 								.replace_nouns(&next_character.borrow().sheet.nouns);
 						console.print_system(message);
-						Ok(TurnOutcome::Yield)
+						Ok(None)
 					}
 				}
 			}
@@ -474,7 +456,7 @@ impl Manager {
 		attack: Rc<Attack>,
 		user: &CharacterRef,
 		arguments: character::ActionArgs,
-	) -> Result<TurnOutcome> {
+	) -> Result<Option<Aut>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
 
@@ -485,10 +467,7 @@ impl Manager {
 			.insert("UseTime", attack.use_time)?
 			.insert("Magnitude", magnitude)?
 			.thread()?;
-		Ok(self
-			.poll::<Option<Aut>>(scripts.runtime, thread, ())?
-			.map(|delay| TurnOutcome::Action { delay })
-			.unwrap_or(TurnOutcome::Yield))
+		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, ())?)
 	}
 
 	pub fn move_piece(
@@ -496,7 +475,7 @@ impl Manager {
 		character: &CharacterRef,
 		dir: OrdDir,
 		console: &console::Handle,
-	) -> Result<TurnOutcome> {
+	) -> Result<Option<Aut>> {
 		use crate::floor::Tile;
 
 		let (x, y, delay) = {
@@ -520,15 +499,15 @@ impl Manager {
 				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				Ok(TurnOutcome::Action { delay })
+				Ok(Some(delay))
 			}
 			Some(Tile::Wall) => {
 				console.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
-				Ok(TurnOutcome::Yield)
+				Ok(None)
 			}
 			None => {
 				console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
-				Ok(TurnOutcome::Yield)
+				Ok(None)
 			}
 		}
 	}

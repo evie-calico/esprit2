@@ -13,7 +13,6 @@
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
 
 use esprit2::prelude::*;
-use esprit2::world::TurnOutcome;
 use std::path::PathBuf;
 use std::process::exit;
 use tracing::error;
@@ -83,41 +82,33 @@ impl Server {
 		scripts: &resource::Scripts,
 		action: character::Action,
 	) -> esprit2::Result<()> {
-		let outcome = self.world.next_turn(&self.console, scripts, action)?;
+		let delay = self
+			.world
+			.next_turn(&self.console, scripts, action)?
+			.unwrap_or(TURN);
 		self.world
 			.characters
 			.retain(|character| character.borrow().hp > 0);
 
-		let mut apply_delay = |delay| {
-			let character = self
-				.world
+		let character = self
+			.world
+			.characters
+			.pop_front()
+			.expect("next_turn's element should still exist");
+		character.borrow_mut().action_delay = delay;
+		// Insert the character into the queue,
+		// immediately before the first character to have a higher action delay.
+		// self.world assumes that the queue is sorted.
+		self.world.characters.insert(
+			self.world
 				.characters
-				.pop_front()
-				.expect("next_turn's element should still exist");
-			character.borrow_mut().action_delay = delay;
-			// Insert the character into the queue,
-			// immediately before the first character to have a higher action delay.
-			// self.world assumes that the queue is sorted.
-			self.world.characters.insert(
-				self.world
-					.characters
-					.iter()
-					.enumerate()
-					.find(|x| x.1.borrow().action_delay > delay)
-					.map(|x| x.0)
-					.unwrap_or(self.world.characters.len()),
-				character,
-			);
-		};
-
-		match outcome {
-			TurnOutcome::Yield => {
-				apply_delay(TURN);
-			}
-			TurnOutcome::Action { delay } => {
-				apply_delay(delay);
-			}
-		}
+				.iter()
+				.enumerate()
+				.find(|x| x.1.borrow().action_delay > delay)
+				.map(|x| x.0)
+				.unwrap_or(self.world.characters.len()),
+			character,
+		);
 		Ok(())
 	}
 }

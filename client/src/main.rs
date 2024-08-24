@@ -183,6 +183,10 @@ pub fn main() {
 	lua.globals()
 		.set("Status", server.resources().statuses_handle())
 		.unwrap();
+	lua.globals()
+		.set("Heuristic", consider::HeuristicConstructor)
+		.unwrap();
+	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
 	let scripts =
 		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use mlua::LuaSerdeExt;
 use paste::paste;
 use std::collections::VecDeque;
 use std::sync::{mpsc, Arc};
@@ -138,8 +137,7 @@ macro_rules! impl_console {
 		impl mlua::UserData for Handle {
 			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 				$(handle_colored_print! { $impl_colors, methods } )*
-				methods.add_method("combat_log", |lua, this, (text, log): (String, mlua::Value)| {
-					let log = lua.from_value(log)?;
+				methods.add_method("combat_log", |_, this, (text, log): (String, combat::Log)| {
 					this.message_sender
 						.send(Message {
 							text,

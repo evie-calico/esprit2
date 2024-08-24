@@ -36,14 +36,11 @@ local function pick(table)
 end
 
 if pierce_failed then
-	local log = { type = "Glance" }
-	Console:combat_log(pick(glance_messages), log)
+	Console:combat_log(pick(glance_messages), Log.Glance)
 elseif damage == 0 then
-	local log = { type = "Miss" }
-	Console:combat_log(pick(failure_messages), log)
+	Console:combat_log(pick(failure_messages), Log.Miss)
 else
-	local log = { type = "Hit", damage = damage }
-	Console:combat_log(pick(damage_messages), log)
+	Console:combat_log(pick(damage_messages), Log.Hit(damage))
 end
 
 return 12

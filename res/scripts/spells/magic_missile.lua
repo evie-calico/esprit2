@@ -49,18 +49,15 @@ end
 -- Avoid showing unskilled messages too often;
 -- poorly made missiles are also likely to miss or be resisted.
 if pierce_failed then
-	local log = { type = "Glance" }
-	Console:combat_log(pick(glancing_messages), log)
+	Console:combat_log(pick(glancing_messages), Log.Glance)
 elseif damage == 0 then
-	local log = { type = "Miss" }
 	if Affinity:weak() and math.random(0, 1) == 1 then
-		Console:combat_log(pick(unskilled_messages), log)
+		Console:combat_log(pick(unskilled_messages), Log.Miss)
 	else
-		Console:combat_log(pick(failure_messages), log)
+		Console:combat_log(pick(failure_messages), Log.Miss)
 	end
 else
-	local log = { type = "Hit", damage = damage }
-	Console:combat_log(pick(damage_messages), log)
+	Console:combat_log(pick(damage_messages), Log.Hit(damage))
 end
 
 return Parameters.cast_time

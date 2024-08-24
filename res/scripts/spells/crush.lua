@@ -27,7 +27,7 @@ local failure_messages = {
 	"{Address} slides down the wall, hitting the ground unscatched",
 }
 
-Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), { type = "Success" });
+Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), Log.Success);
 
 for _, character in ipairs(characters) do
 	if math.abs(character.x - Arguments.target.x) <= Parameters.radius and math.abs(character.y - Arguments.target.y) <= Parameters.radius then
@@ -64,12 +64,12 @@ for _, character in ipairs(characters) do
 					character.hp = character.hp - damage
 					Console:combat_log(
 						character:replace_nouns(damage_messages[math.random(#damage_messages)]),
-						{ type = "Hit", damage = damage }
+						Log.Hit(damage)
 					)
 				else
 					Console:combat_log(
 						character:replace_nouns(failure_messages[math.random(#failure_messages)]),
-						{ type = pierce_failed and "Glance" or "Miss" }
+						pierce_failed and Log.Glance or Log.Miss
 					)
 				end
 

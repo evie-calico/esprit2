@@ -377,7 +377,6 @@ fn gather_attack_inputs<'lua>(
 			u32::evalv(&attack.magnitude, &*next_character.borrow()),
 		)?
 		.insert("User", next_character.clone())?
-		.insert("Heuristic", consider::HeuristicConstructor)?
 		.thread()?;
 	let value = thread.resume(())?;
 	if let mlua::ThreadStatus::Resumable = thread.status() {
@@ -403,7 +402,6 @@ fn gather_spell_inputs<'lua>(
 		.sandbox(&spell.on_input)?
 		.insert("Parameters", parameters)?
 		.insert("User", next_character.clone())?
-		.insert("Heuristic", consider::HeuristicConstructor)?
 		.thread()?;
 	let value = thread.resume(())?;
 	if let mlua::ThreadStatus::Resumable = thread.status() {
