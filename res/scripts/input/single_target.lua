@@ -1,5 +1,5 @@
-local world = require "world"
+local input = require "input"
 
 return {
-	target = world.cursor(User.x, User.y, Parameters.range, 0)
+	target = input.cursor(User.x, User.y, Parameters.range, 0)
 }

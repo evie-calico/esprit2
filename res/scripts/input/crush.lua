@@ -1,6 +1,6 @@
-local world = require "world"
+local input = require "input"
 
 return {
-	target = world.cursor(User.x, User.y, Parameters.range, Parameters.radius),
-	direction = world.direction("Crush in which direction?"),
+	target = input.cursor(User.x, User.y, Parameters.range, Parameters.radius),
+	direction = input.direction("Crush in which direction?"),
 }

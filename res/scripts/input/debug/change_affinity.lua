@@ -1,5 +1,5 @@
 ---@module "lib.spell"
-local world = require "world"
+local input = require "input"
 
 local names = {
 	"Positive",
@@ -16,11 +16,11 @@ local names = {
 	"Order Negative",
 }
 
-local target = world.cursor(User.x, User.y, Parameters.range)
-local is_energy = world.prompt("Major (Y: Energy, N: Harmony)")
-local first_major = world.prompt(is_energy and "Energy (Y: Positive, N: Negative)" or "Harmony (Y: Chaos, N: Order)")
-local id = world.prompt("Configure Minor?") and
-	(world.prompt(is_energy and "Harmony (Y: Chaos, N: Order)" or "Energy (Y: Positive, N: Negative)") and
+local target = input.cursor(User.x, User.y, Parameters.range)
+local is_energy = input.prompt("Major (Y: Energy, N: Harmony)")
+local first_major = input.prompt(is_energy and "Energy (Y: Positive, N: Negative)" or "Harmony (Y: Chaos, N: Order)")
+local id = input.prompt("Configure Minor?") and
+	(input.prompt(is_energy and "Harmony (Y: Chaos, N: Order)" or "Energy (Y: Positive, N: Negative)") and
 		(first_major and (is_energy and 1 or 7) or (is_energy and 4 or 10)) or
 		(first_major and (is_energy and 2 or 8) or (is_energy and 5 or 11)))
 	or
