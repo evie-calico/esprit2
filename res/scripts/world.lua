@@ -7,10 +7,10 @@ return {
 	---@param x integer
 	---@param y integer
 	---@param range integer
-	---@param radius integer
+	---@param radius integer?
 	---@return CursorResult
 	cursor = function(x, y, range, radius)
-		x, y = coroutine.yield({ type = "Cursor", x = x, y = y, range = range, radius = radius })
+		x, y = coroutine.yield(Input.Cursor(x, y, range, radius))
 		return { x = x, y = y }
 	end,
 
@@ -18,14 +18,14 @@ return {
 	---@param message string
 	---@return boolean
 	prompt = function(message)
-		return coroutine.yield({ type = "Prompt", message = message })
+		return coroutine.yield(Input.Prompt(message))
 	end,
 
 	--- Request a direction from the world manager.
 	---@param message string
 	---@return "Up" | "Down" | "Left" | "Right"
 	direction = function(message)
-		return coroutine.yield({ type = "Direction", message = message })
+		return coroutine.yield(Input.Direction(message))
 	end,
 
 	--- Request all currently loaded character pieces.

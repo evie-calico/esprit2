@@ -1,5 +1,6 @@
 use crate::{options::Options, ServerHandle};
 use esprit2::prelude::*;
+use mlua::FromLua;
 use mlua::LuaSerdeExt;
 use sdl2::keyboard::Keycode;
 use std::rc::Rc;
@@ -29,9 +30,9 @@ pub(crate) struct CursorState {
 	pub(crate) float: SinWave,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, FromLua)]
 #[serde(tag = "type")]
-pub(crate) enum InputRequest {
+pub(crate) enum Request {
 	Cursor {
 		x: i32,
 		y: i32,
@@ -44,6 +45,25 @@ pub(crate) enum InputRequest {
 	Direction {
 		message: String,
 	},
+}
+
+impl mlua::UserData for Request {}
+
+pub(crate) struct RequestConstructor;
+
+impl mlua::UserData for RequestConstructor {
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_function("Cursor", |_, (x, y, range, radius)| {
+			Ok(Request::Cursor {
+				x,
+				y,
+				range,
+				radius,
+			})
+		});
+		methods.add_function("Prompt", |_, message| Ok(Request::Prompt { message }));
+		methods.add_function("Direction", |_, message| Ok(Request::Direction { message }));
+	}
 }
 
 pub(crate) enum PartialAction<'lua> {
@@ -62,8 +82,8 @@ impl<'lua> PartialAction<'lua> {
 				let value = thread.resume(arg)?;
 				if let mlua::ThreadStatus::Resumable = thread.status() {
 					Ok(Response::Partial(
-						PartialAction::Attack(attack, next_character.clone(), thread),
-						lua.from_value(value)?,
+						PartialAction::Attack(attack, next_character, thread),
+						Request::from_lua(value, lua)?,
 					))
 				} else {
 					Ok(Response::Act(character::Action::Attack(
@@ -76,8 +96,8 @@ impl<'lua> PartialAction<'lua> {
 				let value = thread.resume(arg)?;
 				if let mlua::ThreadStatus::Resumable = thread.status() {
 					Ok(Response::Partial(
-						PartialAction::Spell(spell, next_character.clone(), thread),
-						lua.from_value(value)?,
+						PartialAction::Spell(spell, next_character, thread),
+						Request::from_lua(value, lua)?,
 					))
 				} else {
 					Ok(Response::Act(character::Action::Cast(
@@ -122,7 +142,7 @@ pub(crate) enum Response<'lua> {
 	Fullscreen,
 	Debug,
 	Act(character::Action),
-	Partial(PartialAction<'lua>, InputRequest),
+	Partial(PartialAction<'lua>, Request),
 }
 
 pub(crate) fn controllable_character<'lua>(
@@ -248,7 +268,7 @@ pub(crate) fn controllable_character<'lua>(
 				let attack = server
 					.resources()
 					.get_attack(&next_character.borrow().sheet.attacks[selected_index as usize])?;
-				let response = gather_attack_inputs(scripts, attack.clone(), &next_character)?;
+				let response = gather_attack_inputs(scripts, attack.clone(), next_character)?;
 				Ok((Mode::Normal, Some(response)))
 			} else {
 				Ok((Mode::Normal, None))
@@ -270,11 +290,7 @@ pub(crate) fn controllable_character<'lua>(
 					.clone();
 				Ok((
 					Mode::Normal,
-					Some(gather_spell_inputs(
-						scripts,
-						spell.clone(),
-						&next_character,
-					)?),
+					Some(gather_spell_inputs(scripts, spell.clone(), next_character)?),
 				))
 			} else {
 				Ok((Mode::Normal, None))
@@ -367,7 +383,7 @@ pub(crate) fn controllable_character<'lua>(
 fn gather_attack_inputs<'lua>(
 	scripts: &resource::Scripts<'lua>,
 	attack: Rc<Attack>,
-	next_character: &character::Ref,
+	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
 	let thread = scripts
 		.sandbox(&attack.on_input)?
@@ -382,7 +398,7 @@ fn gather_attack_inputs<'lua>(
 	if let mlua::ThreadStatus::Resumable = thread.status() {
 		Ok(Response::Partial(
 			PartialAction::Attack(attack, next_character.clone(), thread),
-			scripts.runtime.from_value(value)?,
+			Request::from_lua(value, scripts.runtime)?,
 		))
 	} else {
 		Ok(Response::Act(character::Action::Attack(
@@ -395,7 +411,7 @@ fn gather_attack_inputs<'lua>(
 fn gather_spell_inputs<'lua>(
 	scripts: &resource::Scripts<'lua>,
 	spell: Rc<Spell>,
-	next_character: &character::Ref,
+	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
 	let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
 	let thread = scripts
@@ -403,16 +419,5 @@ fn gather_spell_inputs<'lua>(
 		.insert("Parameters", parameters)?
 		.insert("User", next_character.clone())?
 		.thread()?;
-	let value = thread.resume(())?;
-	if let mlua::ThreadStatus::Resumable = thread.status() {
-		Ok(Response::Partial(
-			PartialAction::Spell(spell, next_character.clone(), thread),
-			scripts.runtime.from_value(value)?,
-		))
-	} else {
-		Ok(Response::Act(character::Action::Cast(
-			spell,
-			scripts.runtime.from_value(value)?,
-		)))
-	}
+	PartialAction::Spell(spell, next_character, thread).resolve(scripts.runtime, ())
 }

@@ -1,4 +1,10 @@
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
+#![warn(
+	clippy::module_name_repetitions,
+	clippy::items_after_statements,
+	clippy::inconsistent_struct_constructor,
+	clippy::unwrap_used
+)]
 
 pub mod draw;
 pub mod gui;
@@ -102,6 +108,7 @@ impl ServerHandle {
 	}
 }
 
+#[allow(clippy::unwrap_used, reason = "SDL")]
 pub fn main() {
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();
@@ -187,6 +194,9 @@ pub fn main() {
 		.set("Heuristic", consider::HeuristicConstructor)
 		.unwrap();
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
+	lua.globals()
+		.set("Input", input::RequestConstructor)
+		.unwrap();
 
 	let scripts =
 		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
@@ -269,7 +279,7 @@ pub fn main() {
 										}
 										Some(input::Response::Partial(partial, request)) => {
 											match request {
-												input::InputRequest::Cursor {
+												input::Request::Cursor {
 													x,
 													y,
 													range,
@@ -285,14 +295,14 @@ pub fn main() {
 															callback: partial,
 														});
 												}
-												input::InputRequest::Prompt { message } => {
+												input::Request::Prompt { message } => {
 													input_mode =
 														input::Mode::Prompt(input::Prompt {
 															message,
 															callback: partial,
 														})
 												}
-												input::InputRequest::Direction { message } => {
+												input::Request::Direction { message } => {
 													input_mode = input::Mode::DirectionPrompt(
 														input::DirectionPrompt {
 															message,
