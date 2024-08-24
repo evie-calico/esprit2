@@ -1,10 +1,4 @@
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
-#![warn(
-	clippy::module_name_repetitions,
-	clippy::items_after_statements,
-	clippy::inconsistent_struct_constructor,
-	clippy::unwrap_used
-)]
 
 pub mod draw;
 pub mod gui;

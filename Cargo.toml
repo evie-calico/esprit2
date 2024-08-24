@@ -5,6 +5,15 @@ edition = "2021"
 
 [workspace]
 members = ["client", "server"]
+# This allows you to `cargo run` in the root.
+# It shouldn't be an issue to default to client since it uses the engine and server.
+default-members = ["client"]
+
+[workspace.lints]
+clippy.module_name_repetitions = "warn"
+clippy.items_after_statements = "warn"
+clippy.inconsistent_struct_constructor = "warn"
+clippy.unwrap_used = "warn"
 
 [dependencies]
 # Lua scripting

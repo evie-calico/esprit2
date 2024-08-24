@@ -7,12 +7,6 @@
 	maybe_uninit_fill,
 	anonymous_lifetime_in_impl_trait
 )]
-#![warn(
-	clippy::module_name_repetitions,
-	clippy::items_after_statements,
-	clippy::inconsistent_struct_constructor,
-	clippy::unwrap_used
-)]
 
 pub mod astar;
 pub mod attack;
