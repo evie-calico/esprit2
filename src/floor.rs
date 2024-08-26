@@ -49,13 +49,17 @@ impl Default for Floor {
 
 impl Floor {
 	pub fn get(&self, x: usize, y: usize) -> Option<Tile> {
-		self.map
-			.get(x.checked_add(y.checked_mul(self.width)?)?)
-			.copied()
+		if x >= self.width() || y >= self.height() {
+			return None;
+		}
+		self.map.get(x + y * self.width()).copied()
 	}
 
 	pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
-		self.map.get_mut(x.checked_add(y.checked_mul(self.width)?)?)
+		if x >= self.width() || y >= self.height() {
+			return None;
+		}
+		self.map.get_mut(x + y * self.width())
 	}
 
 	pub fn width(&self) -> usize {

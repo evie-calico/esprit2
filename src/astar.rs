@@ -24,10 +24,16 @@ pub struct DijkstraMap {
 /// Grid access
 impl DijkstraMap {
 	fn get(&self, x: usize, y: usize) -> Option<Distance> {
+		if x >= self.width {
+			return None;
+		}
 		self.grid.get(x + y * self.width).copied()
 	}
 
 	fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Distance> {
+		if x >= self.width {
+			return None;
+		}
 		self.grid.get_mut(x + y * self.width)
 	}
 }
