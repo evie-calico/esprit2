@@ -1,11 +1,17 @@
-#![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
+#![feature(
+	anonymous_lifetime_in_impl_trait,
+	once_cell_try,
+	let_chains,
+	int_roundings
+)]
 
-pub mod draw;
-pub mod gui;
-pub mod input;
-pub mod options;
-pub mod texture;
-pub mod typography;
+pub(crate) mod draw;
+pub(crate) mod gui;
+pub(crate) mod input;
+pub(crate) mod options;
+pub(crate) mod select;
+pub(crate) mod texture;
+pub(crate) mod typography;
 
 use esprit2::prelude::*;
 use esprit2_server::Server;
@@ -225,6 +231,8 @@ pub fn main() {
 	let mut pamphlet = gui::widget::Pamphlet::new();
 
 	let mut input_mode = input::Mode::Normal;
+	// I think that this could be in an enum along with input_mode, since they're mutually exclusive
+	let mut chase_point = None;
 	let mut fps = 60.0;
 	let mut fps_timer = 0.0;
 	let mut debug = false;
@@ -238,6 +246,12 @@ pub fn main() {
 						keycode: Some(keycode),
 						..
 					} => {
+						if chase_point.is_some() {
+							if options.controls.escape.contains(keycode) {
+								chase_point = None;
+							}
+							continue;
+						}
 						let next_character = server.world().next_character().clone();
 						if next_character.borrow().player_controlled {
 							let controllable_character = input::controllable_character(
@@ -268,6 +282,9 @@ pub fn main() {
 											}
 										}
 										Some(input::Response::Debug) => debug ^= true,
+										Some(input::Response::Select(point)) => {
+											chase_point = Some(point);
+										}
 										Some(input::Response::Act(action)) => {
 											server.act(&scripts, action).unwrap();
 										}
@@ -323,7 +340,42 @@ pub fn main() {
 		// Logic
 		{
 			let next_character = server.world().next_character().clone();
-			if !next_character.borrow().player_controlled {
+			if next_character.borrow().player_controlled {
+				if let Some(point) = &chase_point {
+					match point {
+						select::Point::Character(character) => {
+							let (x, y) = {
+								let c = character.borrow();
+								(c.x, c.y)
+							};
+							// Give a safe range of 2 tiles if the target is an enemy.
+							let distance = if next_character.borrow().alliance
+								!= character.borrow().alliance
+							{
+								2
+							} else {
+								1
+							};
+							if (next_character.borrow().x - x).abs() <= distance
+								&& (next_character.borrow().y - y).abs() <= distance
+							{
+								chase_point = None;
+							} else {
+								server.act(&scripts, character::Action::Move(x, y)).unwrap();
+							}
+						}
+						select::Point::Exit(x, y) => {
+							if next_character.borrow().x == *x && next_character.borrow().y == *y {
+								chase_point = None;
+							} else {
+								server
+									.act(&scripts, character::Action::Move(*x, *y))
+									.unwrap();
+							}
+						}
+					}
+				}
+			} else {
 				let considerations = server
 					.world()
 					.consider_turn(server.resources(), &scripts)

@@ -77,10 +77,15 @@ pub(crate) fn menu(
 			);
 			menu.console(console);
 		}
+		input::Mode::Select => menu.label_styled(
+			"Select",
+			options.ui.colors.select_mode,
+			&menu.typography.annotation,
+		),
 		input::Mode::Attack => {
 			menu.label_styled(
 				"Attack",
-				options.ui.colors.cast_mode,
+				options.ui.colors.select_mode,
 				&menu.typography.annotation,
 			);
 			attack_menu(menu, &world_manager.next_character().borrow(), resources);
@@ -88,7 +93,7 @@ pub(crate) fn menu(
 		input::Mode::Cast => {
 			menu.label_styled(
 				"Cast",
-				options.ui.colors.cast_mode,
+				options.ui.colors.select_mode,
 				&menu.typography.annotation,
 			);
 			spell_menu(menu, &world_manager.next_character().borrow(), resources);
@@ -98,7 +103,7 @@ pub(crate) fn menu(
 		}) => {
 			menu.label_styled(
 				"Cursor",
-				options.ui.colors.cursor_mode,
+				options.ui.colors.prompt_mode,
 				&menu.typography.annotation,
 			);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
@@ -119,7 +124,7 @@ pub(crate) fn menu(
 		input::Mode::Prompt(input::Prompt { message, .. }) => {
 			menu.label_styled(
 				"Prompt",
-				options.ui.colors.cursor_mode,
+				options.ui.colors.prompt_mode,
 				&menu.typography.annotation,
 			);
 			menu.label(message);
@@ -132,7 +137,7 @@ pub(crate) fn menu(
 		input::Mode::DirectionPrompt(input::DirectionPrompt { message, .. }) => {
 			menu.label_styled(
 				"Direction Prompt",
-				options.ui.colors.cursor_mode,
+				options.ui.colors.prompt_mode,
 				&menu.typography.annotation,
 			);
 			menu.label(message);

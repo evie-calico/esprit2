@@ -95,8 +95,8 @@ impl Default for UserInterface {
 #[serde(default, deny_unknown_fields)]
 pub struct Colors {
 	pub normal_mode: Color,
-	pub cast_mode: Color,
-	pub cursor_mode: Color,
+	pub select_mode: Color,
+	pub prompt_mode: Color,
 	pub console: console::Colors,
 }
 
@@ -104,8 +104,8 @@ impl Default for Colors {
 	fn default() -> Self {
 		Self {
 			normal_mode: (0x77, 0xE7, 0xA2, 0xFF),
-			cast_mode: (0xA2, 0x77, 0xE7, 0xFF),
-			cursor_mode: (0xE7, 0xA2, 0x77, 0xFF),
+			select_mode: (0xA2, 0x77, 0xE7, 0xFF),
+			prompt_mode: (0xE7, 0xA2, 0x77, 0xFF),
 			console: console::Colors::default(),
 		}
 	}
@@ -113,12 +113,6 @@ impl Default for Colors {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Key(Keycode);
-
-impl Key {
-	pub fn new(key: Keycode) -> Self {
-		Self(key)
-	}
-}
 
 impl serde::Serialize for Key {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -210,6 +204,7 @@ pub struct Controls {
 
 	pub talk: Triggers,
 	pub autocombat: Triggers,
+	pub select: Triggers,
 	pub attack: Triggers,
 	pub cast: Triggers,
 	pub underfoot: Triggers,
@@ -238,6 +233,7 @@ impl Default for Controls {
 
 			talk: Triggers(vec![Key(K::T)]),
 			autocombat: Triggers(vec![Key(K::Tab)]),
+			select: Triggers(vec![Key(K::F)]),
 			attack: Triggers(vec![Key(K::V)]),
 			cast: Triggers(vec![Key(K::C)]),
 			underfoot: Triggers(vec![Key(K::Period)]),
@@ -249,32 +245,5 @@ impl Default for Controls {
 			fullscreen: Triggers(vec![Key(K::F11)]),
 			debug: Triggers(vec![Key(K::F1)]),
 		}
-	}
-}
-
-/// Potentially useful information for assinging lettered shortcuts for a list.
-///
-/// Does not (currently) support shifted letters; they're probably necessary but I don't know how I feel about it yet.
-pub struct Shortcut {
-	pub symbol: char,
-	pub keycode: Keycode,
-}
-
-impl TryFrom<usize> for Shortcut {
-	type Error = ();
-
-	fn try_from(index: usize) -> Result<Self, ()> {
-		// i32 is the most restrictive value we use (actually, a u5 would be fine—we only care about 0-25)
-		// However, it makes sense for this function to accept a usize considering this is for lettering indices.
-		let Ok::<i32, _>(index) = index.try_into() else {
-			return Err(());
-		};
-		let Some(symbol) = char::from_digit(10 + (index as u32), 36) else {
-			return Err(());
-		};
-		// This unwrap is safe because the above succeeded.
-		let keycode = Keycode::from_i32(Keycode::A.into_i32() + index)
-			.expect("symbol must be within the valid keycode range");
-		Ok(Self { symbol, keycode })
 	}
 }

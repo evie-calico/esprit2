@@ -1,3 +1,4 @@
+use crate::select;
 use crate::{options::Options, ServerHandle};
 use esprit2::prelude::*;
 use mlua::FromLua;
@@ -131,8 +132,11 @@ pub(crate) struct DirectionPrompt<'lua> {
 
 pub(crate) enum Mode<'lua> {
 	Normal,
+	// Select modes
+	Select,
 	Attack,
 	Cast,
+	// Prompt modes
 	Cursor(Cursor<'lua>),
 	Prompt(Prompt<'lua>),
 	DirectionPrompt(DirectionPrompt<'lua>),
@@ -141,6 +145,7 @@ pub(crate) enum Mode<'lua> {
 pub(crate) enum Response<'lua> {
 	Fullscreen,
 	Debug,
+	Select(select::Point),
 	Act(character::Action),
 	Partial(PartialAction<'lua>, Request),
 }
@@ -210,6 +215,10 @@ pub(crate) fn controllable_character<'lua>(
 				return Ok((Mode::Attack, None));
 			}
 
+			if options.controls.select.contains(keycode) {
+				return Ok((Mode::Select, None));
+			}
+
 			let (x, y) = {
 				let next_character = next_character.borrow();
 				(next_character.x, next_character.y)
@@ -251,6 +260,18 @@ pub(crate) fn controllable_character<'lua>(
 					considerations,
 				)?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
+			} else {
+				Ok((Mode::Normal, None))
+			}
+		}
+		Mode::Select => {
+			let candidates = select::assign_indicies(server.world());
+			// TODO: just make an array of keys in the options file or something.
+			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			if (0..=26).contains(&selected_index)
+				&& let Some(candidate) = candidates.into_iter().nth(selected_index as usize)
+			{
+				Ok((Mode::Normal, Some(Response::Select(candidate))))
 			} else {
 				Ok((Mode::Normal, None))
 			}
