@@ -139,6 +139,7 @@ where
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 struct InnerRef(#[with(InlineRefCell)] RefCell<character::Piece>);
 
 #[derive(
@@ -151,6 +152,7 @@ struct InnerRef(#[with(InlineRefCell)] RefCell<character::Piece>);
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Ref(Rc<InnerRef>);
 
 impl Ref {
@@ -225,6 +227,7 @@ impl mlua::UserData for Ref {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Piece {
 	pub sheet: Sheet,
 
@@ -329,7 +332,16 @@ impl Piece {
 	}
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+#[archive(check_bytes)]
 #[serde(untagged)]
 pub enum ActionArg {
 	Boolean(bool),
@@ -339,7 +351,16 @@ pub enum ActionArg {
 }
 
 // I'd rather this be a list of tuples but I don't wanna write lua conversion code right now.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+#[archive(check_bytes)]
 pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 
 /// Anything a character piece can "do".
@@ -347,12 +368,13 @@ pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 /// This is the only way that character logic or player input should communicate with pieces.
 /// The information here should be enough to perform the action, but in the event it isn't
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[archive(check_bytes)]
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(Rc<Attack>, ActionArgs),
-	Cast(Rc<Spell>, ActionArgs),
+	Attack(resource::Id, ActionArgs),
+	Cast(resource::Id, ActionArgs),
 }
 
 #[derive(
@@ -368,6 +390,7 @@ pub enum Action {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 #[repr(u32)]
 pub enum Alliance {
 	Friendly,
@@ -425,6 +448,7 @@ mod sheet {
 		rkyv::Deserialize,
 	)]
 	#[alua(method = stats)]
+	#[archive(check_bytes)]
 	pub struct Sheet {
 		pub icon: resource::Id,
 		/// Note that this includes the character's name.
@@ -497,6 +521,7 @@ impl expression::Variables for Sheet {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]

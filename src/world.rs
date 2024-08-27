@@ -3,20 +3,18 @@ use consider::TaggedHeuristics;
 use mlua::LuaSerdeExt;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use std::collections::VecDeque;
-use std::rc::Rc;
-
-pub use character::Ref as CharacterRef;
 
 /// This struct contains all information that is relevant during gameplay.
 #[derive(
 	Debug, serde::Serialize, serde::Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
 	pub current_floor: Floor,
 	// It might be useful to sort this by remaining action delay to make selecting the next character easier.
-	pub characters: VecDeque<CharacterRef>,
+	pub characters: VecDeque<character::Ref>,
 	pub items: Vec<item::Piece>,
 	/// Always point to the party's pieces, even across floors.
 	/// When exiting a dungeon, these sheets will be saved to a party struct.
@@ -48,15 +46,16 @@ impl Default for Level {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
-	pub piece: CharacterRef,
+	pub piece: character::Ref,
 	/// Displayed on the pamphlet.
 	pub accent_color: Color,
 }
 
 impl PartyReference {
-	pub fn new(piece: CharacterRef, accent_color: Color) -> Self {
+	pub fn new(piece: character::Ref, accent_color: Color) -> Self {
 		Self {
 			piece,
 			accent_color,
@@ -79,6 +78,7 @@ pub struct PartyReferenceBase {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Location {
 	/// Which level is currently loaded.
 	pub level: String,
@@ -101,7 +101,7 @@ impl Manager {
 		} in party_blueprint
 		{
 			let sheet = resource_manager.get_sheet(sheet)?;
-			let character = CharacterRef::new(character::Piece {
+			let character = character::Ref::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
 				..character::Piece::new(sheet.clone())
@@ -183,11 +183,11 @@ impl Manager {
 		)
 	}
 
-	pub fn next_character(&self) -> &CharacterRef {
+	pub fn next_character(&self) -> &character::Ref {
 		&self.characters[0]
 	}
 
-	pub fn get_character_at(&self, x: i32, y: i32) -> Option<&CharacterRef> {
+	pub fn get_character_at(&self, x: i32, y: i32) -> Option<&character::Ref> {
 		self.characters.iter().find(|p| {
 			let p = p.borrow();
 			p.x == x && p.y == y
@@ -264,14 +264,8 @@ impl Manager {
 			})
 		}
 
-		for attack in next_character
-			.borrow()
-			.sheet
-			.attacks
-			.iter()
-			.map(|k| resources.get_attack(k))
-		{
-			let attack = attack?;
+		for attack_id in next_character.borrow().sheet.attacks.iter() {
+			let attack = resources.get_attack(attack_id)?;
 			if let Some(on_consider) = &attack.on_consider {
 				let attack_heuristics: mlua::Table = scripts
 					.sandbox(on_consider)?
@@ -287,21 +281,15 @@ impl Manager {
 					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Attack(attack.clone(), arguments),
+						action: character::Action::Attack(attack_id.clone(), arguments),
 						heuristics,
 					})
 				}
 			}
 		}
 
-		for spell in next_character
-			.borrow()
-			.sheet
-			.spells
-			.iter()
-			.map(|k| resources.get_spell(k))
-		{
-			let spell = spell?;
+		for spell_id in next_character.borrow().sheet.spells.iter() {
+			let spell = resources.get_spell(spell_id)?;
 			if let (spell::Castable::Yes, Some(on_consider)) = (
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
@@ -320,7 +308,7 @@ impl Manager {
 					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
 					let heuristics = heuristics.get("heuristics")?;
 					considerations.push(Consider {
-						action: character::Action::Cast(spell.clone(), arguments),
+						action: character::Action::Cast(spell_id.clone(), arguments),
 						heuristics,
 					})
 				}
@@ -333,7 +321,7 @@ impl Manager {
 	pub fn consider_action(
 		&self,
 		scripts: &resource::Scripts,
-		character: CharacterRef,
+		character: character::Ref,
 		mut considerations: Vec<Consider>,
 	) -> Result<character::Action> {
 		Ok(scripts
@@ -348,15 +336,15 @@ impl Manager {
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
-	/// # Returns
-	/// How much time the action took, if one occured.
-	pub fn next_turn(
-		&self,
+	/// Causes the next character in the queue to perform a given action.
+	pub fn perform_action(
+		&mut self,
 		console: &console::Handle,
+		resources: &resource::Manager,
 		scripts: &resource::Scripts,
 		action: character::Action,
-	) -> Result<Option<Aut>> {
-		let next_character = self.next_character();
+	) -> Result<()> {
+		let next_character = self.next_character().clone();
 
 		let delay = next_character.borrow().action_delay;
 		// The delay represents how many auts must pass until this character's next action.
@@ -369,8 +357,8 @@ impl Manager {
 		// Once an action has been provided, pending turn updates may run.
 		next_character.borrow_mut().new_turn();
 
-		match action {
-			character::Action::Wait(delay) => Ok(Some(delay)),
+		let delay = match action {
+			character::Action::Wait(delay) => Some(delay),
 			character::Action::Move(target_x, target_y) => {
 				let (x, y) = {
 					let next_character = next_character.borrow();
@@ -378,7 +366,7 @@ impl Manager {
 				};
 				// For distances of 1 tile, don't bother using a dijkstra map.
 				if let Some(direction) = OrdDir::from_offset(target_x - x, target_y - y) {
-					self.move_piece(next_character, direction, console)
+					self.move_piece(&next_character, direction, console)?
 				} else {
 					let mut dijkstra = astar::DijkstraMap::target(
 						self.current_floor.width(),
@@ -402,59 +390,98 @@ impl Manager {
 						});
 					}
 					if let Some(direction) = dijkstra.step(x, y) {
-						self.move_piece(next_character, direction, console)
+						self.move_piece(&next_character, direction, console)?
 					} else {
-						Ok(None)
+						None
 					}
 				}
 			}
-			character::Action::Attack(attack, arguments) => {
-				Ok(self.attack_piece(scripts, attack, next_character, arguments)?)
-			}
-			character::Action::Cast(spell, arguments) => {
-				let castable = spell.castable_by(&next_character.borrow());
-				match castable {
-					spell::Castable::Yes => {
-						let affinity = spell.affinity(&next_character.borrow());
+			character::Action::Attack(attack, arguments) => self.attack(
+				scripts,
+				resources.get_attack(&attack)?,
+				next_character,
+				arguments,
+			)?,
+			character::Action::Cast(spell, arguments) => self.cast(
+				resources.get_spell(&spell)?,
+				next_character,
+				scripts,
+				arguments,
+				console,
+			)?,
+		};
 
-						let thread = scripts
-							.sandbox(&spell.on_cast)?
-							.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
-							.insert(
-								"Parameters",
-								spell.parameter_table(scripts, &*next_character.borrow())?,
-							)?
-							.insert("User", next_character.clone())?
-							// Maybe these should be members of the spell?
-							.insert("Level", spell.level)?
-							.insert("Affinity", affinity)?
-							.thread()?;
-						Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, ())?)
-					}
-					spell::Castable::NotEnoughSP => {
-						let message =
-							format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-								.replace_nouns(&next_character.borrow().sheet.nouns);
-						console.print_system(message);
-						Ok(None)
-					}
-					spell::Castable::UncastableAffinity => {
-						let message =
-							format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
-								.replace_nouns(&next_character.borrow().sheet.nouns);
-						console.print_system(message);
-						Ok(None)
-					}
-				}
-			}
-		}
+		// Remove dead characters.
+		// TODO: Does this belong here?
+		self.characters
+			.retain(|character| character.borrow().hp > 0);
+
+		let character = self
+			.characters
+			.pop_front()
+			.expect("next_turn's element should still exist");
+		// TODO: A turn should never result in a None. earlier versions of the engine used this to cancel actions.
+		let delay = delay.unwrap_or(TURN);
+		character.borrow_mut().action_delay = delay;
+		// Insert the character into the queue,
+		// immediately before the first character to have a higher action delay.
+		// self.world assumes that the queue is sorted.
+		self.characters.insert(
+			self.characters
+				.iter()
+				.enumerate()
+				.find(|x| x.1.borrow().action_delay > delay)
+				.map(|x| x.0)
+				.unwrap_or(self.characters.len()),
+			character,
+		);
+		Ok(())
 	}
 
-	pub fn attack_piece(
+	fn cast(
+		&mut self,
+		spell: &Spell,
+		user: character::Ref,
+		scripts: &resource::Scripts,
+		arguments: character::ActionArgs,
+		console: &console::Handle,
+	) -> Result<Option<u32>, Error> {
+		let castable = spell.castable_by(&user.borrow());
+		Ok(match castable {
+			spell::Castable::Yes => {
+				let affinity = spell.affinity(&user.borrow());
+				let parameters = spell.parameter_table(scripts, &*user.borrow())?;
+				let thread = scripts
+					.sandbox(&spell.on_cast)?
+					.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
+					.insert("Parameters", parameters)?
+					.insert("User", user)?
+					// Maybe these should be members of the spell?
+					.insert("Level", spell.level)?
+					.insert("Affinity", affinity)?
+					.thread()?;
+				self.poll::<Option<Aut>>(scripts.runtime, thread, ())?
+			}
+			spell::Castable::NotEnoughSP => {
+				let message = format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
+					.replace_nouns(&user.borrow().sheet.nouns);
+				console.print_system(message);
+				None
+			}
+			spell::Castable::UncastableAffinity => {
+				let message = format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
+					.replace_nouns(&user.borrow().sheet.nouns);
+				console.print_system(message);
+				None
+			}
+		})
+	}
+
+	pub fn attack(
 		&self,
 		scripts: &resource::Scripts,
-		attack: Rc<Attack>,
-		user: &CharacterRef,
+		attack: &Attack,
+		user: character::Ref,
 		arguments: character::ActionArgs,
 	) -> Result<Option<Aut>> {
 		// Calculate damage
@@ -462,7 +489,7 @@ impl Manager {
 
 		let thread = scripts
 			.sandbox(&attack.on_use)?
-			.insert("User", user.clone())?
+			.insert("User", user)?
 			.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
 			.insert("UseTime", attack.use_time)?
 			.insert("Magnitude", magnitude)?
@@ -472,7 +499,7 @@ impl Manager {
 
 	pub fn move_piece(
 		&self,
-		character: &CharacterRef,
+		character: &character::Ref,
 		dir: OrdDir,
 		console: &console::Handle,
 	) -> Result<Option<Aut>> {

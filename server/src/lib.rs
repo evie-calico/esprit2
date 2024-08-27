@@ -12,10 +12,19 @@
 
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
 
+pub mod protocol;
+
 use esprit2::prelude::*;
 use std::path::PathBuf;
 use std::process::exit;
-use tracing::error;
+use std::time::Instant;
+use tracing::{error, warn};
+
+pub struct Player {
+	// TODO: controlled_characters.
+	prospective_action: Option<character::Action>,
+	ping: Option<Instant>,
+}
 
 /// Server state
 ///
@@ -24,6 +33,7 @@ pub struct Server {
 	resource_directory: PathBuf,
 
 	pub resources: resource::Manager,
+	pub players: Player,
 
 	// These fields should be kept in sync with the client.
 	pub console: console::Handle,
@@ -71,44 +81,61 @@ impl Server {
 			resource_directory,
 
 			resources,
+			// Start with no players/connections.
+			players: Player {
+				prospective_action: None,
+				ping: None,
+			},
 
 			console,
 			world,
 		}
 	}
 
-	pub fn act(
-		&mut self,
-		scripts: &resource::Scripts,
-		action: character::Action,
-	) -> esprit2::Result<()> {
-		let delay = self
-			.world
-			.next_turn(&self.console, scripts, action)?
-			.unwrap_or(TURN);
-		self.world
-			.characters
-			.retain(|character| character.borrow().hp > 0);
-
-		let character = self
-			.world
-			.characters
-			.pop_front()
-			.expect("next_turn's element should still exist");
-		character.borrow_mut().action_delay = delay;
-		// Insert the character into the queue,
-		// immediately before the first character to have a higher action delay.
-		// self.world assumes that the queue is sorted.
-		self.world.characters.insert(
+	pub fn tick(&mut self, scripts: &resource::Scripts) -> esprit2::Result<()> {
+		if let Some(action) = self.players.prospective_action.take() {
 			self.world
-				.characters
-				.iter()
-				.enumerate()
-				.find(|x| x.1.borrow().action_delay > delay)
-				.map(|x| x.0)
-				.unwrap_or(self.world.characters.len()),
-			character,
-		);
+				.perform_action(&self.console, &self.resources, scripts, action)?;
+		}
+
 		Ok(())
+	}
+}
+
+/// Recieve operations
+// TODO: Multiple clients.
+impl Server {
+	pub fn recv_ping(&mut self) {
+		if let Some(ping) = &mut self.players.ping {
+			let ms = ping.elapsed().as_millis();
+			if ms > 50 {
+				info!("recieved ping after {ms}ms (slow) from {{client}}")
+			}
+			*ping = Instant::now();
+		} else {
+			warn!("recieved unexpected ping packet");
+		}
+	}
+
+	pub fn recv_action(&mut self, action: character::Action) {
+		self.players.prospective_action = Some(action);
+	}
+}
+
+/// Send operations.
+// TODO: Multiple clients.
+impl Server {
+	/// Check if the server is ready to ping this client.
+	///
+	/// # Returns
+	/// `Some(())` if a ping packet should be sent.
+	pub fn send_ping(&mut self) -> Option<()> {
+		self.players.ping.get_or_insert(Instant::now());
+		Some(())
+	}
+
+	/// Returns an archived version of the world state, as an array of bytes.
+	pub fn send_world(&self) -> Option<&world::Manager> {
+		Some(&self.world)
 	}
 }

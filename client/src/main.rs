@@ -2,7 +2,10 @@
 	anonymous_lifetime_in_impl_trait,
 	once_cell_try,
 	let_chains,
-	int_roundings
+	int_roundings,
+	core_io_borrowed_buf,
+	new_uninit,
+	read_buf
 )]
 
 pub(crate) mod draw;
@@ -14,9 +17,12 @@ pub(crate) mod texture;
 pub(crate) mod typography;
 
 use esprit2::prelude::*;
-use esprit2_server::Server;
+use esprit2_server::{protocol, Server};
 use options::Options;
+use rkyv::Deserialize;
 use sdl2::rect::Rect;
+use std::io::{prelude::*, BorrowedBuf};
+use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
@@ -53,8 +59,16 @@ fn update_delta(
 /// along with whatever action it performed. If this checksum differs from the server's copy,
 /// it will send an complete copy of the world state back to the client, which it *must* accept.
 enum ServerHandle {
-	Internal { server: Server },
-	// External { },
+	Internal {
+		server: Server,
+	},
+	External {
+		stream: TcpStream,
+		packet_reciever: protocol::PacketReciever,
+		world_cache: world::Manager,
+		console: console::Handle,
+		resources: resource::Manager,
+	},
 }
 
 impl ServerHandle {
@@ -62,6 +76,44 @@ impl ServerHandle {
 	fn internal(console: console::Handle, resource_directory: PathBuf) -> Self {
 		Self::Internal {
 			server: Server::new(console, resource_directory),
+		}
+	}
+
+	/// Connect to an external server.
+	fn external(
+		address: impl ToSocketAddrs,
+		console: console::Handle,
+		resource_directory: PathBuf,
+	) -> Self {
+		let mut stream = TcpStream::connect(address).unwrap();
+		let mut packet_len = [0; 4];
+		// Read a ping back, reusing the buffers we used to send it.
+		stream.read_exact(&mut packet_len).unwrap();
+		let mut packet = Box::new_uninit_slice(u32::from_le_bytes(packet_len) as usize);
+		let mut packet_buf = BorrowedBuf::from(&mut *packet);
+		stream
+			.set_nonblocking(true)
+			.expect("failed to set nonblocking");
+		stream.read_buf_exact(packet_buf.unfilled()).unwrap();
+		// SAFETY: read_buf_exact always fills the entire buffer.
+		let packet = unsafe { packet.assume_init() };
+		// Parse the ping and print its message
+		let packet = rkyv::check_archived_root::<protocol::ServerPacket>(&packet).unwrap();
+		let world_cache = match packet {
+			protocol::ArchivedServerPacket::World { world } => {
+				let mut deserializer = rkyv::de::deserializers::SharedDeserializeMap::new();
+				world.deserialize(&mut deserializer).unwrap()
+			}
+			_ => {
+				todo!();
+			}
+		};
+		Self::External {
+			stream,
+			packet_reciever: protocol::PacketReciever::default(),
+			world_cache,
+			console,
+			resources: resource::Manager::open(resource_directory).unwrap(),
 		}
 	}
 
@@ -73,6 +125,7 @@ impl ServerHandle {
 	fn world(&self) -> &world::Manager {
 		match self {
 			Self::Internal { server } => &server.world,
+			Self::External { world_cache, .. } => world_cache,
 		}
 	}
 
@@ -84,6 +137,7 @@ impl ServerHandle {
 	fn console(&self) -> &console::Handle {
 		match self {
 			Self::Internal { server } => &server.console,
+			Self::External { console, .. } => console,
 		}
 	}
 
@@ -94,16 +148,59 @@ impl ServerHandle {
 	fn resources(&self) -> &resource::Manager {
 		match self {
 			Self::Internal { server } => &server.resources,
+			Self::External { resources, .. } => resources,
 		}
 	}
 
-	fn act(
-		&mut self,
-		scripts: &resource::Scripts,
-		action: character::Action,
-	) -> esprit2::Result<()> {
+	fn tick(&mut self, scripts: &resource::Scripts) -> esprit2::Result<()> {
 		match self {
-			Self::Internal { server } => server.act(scripts, action),
+			Self::Internal { server } => {
+				server.recv_ping();
+				server.tick(scripts)?;
+			}
+			Self::External {
+				stream,
+				packet_reciever,
+				world_cache,
+				..
+			} => {
+				let packet =
+					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Ping("meow".into())).unwrap();
+				stream
+					.write_all(&(packet.len() as u32).to_le_bytes())
+					.unwrap();
+				stream.write_all(&packet).unwrap();
+				packet_reciever.recv(stream, |packet| {
+					let packet =
+						rkyv::check_archived_root::<protocol::ServerPacket>(&packet).unwrap();
+					match packet {
+						protocol::ArchivedServerPacket::Ping(_) => todo!(),
+						protocol::ArchivedServerPacket::World { world } => {
+							let mut deserializer =
+								rkyv::de::deserializers::SharedDeserializeMap::new();
+							*world_cache = world.deserialize(&mut deserializer).unwrap();
+						}
+					}
+				});
+			}
+		}
+		Ok(())
+	}
+}
+
+/// Send operations.
+impl ServerHandle {
+	fn send_action(&mut self, action: character::Action) {
+		match self {
+			Self::Internal { server } => server.recv_action(action),
+			Self::External { stream, .. } => {
+				let packet =
+					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Action(action)).unwrap();
+				stream
+					.write_all(&(packet.len() as u32).to_le_bytes())
+					.unwrap();
+				stream.write_all(&packet).unwrap()
+			}
 		}
 	}
 }
@@ -167,7 +264,8 @@ pub fn main() {
 
 	// Create an internal server instance
 	// TODO: allow for external servers over a TCP protocol.
-	let mut server = ServerHandle::internal(
+	let mut server = ServerHandle::external(
+		(Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT),
 		console.handle.clone(),
 		options::resource_directory().clone(),
 	);
@@ -207,6 +305,8 @@ pub fn main() {
 			}
 		};
 
+	server.tick(&scripts).unwrap();
+
 	let textures = match texture::Manager::new(
 		options::resource_directory().join("textures/"),
 		&texture_creator,
@@ -231,7 +331,7 @@ pub fn main() {
 	let mut pamphlet = gui::widget::Pamphlet::new();
 
 	let mut input_mode = input::Mode::Normal;
-	// I think that this could be in an enum along with input_mode, since they're mutually exclusive
+	// TODO: Make this part of input::Mode::Select;
 	let mut chase_point = None;
 	let mut fps = 60.0;
 	let mut fps_timer = 0.0;
@@ -246,14 +346,8 @@ pub fn main() {
 						keycode: Some(keycode),
 						..
 					} => {
-						if chase_point.is_some() {
-							if options.controls.escape.contains(keycode) {
-								chase_point = None;
-							}
-							continue;
-						}
 						let next_character = server.world().next_character().clone();
-						if next_character.borrow().player_controlled {
+						if true || next_character.borrow().player_controlled {
 							let controllable_character = input::controllable_character(
 								keycode,
 								next_character,
@@ -286,8 +380,9 @@ pub fn main() {
 											chase_point = Some(point);
 										}
 										Some(input::Response::Act(action)) => {
-											server.act(&scripts, action).unwrap();
+											server.send_action(action)
 										}
+
 										Some(input::Response::Partial(partial, request)) => {
 											match request {
 												input::Request::Cursor {
@@ -361,31 +456,24 @@ pub fn main() {
 							{
 								chase_point = None;
 							} else {
-								server.act(&scripts, character::Action::Move(x, y)).unwrap();
+								server.send_action(character::Action::Move(x, y));
 							}
 						}
 						select::Point::Exit(x, y) => {
 							if next_character.borrow().x == *x && next_character.borrow().y == *y {
 								chase_point = None;
 							} else {
-								server
-									.act(&scripts, character::Action::Move(*x, *y))
-									.unwrap();
+								server.send_action(character::Action::Move(*x, *y));
 							}
 						}
 					}
 				}
-			} else {
-				let considerations = server
-					.world()
-					.consider_turn(server.resources(), &scripts)
-					.unwrap();
-				let action = server
-					.world()
-					.consider_action(&scripts, next_character, considerations)
-					.unwrap();
-				server.act(&scripts, action).unwrap();
 			}
+			if let Err(msg) = server.tick(&scripts) {
+				error!("server tick failed: {msg}");
+				exit(1);
+			}
+
 			// This is the only place where delta time should be used.
 			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 

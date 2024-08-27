@@ -13,6 +13,7 @@ use std::sync::{Arc, LazyLock};
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Nouns {
 	/// This is an `Arc<str>` rather than a `String` because it's very common to
 	/// store a reference to a character's name (see `Console`).
@@ -34,6 +35,7 @@ pub struct Nouns {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub enum Pronouns {
 	Female,
 	Male,

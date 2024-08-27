@@ -4,7 +4,6 @@ use esprit2::prelude::*;
 use mlua::FromLua;
 use mlua::LuaSerdeExt;
 use sdl2::keyboard::Keycode;
-use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SinWave(u16);
@@ -68,8 +67,8 @@ impl mlua::UserData for RequestConstructor {
 }
 
 pub(crate) enum PartialAction<'lua> {
-	Attack(Rc<Attack>, character::Ref, mlua::Thread<'lua>),
-	Spell(Rc<Spell>, character::Ref, mlua::Thread<'lua>),
+	Attack(resource::Id, character::Ref, mlua::Thread<'lua>),
+	Spell(resource::Id, character::Ref, mlua::Thread<'lua>),
 }
 
 impl<'lua> PartialAction<'lua> {
@@ -152,7 +151,7 @@ pub(crate) enum Response<'lua> {
 
 pub(crate) fn controllable_character<'lua>(
 	keycode: sdl2::keyboard::Keycode,
-	next_character: world::CharacterRef,
+	next_character: character::Ref,
 	server: &ServerHandle,
 	scripts: &resource::Scripts<'lua>,
 	mode: Mode<'lua>,
@@ -183,17 +182,13 @@ pub(crate) fn controllable_character<'lua>(
 						(next_character.x + xoff, next_character.y + yoff)
 					};
 					if server.world().get_character_at(x, y).is_some() {
-						let default_attack = next_character
-							.borrow()
-							.sheet
-							.attacks
-							.first()
-							.map(|k| server.resources().get_attack(k));
-						if let Some(default_attack) = default_attack {
+						if let Some(default_attack) =
+							next_character.borrow().sheet.attacks.first().cloned()
+						{
 							return Ok((
 								mode,
 								Some(Response::Act(character::Action::Attack(
-									default_attack?.clone(),
+									default_attack,
 									character::ActionArgs(std::collections::HashMap::from([(
 										"target".into(),
 										character::ActionArg::Position { x, y },
@@ -283,14 +278,24 @@ pub(crate) fn controllable_character<'lua>(
 
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			let attack_id = next_character
+				.borrow()
+				.sheet
+				.attacks
+				.get(selected_index as usize)
+				.cloned();
 			if (0..=26).contains(&selected_index)
-				&& (selected_index as usize) < next_character.borrow().sheet.attacks.len()
+				&& let Some(attack_id) = attack_id
 			{
-				let attack = server
-					.resources()
-					.get_attack(&next_character.borrow().sheet.attacks[selected_index as usize])?;
-				let response = gather_attack_inputs(scripts, attack.clone(), next_character)?;
-				Ok((Mode::Normal, Some(response)))
+				Ok((
+					Mode::Normal,
+					Some(gather_attack_inputs(
+						server.resources(),
+						scripts,
+						attack_id,
+						next_character,
+					)?),
+				))
 			} else {
 				Ok((Mode::Normal, None))
 			}
@@ -302,16 +307,23 @@ pub(crate) fn controllable_character<'lua>(
 
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			let spell_id = next_character
+				.borrow()
+				.sheet
+				.spells
+				.get(selected_index as usize)
+				.cloned();
 			if (0..=26).contains(&selected_index)
-				&& (selected_index as usize) < next_character.borrow().sheet.spells.len()
+				&& let Some(spell_id) = spell_id
 			{
-				let spell = server
-					.resources()
-					.get_spell(&next_character.borrow().sheet.spells[selected_index as usize])?
-					.clone();
 				Ok((
 					Mode::Normal,
-					Some(gather_spell_inputs(scripts, spell.clone(), next_character)?),
+					Some(gather_spell_inputs(
+						server.resources(),
+						scripts,
+						spell_id,
+						next_character,
+					)?),
 				))
 			} else {
 				Ok((Mode::Normal, None))
@@ -402,10 +414,12 @@ pub(crate) fn controllable_character<'lua>(
 }
 
 fn gather_attack_inputs<'lua>(
+	resources: &resource::Manager,
 	scripts: &resource::Scripts<'lua>,
-	attack: Rc<Attack>,
+	attack_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
+	let attack = resources.get_attack(&attack_id)?;
 	let thread = scripts
 		.sandbox(&attack.on_input)?
 		.insert("UseTime", attack.use_time)?
@@ -415,30 +429,22 @@ fn gather_attack_inputs<'lua>(
 		)?
 		.insert("User", next_character.clone())?
 		.thread()?;
-	let value = thread.resume(())?;
-	if let mlua::ThreadStatus::Resumable = thread.status() {
-		Ok(Response::Partial(
-			PartialAction::Attack(attack, next_character.clone(), thread),
-			Request::from_lua(value, scripts.runtime)?,
-		))
-	} else {
-		Ok(Response::Act(character::Action::Attack(
-			attack,
-			scripts.runtime.from_value(value)?,
-		)))
-	}
+
+	PartialAction::Attack(attack_id, next_character, thread).resolve(scripts.runtime, ())
 }
 
 fn gather_spell_inputs<'lua>(
+	resources: &resource::Manager,
 	scripts: &resource::Scripts<'lua>,
-	spell: Rc<Spell>,
+	spell_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
+	let spell = resources.get_spell(&spell_id)?;
 	let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
 	let thread = scripts
 		.sandbox(&spell.on_input)?
 		.insert("Parameters", parameters)?
 		.insert("User", next_character.clone())?
 		.thread()?;
-	PartialAction::Spell(spell, next_character, thread).resolve(scripts.runtime, ())
+	PartialAction::Spell(spell_id, next_character, thread).resolve(scripts.runtime, ())
 }

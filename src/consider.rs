@@ -15,7 +15,7 @@ use crate::prelude::*;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
 pub enum Heuristic {
 	Damage {
-		target: world::CharacterRef,
+		target: character::Ref,
 		amount: u32,
 	},
 	/// Reflects a rough estimation of the lasting effects of a debuff from this attack.
@@ -23,7 +23,7 @@ pub enum Heuristic {
 	/// For example, the bleed effect builds up a defense loss after repeated attacks,
 	/// and is represented by a debuff heuristic of 1 despite being more variable than that.
 	Debuff {
-		target: world::CharacterRef,
+		target: character::Ref,
 		amount: u32,
 	},
 	Move {
@@ -74,19 +74,16 @@ impl mlua::UserData for HeuristicConstructor {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
 		methods.add_function(
 			"damage",
-			|_, (target, amount): (world::CharacterRef, mlua::Integer)| {
+			|_, (target, amount): (character::Ref, mlua::Integer)| {
 				Ok(Heuristic::Damage {
 					target,
 					amount: amount.try_into().unwrap_or_default(),
 				})
 			},
 		);
-		methods.add_function(
-			"debuff",
-			|_, (target, amount): (world::CharacterRef, u32)| {
-				Ok(Heuristic::Debuff { target, amount })
-			},
-		);
+		methods.add_function("debuff", |_, (target, amount): (character::Ref, u32)| {
+			Ok(Heuristic::Debuff { target, amount })
+		});
 	}
 }
 

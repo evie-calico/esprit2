@@ -16,6 +16,7 @@ use tracing::warn;
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub enum Tile {
 	Floor,
 	#[default]
@@ -32,6 +33,7 @@ pub enum Tile {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Floor {
 	pub width: usize,
 	pub map: Box<[Tile]>,

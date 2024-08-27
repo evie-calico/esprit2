@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
-use std::cell::Cell;
 use tracing::{error, warn};
 
 #[derive(
@@ -12,6 +11,7 @@ use tracing::{error, warn};
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub enum Duration {
 	Rest,
 	Turn,
@@ -26,14 +26,11 @@ pub enum Duration {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
 	on_debuff: resource::Id,
-
-	#[serde(skip)]
-	#[with(rkyv::with::Unsafe)]
-	cache: Cell<Option<(u32, character::Stats)>>,
 }
 
 impl Debuff {
@@ -47,16 +44,10 @@ impl Debuff {
 	}
 
 	pub fn get(&self) -> Option<character::Stats> {
-		if let Some((last_magnitude, cache)) = self.cache.get() {
-			if self.magnitude == last_magnitude {
-				return Some(cache);
-			}
-		}
 		let stats = self
 			.get_script()
 			.map_err(|msg| error!("failed to calculate debuff: {msg}"))
 			.unwrap_or_default();
-		self.cache.set(Some((self.magnitude, stats)));
 		Some(stats)
 	}
 }
@@ -70,6 +61,7 @@ impl Debuff {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub enum Effect {
 	StaticDebuff(character::Stats),
 	Debuff(Debuff),
@@ -84,6 +76,7 @@ pub enum Effect {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[archive(check_bytes)]
 pub struct Status {
 	pub name: String,
 	pub icon: String,
