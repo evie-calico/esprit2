@@ -18,12 +18,10 @@ use esprit2::prelude::*;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Instant;
-use tracing::{error, warn};
+use tracing::error;
 
 pub struct Player {
-	// TODO: controlled_characters.
-	prospective_action: Option<character::Action>,
-	ping: Option<Instant>,
+	pub ping: Instant,
 }
 
 /// Server state
@@ -83,8 +81,7 @@ impl Server {
 			resources,
 			// Start with no players/connections.
 			players: Player {
-				prospective_action: None,
-				ping: None,
+				ping: Instant::now(),
 			},
 
 			console,
@@ -93,11 +90,15 @@ impl Server {
 	}
 
 	pub fn tick(&mut self, scripts: &resource::Scripts) -> esprit2::Result<()> {
-		if let Some(action) = self.players.prospective_action.take() {
+		let character = self.world.next_character();
+		if !character.borrow().player_controlled {
+			let considerations = self.world.consider_turn(&self.resources, scripts)?;
+			let action = self
+				.world
+				.consider_action(scripts, character.clone(), considerations)?;
 			self.world
 				.perform_action(&self.console, &self.resources, scripts, action)?;
 		}
-
 		Ok(())
 	}
 }
@@ -106,19 +107,23 @@ impl Server {
 // TODO: Multiple clients.
 impl Server {
 	pub fn recv_ping(&mut self) {
-		if let Some(ping) = &mut self.players.ping {
-			let ms = ping.elapsed().as_millis();
-			if ms > 50 {
-				info!("recieved ping after {ms}ms (slow) from {{client}}")
-			}
-			*ping = Instant::now();
-		} else {
-			warn!("recieved unexpected ping packet");
+		let ms = self.players.ping.elapsed().as_millis();
+		if ms > 50 {
+			info!("recieved ping after {ms}ms (slow) from {{client}}")
 		}
+		self.players.ping = Instant::now();
 	}
 
-	pub fn recv_action(&mut self, action: character::Action) {
-		self.players.prospective_action = Some(action);
+	pub fn recv_action(
+		&mut self,
+		scripts: &resource::Scripts,
+		action: character::Action,
+	) -> esprit2::Result<()> {
+		if self.world.next_character().borrow().player_controlled {
+			self.world
+				.perform_action(&self.console, &self.resources, scripts, action)?;
+		}
+		Ok(())
 	}
 }
 
@@ -130,7 +135,7 @@ impl Server {
 	/// # Returns
 	/// `Some(())` if a ping packet should be sent.
 	pub fn send_ping(&mut self) -> Option<()> {
-		self.players.ping.get_or_insert(Instant::now());
+		self.players.ping = Instant::now();
 		Some(())
 	}
 

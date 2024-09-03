@@ -22,7 +22,7 @@ use options::Options;
 use rkyv::Deserialize;
 use sdl2::rect::Rect;
 use std::io::{prelude::*, BorrowedBuf};
-use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
@@ -58,6 +58,10 @@ fn update_delta(
 /// The client should simulate changes to its cache of the world manager and send a checksum
 /// along with whatever action it performed. If this checksum differs from the server's copy,
 /// it will send an complete copy of the world state back to the client, which it *must* accept.
+#[expect(
+	clippy::large_enum_variant,
+	reason = "Clippy suggests boxing `resources` even though it's in the smaller variant"
+)]
 enum ServerHandle {
 	Internal {
 		server: Server,
@@ -74,9 +78,9 @@ enum ServerHandle {
 impl ServerHandle {
 	/// Create an internal server.
 	fn internal(console: console::Handle, resource_directory: PathBuf) -> Self {
-		Self::Internal {
-			server: Server::new(console, resource_directory),
-		}
+		let mut server = Server::new(console, resource_directory);
+		server.send_ping();
+		Self::Internal { server }
 	}
 
 	/// Connect to an external server.
@@ -170,7 +174,7 @@ impl ServerHandle {
 					.write_all(&(packet.len() as u32).to_le_bytes())
 					.unwrap();
 				stream.write_all(&packet).unwrap();
-				packet_reciever.recv(stream, |packet| {
+				match packet_reciever.recv(stream, |packet| {
 					let packet =
 						rkyv::check_archived_root::<protocol::ServerPacket>(&packet).unwrap();
 					match packet {
@@ -181,7 +185,11 @@ impl ServerHandle {
 							*world_cache = world.deserialize(&mut deserializer).unwrap();
 						}
 					}
-				});
+				}) {
+					Ok(()) => {}
+					Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+					Err(e) => Err(e)?,
+				}
 			}
 		}
 		Ok(())
@@ -190,23 +198,42 @@ impl ServerHandle {
 
 /// Send operations.
 impl ServerHandle {
-	fn send_action(&mut self, action: character::Action) {
+	fn send_action(
+		&mut self,
+		scripts: &resource::Scripts,
+		action: character::Action,
+	) -> esprit2::Result<()> {
 		match self {
-			Self::Internal { server } => server.recv_action(action),
-			Self::External { stream, .. } => {
+			Self::Internal { server } => server.recv_action(scripts, action),
+			Self::External {
+				stream,
+				world_cache,
+				console,
+				resources,
+				..
+			} => {
 				let packet =
-					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Action(action)).unwrap();
+					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Action(action.clone()))
+						.unwrap();
 				stream
 					.write_all(&(packet.len() as u32).to_le_bytes())
 					.unwrap();
-				stream.write_all(&packet).unwrap()
+				stream.write_all(&packet).unwrap();
+
+				world_cache.perform_action(console, resources, scripts, action)
 			}
 		}
 	}
 }
 
+#[derive(clap::Parser)]
+struct Cli {
+	address: Option<Box<str>>,
+}
+
 #[allow(clippy::unwrap_used, reason = "SDL")]
 pub fn main() {
+	let cli = <Cli as clap::Parser>::parse();
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();
 	let ttf_context = sdl2::ttf::init().unwrap();
@@ -263,12 +290,18 @@ pub fn main() {
 	let mut console = Console::new(options.ui.colors.console.clone());
 
 	// Create an internal server instance
-	// TODO: allow for external servers over a TCP protocol.
-	let mut server = ServerHandle::external(
-		(Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT),
-		console.handle.clone(),
-		options::resource_directory().clone(),
-	);
+	let mut server = if let Some(address) = &cli.address {
+		ServerHandle::external(
+			(&**address, protocol::DEFAULT_PORT),
+			console.handle.clone(),
+			options::resource_directory().clone(),
+		)
+	} else {
+		ServerHandle::internal(
+			console.handle.clone(),
+			options::resource_directory().clone(),
+		)
+	};
 
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
@@ -304,8 +337,6 @@ pub fn main() {
 				exit(1);
 			}
 		};
-
-	server.tick(&scripts).unwrap();
 
 	let textures = match texture::Manager::new(
 		options::resource_directory().join("textures/"),
@@ -347,7 +378,7 @@ pub fn main() {
 						..
 					} => {
 						let next_character = server.world().next_character().clone();
-						if true || next_character.borrow().player_controlled {
+						if next_character.borrow().player_controlled {
 							let controllable_character = input::controllable_character(
 								keycode,
 								next_character,
@@ -380,7 +411,7 @@ pub fn main() {
 											chase_point = Some(point);
 										}
 										Some(input::Response::Act(action)) => {
-											server.send_action(action)
+											server.send_action(&scripts, action).unwrap()
 										}
 
 										Some(input::Response::Partial(partial, request)) => {
@@ -456,14 +487,18 @@ pub fn main() {
 							{
 								chase_point = None;
 							} else {
-								server.send_action(character::Action::Move(x, y));
+								server
+									.send_action(&scripts, character::Action::Move(x, y))
+									.unwrap();
 							}
 						}
 						select::Point::Exit(x, y) => {
 							if next_character.borrow().x == *x && next_character.borrow().y == *y {
 								chase_point = None;
 							} else {
-								server.send_action(character::Action::Move(*x, *y));
+								server
+									.send_action(&scripts, character::Action::Move(*x, *y))
+									.unwrap();
 							}
 						}
 					}

@@ -7,6 +7,9 @@ use std::io::{self, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::process::exit;
 use std::thread;
+use std::time::Duration;
+
+const TIMEOUT: Duration = Duration::from_secs(10);
 
 struct Instance {
 	console: Console,
@@ -36,26 +39,25 @@ fn main() {
 		"listening for connections on {}",
 		listener.local_addr().unwrap()
 	);
-	loop {
-		for stream in listener.incoming() {
-			match stream {
-				Ok(stream) => {
-					connections.push(thread::spawn(move || {
-						let _enter = tracing::error_span!(
-							"client",
-							addr = stream.peer_addr().unwrap().to_string()
-						)
-						.entered();
-						info!("connected");
-						connection(stream)
-					}));
-				}
-				Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-					break;
-				}
-				// TODO: What errors may occur? How should they be handled?
-				Err(msg) => error!("failed to read incoming stream: {msg}"),
+	for stream in listener.incoming() {
+		match stream {
+			Ok(stream) => {
+				connections.push(thread::spawn(move || {
+					let _enter = tracing::error_span!(
+						"client",
+						addr = stream.peer_addr().unwrap().to_string()
+					)
+					.entered();
+					info!("connected");
+					connection(stream)
+				}));
+
+				connections.retain(|x| !x.is_finished());
+				info!("{} live instances", connections.len());
 			}
+			Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
+			// TODO: What errors may occur? How should they be handled?
+			Err(msg) => error!("failed to read incoming stream: {msg}"),
 		}
 	}
 }
@@ -97,8 +99,8 @@ fn connection(mut stream: TcpStream) {
 		stream.write_all(&packet).unwrap();
 	}
 	let mut packet_reciever = protocol::PacketReciever::default();
+	let mut awaiting_input = false;
 	loop {
-		let mut world_needs_update = false;
 		packet_reciever
 			.recv(&mut stream, |packet| {
 				let packet = rkyv::check_archived_root::<protocol::ClientPacket>(&packet).unwrap();
@@ -110,22 +112,27 @@ fn connection(mut stream: TcpStream) {
 						let mut deserializer = rkyv::de::deserializers::SharedDeserializeMap::new();
 						let action: character::Action =
 							action_archive.deserialize(&mut deserializer).unwrap();
-						instance
-							.server
-							.world
-							.perform_action(
-								&instance.console,
-								&instance.server.resources,
-								&scripts,
-								action,
-							)
-							.unwrap();
-						world_needs_update = true;
+						instance.server.recv_action(&scripts, action).unwrap();
+						awaiting_input = false;
 					}
 				}
 			})
 			.unwrap();
-		if world_needs_update {
+		// This check has to happen after recieving packets to be as charitable to the client as possible.
+		if instance.server.players.ping.elapsed() > TIMEOUT {
+			info!("{{player}} disconnected by timeout");
+			return;
+		}
+		instance.server.tick(&scripts).unwrap();
+		if instance
+			.server
+			.world
+			.next_character()
+			.borrow()
+			.player_controlled
+			&& !awaiting_input
+		{
+			awaiting_input = true;
 			let packet = rkyv::to_bytes::<_, 4096>(&protocol::ServerPacket::World {
 				world: &instance.server.world,
 			})
