@@ -3,24 +3,42 @@
 use esprit2::prelude::*;
 use esprit2_server::*;
 use rkyv::Deserialize;
-use std::io::{self, Write};
+use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::process::exit;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
 
+#[derive(Clone, Debug)]
+pub struct Console {
+	sender: mpsc::Sender<console::Message>,
+}
+
+impl console::Handle for Console {
+	fn send_message(&self, message: console::Message) {
+		let _ = self.sender.send(message);
+	}
+}
+
 struct Instance {
-	console: Console,
-	server: Server,
+	console_reciever: mpsc::Receiver<console::Message>,
+	console_handle: Console,
+	server: Server<Console>,
 }
 
 impl Instance {
 	fn new() -> Self {
-		let console = Console::new(console::Colors::default());
-		let server = Server::new(console.handle.clone(), "res/".into());
-		Self { console, server }
+		let (sender, console_reciever) = mpsc::channel();
+		let console_handle = Console { sender };
+		let server = Server::new(console_handle.clone(), "res/".into());
+		Self {
+			console_reciever,
+			console_handle,
+			server,
+		}
 	}
 }
 
@@ -31,9 +49,6 @@ fn main() {
 			error!("failed to bind listener: {msg}");
 			exit(1);
 		});
-	listener
-		.set_nonblocking(true)
-		.expect("failed to disable blocking");
 	let mut connections = Vec::new();
 	info!(
 		"listening for connections on {}",
@@ -55,7 +70,6 @@ fn main() {
 				connections.retain(|x| !x.is_finished());
 				info!("{} live instances", connections.len());
 			}
-			Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {}
 			// TODO: What errors may occur? How should they be handled?
 			Err(msg) => error!("failed to read incoming stream: {msg}"),
 		}
@@ -75,7 +89,10 @@ fn connection(mut stream: TcpStream) {
 		.set("path", "res/scripts/?.lua")
 		.unwrap();
 	lua.globals()
-		.set("Console", instance.server.console.clone())
+		.set(
+			"Console",
+			console::LuaHandle(instance.server.console.clone()),
+		)
 		.unwrap();
 	lua.globals()
 		.set("Status", instance.server.resources.statuses_handle())

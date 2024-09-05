@@ -164,7 +164,6 @@ pub mod prelude {
 	// Import redundant module::Struct names.
 	pub use attack::Attack;
 	pub use consider::Consider;
-	pub use console::Console;
 	pub use expression::Expression;
 	pub use floor::Floor;
 	pub use item::Item;
@@ -175,6 +174,7 @@ pub mod prelude {
 	pub use vault::Vault;
 
 	// Export common traits
+	pub use console::Handle;
 	pub use expression::Evaluate;
 	pub use nouns::StrExt;
 	pub use rand::Rng;

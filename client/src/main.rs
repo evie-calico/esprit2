@@ -8,6 +8,7 @@
 	read_buf
 )]
 
+mod console;
 pub(crate) mod draw;
 pub(crate) mod gui;
 pub(crate) mod input;
@@ -16,6 +17,7 @@ pub(crate) mod select;
 pub(crate) mod texture;
 pub(crate) mod typography;
 
+use console::Console;
 use esprit2::prelude::*;
 use esprit2_server::{protocol, Server};
 use options::Options;
@@ -64,7 +66,7 @@ fn update_delta(
 )]
 enum ServerHandle {
 	Internal {
-		server: Server,
+		server: Server<console::Handle>,
 	},
 	External {
 		stream: TcpStream,
@@ -287,7 +289,7 @@ pub fn main() {
 	// Create a console.
 	// An internal server will send messages to it using a console::Handle.
 	// An external server will send messages to it over TCP.
-	let mut console = Console::new(options.ui.colors.console.clone());
+	let mut console = Console::default();
 
 	// Create an internal server instance
 	let mut server = if let Some(address) = &cli.address {
@@ -317,7 +319,12 @@ pub fn main() {
 				.unwrap(),
 		)
 		.unwrap();
-	lua.globals().set("Console", console.clone()).unwrap();
+	lua.globals()
+		.set(
+			"Console",
+			esprit2::console::LuaHandle(console.handle.clone()),
+		)
+		.unwrap();
 	lua.globals()
 		.set("Status", server.resources().statuses_handle())
 		.unwrap();

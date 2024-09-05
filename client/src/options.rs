@@ -90,6 +90,34 @@ impl Default for UserInterface {
 	}
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConsoleColors {
+	pub normal: Color,
+	pub system: Color,
+	pub unimportant: Color,
+	pub defeat: Color,
+	pub danger: Color,
+	pub important: Color,
+	pub special: Color,
+	pub combat: Color,
+}
+
+impl Default for ConsoleColors {
+	fn default() -> Self {
+		Self {
+			normal: (255, 255, 255, 255),
+			system: (100, 100, 100, 255),
+			unimportant: (100, 100, 100, 255),
+			defeat: (255, 128, 128, 255),
+			danger: (255, 0, 0, 255),
+			important: (255, 255, 0, 255),
+			special: (0, 255, 0, 255),
+			combat: (255, 255, 128, 255),
+		}
+	}
+}
+
 /// User interfact colors
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -97,7 +125,7 @@ pub struct Colors {
 	pub normal_mode: Color,
 	pub select_mode: Color,
 	pub prompt_mode: Color,
-	pub console: console::Colors,
+	pub console: ConsoleColors,
 }
 
 impl Default for Colors {
@@ -106,7 +134,7 @@ impl Default for Colors {
 			normal_mode: (0x77, 0xE7, 0xA2, 0xFF),
 			select_mode: (0xA2, 0x77, 0xE7, 0xFF),
 			prompt_mode: (0xE7, 0xA2, 0x77, 0xFF),
-			console: console::Colors::default(),
+			console: ConsoleColors::default(),
 		}
 	}
 }

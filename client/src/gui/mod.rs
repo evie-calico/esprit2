@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
+use crate::console::Console;
 use crate::typography::Typography;
 use esprit2::prelude::*;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -366,7 +367,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(width, height)
 	}
 
-	pub fn console(&mut self, console: &Console) {
+	pub fn console(&mut self, console: &Console, colors: &crate::options::ConsoleColors) {
 		let canvas = &mut self.canvas;
 		let rect = Rect::new(
 			self.x,
@@ -394,7 +395,18 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		for message in console.history.iter().rev() {
 			match &message.printer {
 				console::MessagePrinter::Console(color) => {
-					let (font_texture, width, height) = text(&message.text, *color);
+					let (font_texture, width, height) = text(
+						&message.text,
+						match color {
+							console::Color::Normal => colors.normal,
+							console::Color::System => colors.system,
+							console::Color::Unimportant => colors.unimportant,
+							console::Color::Defeat => colors.defeat,
+							console::Color::Danger => colors.danger,
+							console::Color::Important => colors.important,
+							console::Color::Special => colors.special,
+						},
+					);
 					cursor -= height as i32;
 					canvas
 						.copy(
@@ -415,7 +427,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 							(rect.x + (width as i32)) as i16,
 							(cursor - (height as i32) + 2) as i16,
 							5,
-							console.colors.normal,
+							colors.normal,
 						)
 						.unwrap();
 					cursor -= height as i32;
@@ -432,7 +444,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 
 					let shown_characters = message.text.len().min((*progress as usize) + 1);
 					let (font_texture, width, height) =
-						text(&message.text[0..shown_characters], console.colors.normal);
+						text(&message.text[0..shown_characters], colors.normal);
 					canvas
 						.copy(
 							&font_texture,
@@ -443,9 +455,9 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 				}
 				console::MessagePrinter::Combat(log) => {
 					let color = if log.is_weak() {
-						console.colors.unimportant
+						colors.unimportant
 					} else {
-						console.colors.normal
+						colors.normal
 					};
 					let (texture, width, height) = text(&message.text, color);
 					cursor -= height as i32;
@@ -458,7 +470,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 						.typography
 						.annotation
 						.render(&info)
-						.blended(console.colors.combat)
+						.blended(colors.combat)
 						.unwrap()
 						.as_texture(&font_texture_creator)
 						.unwrap();

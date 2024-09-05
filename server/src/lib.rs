@@ -27,19 +27,19 @@ pub struct Player {
 /// Server state
 ///
 /// These fields are public for now but it might make sense to better encapsulate the server in the future.
-pub struct Server {
+pub struct Server<T: console::Handle> {
 	resource_directory: PathBuf,
 
 	pub resources: resource::Manager,
 	pub players: Player,
 
 	// These fields should be kept in sync with the client.
-	pub console: console::Handle,
+	pub console: T,
 	pub world: world::Manager,
 }
 
-impl Server {
-	pub fn new(console: console::Handle, resource_directory: PathBuf) -> Self {
+impl<T: console::Handle> Server<T> {
+	pub fn new(console: T, resource_directory: PathBuf) -> Self {
 		// Game initialization.
 		let resources = match resource::Manager::open(&resource_directory) {
 			Ok(resources) => resources,
@@ -105,7 +105,7 @@ impl Server {
 
 /// Recieve operations
 // TODO: Multiple clients.
-impl Server {
+impl<T: console::Handle> Server<T> {
 	pub fn recv_ping(&mut self) {
 		let ms = self.players.ping.elapsed().as_millis();
 		if ms > 50 {
@@ -129,7 +129,7 @@ impl Server {
 
 /// Send operations.
 // TODO: Multiple clients.
-impl Server {
+impl<T: console::Handle> Server<T> {
 	/// Check if the server is ready to ping this client.
 	///
 	/// # Returns

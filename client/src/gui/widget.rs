@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
+use crate::console::Console;
 use crate::options::Options;
 use crate::{draw, gui, input, texture};
 use esprit2::prelude::*;
@@ -75,7 +76,7 @@ pub(crate) fn menu(
 				options.ui.colors.normal_mode,
 				&menu.typography.annotation,
 			);
-			menu.console(console);
+			menu.console(console, &options.ui.colors.console);
 		}
 		input::Mode::Select => menu.label_styled(
 			"Select",
@@ -118,7 +119,7 @@ pub(crate) fn menu(
 					Some(&mut buff_fn),
 				]);
 			} else {
-				menu.console(console);
+				menu.console(console, &options.ui.colors.console);
 			}
 		}
 		input::Mode::Prompt(input::Prompt { message, .. }) => {
