@@ -36,6 +36,7 @@ pub enum ServerPacket<'a> {
 		#[with(rkyv::with::Inline)]
 		world: &'a world::Manager,
 	},
+	Message(console::Message),
 }
 
 #[derive(Clone, Default, Debug)]

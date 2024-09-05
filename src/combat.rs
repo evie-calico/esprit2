@@ -1,6 +1,16 @@
 use std::fmt;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	mlua::FromLua,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+#[archive(check_bytes)]
 #[serde(tag = "type")]
 pub enum Log {
 	/// An attack that dealt damage

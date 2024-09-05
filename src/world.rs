@@ -343,7 +343,7 @@ impl Manager {
 	/// Causes the next character in the queue to perform a given action.
 	pub fn perform_action(
 		&mut self,
-		console: &impl console::Handle,
+		console: impl console::Handle,
 		resources: &resource::Manager,
 		scripts: &resource::Scripts,
 		action: character::Action,
@@ -448,7 +448,7 @@ impl Manager {
 		user: character::Ref,
 		scripts: &resource::Scripts,
 		arguments: character::ActionArgs,
-		console: &impl console::Handle,
+		console: impl console::Handle,
 	) -> Result<Option<u32>, Error> {
 		let castable = spell.castable_by(&user.borrow());
 		Ok(match castable {
@@ -505,7 +505,7 @@ impl Manager {
 		&self,
 		character: &character::Ref,
 		dir: OrdDir,
-		console: &impl console::Handle,
+		console: impl console::Handle,
 	) -> Result<Option<Aut>> {
 		use crate::floor::Tile;
 

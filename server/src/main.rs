@@ -26,14 +26,14 @@ impl console::Handle for Console {
 struct Instance {
 	console_reciever: mpsc::Receiver<console::Message>,
 	console_handle: Console,
-	server: Server<Console>,
+	server: Server,
 }
 
 impl Instance {
 	fn new() -> Self {
 		let (sender, console_reciever) = mpsc::channel();
 		let console_handle = Console { sender };
-		let server = Server::new(console_handle.clone(), "res/".into());
+		let server = Server::new("res/".into());
 		Self {
 			console_reciever,
 			console_handle,
@@ -91,7 +91,7 @@ fn connection(mut stream: TcpStream) {
 	lua.globals()
 		.set(
 			"Console",
-			console::LuaHandle(instance.server.console.clone()),
+			console::LuaHandle(instance.console_handle.clone()),
 		)
 		.unwrap();
 	lua.globals()
@@ -129,7 +129,10 @@ fn connection(mut stream: TcpStream) {
 						let mut deserializer = rkyv::de::deserializers::SharedDeserializeMap::new();
 						let action: character::Action =
 							action_archive.deserialize(&mut deserializer).unwrap();
-						instance.server.recv_action(&scripts, action).unwrap();
+						instance
+							.server
+							.recv_action(&instance.console_handle, &scripts, action)
+							.unwrap();
 						awaiting_input = false;
 					}
 				}
@@ -140,7 +143,10 @@ fn connection(mut stream: TcpStream) {
 			info!("{{player}} disconnected by timeout");
 			return;
 		}
-		instance.server.tick(&scripts).unwrap();
+		instance
+			.server
+			.tick(&scripts, &instance.console_handle)
+			.unwrap();
 		if instance
 			.server
 			.world
@@ -154,6 +160,13 @@ fn connection(mut stream: TcpStream) {
 				world: &instance.server.world,
 			})
 			.unwrap();
+			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
+			stream.write_all(&packet_len).unwrap();
+			stream.write_all(&packet).unwrap();
+		}
+
+		for i in instance.console_reciever.try_iter() {
+			let packet = rkyv::to_bytes::<_, 4096>(&protocol::ServerPacket::Message(i)).unwrap();
 			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
 			stream.write_all(&packet_len).unwrap();
 			stream.write_all(&packet).unwrap();

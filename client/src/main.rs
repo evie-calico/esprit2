@@ -60,37 +60,34 @@ fn update_delta(
 /// The client should simulate changes to its cache of the world manager and send a checksum
 /// along with whatever action it performed. If this checksum differs from the server's copy,
 /// it will send an complete copy of the world state back to the client, which it *must* accept.
-#[expect(
-	clippy::large_enum_variant,
-	reason = "Clippy suggests boxing `resources` even though it's in the smaller variant"
-)]
 enum ServerHandle {
 	Internal {
-		server: Server<console::Handle>,
+		server: Server,
 	},
 	External {
 		stream: TcpStream,
 		packet_reciever: protocol::PacketReciever,
 		world_cache: world::Manager,
-		console: console::Handle,
 		resources: resource::Manager,
 	},
 }
 
+struct DummyConsole;
+
+impl esprit2::console::Handle for DummyConsole {
+	fn send_message(&self, _message: esprit2::console::Message) {}
+}
+
 impl ServerHandle {
 	/// Create an internal server.
-	fn internal(console: console::Handle, resource_directory: PathBuf) -> Self {
-		let mut server = Server::new(console, resource_directory);
+	fn internal(resource_directory: PathBuf) -> Self {
+		let mut server = Server::new(resource_directory);
 		server.send_ping();
 		Self::Internal { server }
 	}
 
 	/// Connect to an external server.
-	fn external(
-		address: impl ToSocketAddrs,
-		console: console::Handle,
-		resource_directory: PathBuf,
-	) -> Self {
+	fn external(address: impl ToSocketAddrs, resource_directory: PathBuf) -> Self {
 		let mut stream = TcpStream::connect(address).unwrap();
 		let mut packet_len = [0; 4];
 		// Read a ping back, reusing the buffers we used to send it.
@@ -118,7 +115,6 @@ impl ServerHandle {
 			stream,
 			packet_reciever: protocol::PacketReciever::default(),
 			world_cache,
-			console,
 			resources: resource::Manager::open(resource_directory).unwrap(),
 		}
 	}
@@ -135,18 +131,6 @@ impl ServerHandle {
 		}
 	}
 
-	/// Access the console handle.
-	///
-	/// This is a handle to whatever console was originally passed to the server.
-	/// Sending messages over this handle does *not* implicitly send them to a remote server,
-	/// that must be done in a separate step.
-	fn console(&self) -> &console::Handle {
-		match self {
-			Self::Internal { server } => &server.console,
-			Self::External { console, .. } => console,
-		}
-	}
-
 	/// Access resources.
 	///
 	/// Both servers and clients keep track of game resources, and they may not be the same.
@@ -158,11 +142,15 @@ impl ServerHandle {
 		}
 	}
 
-	fn tick(&mut self, scripts: &resource::Scripts) -> esprit2::Result<()> {
+	fn tick(
+		&mut self,
+		scripts: &resource::Scripts,
+		console: &mut console::Console,
+	) -> esprit2::Result<()> {
 		match self {
 			Self::Internal { server } => {
 				server.recv_ping();
-				server.tick(scripts)?;
+				server.tick(scripts, &console.handle)?;
 			}
 			Self::External {
 				stream,
@@ -186,6 +174,13 @@ impl ServerHandle {
 								rkyv::de::deserializers::SharedDeserializeMap::new();
 							*world_cache = world.deserialize(&mut deserializer).unwrap();
 						}
+						protocol::ArchivedServerPacket::Message(message) => {
+							let mut deserializer =
+								rkyv::de::deserializers::SharedDeserializeMap::new();
+							console
+								.history
+								.push(message.deserialize(&mut deserializer).unwrap());
+						}
 					}
 				}) {
 					Ok(()) => {}
@@ -202,15 +197,15 @@ impl ServerHandle {
 impl ServerHandle {
 	fn send_action(
 		&mut self,
+		console: impl esprit2::console::Handle,
 		scripts: &resource::Scripts,
 		action: character::Action,
 	) -> esprit2::Result<()> {
 		match self {
-			Self::Internal { server } => server.recv_action(scripts, action),
+			Self::Internal { server } => server.recv_action(console, scripts, action),
 			Self::External {
 				stream,
 				world_cache,
-				console,
 				resources,
 				..
 			} => {
@@ -222,7 +217,7 @@ impl ServerHandle {
 					.unwrap();
 				stream.write_all(&packet).unwrap();
 
-				world_cache.perform_action(console, resources, scripts, action)
+				world_cache.perform_action(DummyConsole, resources, scripts, action)
 			}
 		}
 	}
@@ -295,14 +290,10 @@ pub fn main() {
 	let mut server = if let Some(address) = &cli.address {
 		ServerHandle::external(
 			(&**address, protocol::DEFAULT_PORT),
-			console.handle.clone(),
 			options::resource_directory().clone(),
 		)
 	} else {
-		ServerHandle::internal(
-			console.handle.clone(),
-			options::resource_directory().clone(),
-		)
+		ServerHandle::internal(options::resource_directory().clone())
 	};
 
 	// Create a Lua runtime.
@@ -319,12 +310,18 @@ pub fn main() {
 				.unwrap(),
 		)
 		.unwrap();
-	lua.globals()
-		.set(
-			"Console",
-			esprit2::console::LuaHandle(console.handle.clone()),
-		)
-		.unwrap();
+	if let ServerHandle::Internal { .. } = server {
+		lua.globals()
+			.set(
+				"Console",
+				esprit2::console::LuaHandle(console.handle.clone()),
+			)
+			.unwrap();
+	} else {
+		lua.globals()
+			.set("Console", esprit2::console::LuaHandle(DummyConsole))
+			.unwrap();
+	}
 	lua.globals()
 		.set("Status", server.resources().statuses_handle())
 		.unwrap();
@@ -390,6 +387,7 @@ pub fn main() {
 								keycode,
 								next_character,
 								&server,
+								&console.handle,
 								&scripts,
 								input_mode,
 								&options,
@@ -417,9 +415,9 @@ pub fn main() {
 										Some(input::Response::Select(point)) => {
 											chase_point = Some(point);
 										}
-										Some(input::Response::Act(action)) => {
-											server.send_action(&scripts, action).unwrap()
-										}
+										Some(input::Response::Act(action)) => server
+											.send_action(&console.handle, &scripts, action)
+											.unwrap(),
 
 										Some(input::Response::Partial(partial, request)) => {
 											match request {
@@ -495,7 +493,11 @@ pub fn main() {
 								chase_point = None;
 							} else {
 								server
-									.send_action(&scripts, character::Action::Move(x, y))
+									.send_action(
+										&console.handle,
+										&scripts,
+										character::Action::Move(x, y),
+									)
 									.unwrap();
 							}
 						}
@@ -504,14 +506,19 @@ pub fn main() {
 								chase_point = None;
 							} else {
 								server
-									.send_action(&scripts, character::Action::Move(*x, *y))
+									.send_action(
+										&console.handle,
+										&scripts,
+										character::Action::Move(*x, *y),
+									)
 									.unwrap();
 							}
 						}
 					}
 				}
 			}
-			if let Err(msg) = server.tick(&scripts) {
+
+			if let Err(msg) = server.tick(&scripts, &mut console) {
 				error!("server tick failed: {msg}");
 				exit(1);
 			}

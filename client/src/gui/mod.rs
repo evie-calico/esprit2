@@ -30,6 +30,7 @@ pub struct Context<'canvas, 'ttf_module, 'rwops> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Justification {
 	Left,
+	#[expect(dead_code)]
 	Right,
 }
 
@@ -204,6 +205,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.label_color(s, self.typography.color)
 	}
 
+	#[expect(dead_code)]
 	pub fn label_justified(&mut self, s: &str, justification: Justification) {
 		self.label_custom(
 			s,
@@ -291,6 +293,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(self.rect.width(), height);
 	}
 
+	#[expect(dead_code)]
 	pub fn expression<Colors: VariableColors>(&mut self, expression: &Expression, font: &Font) {
 		fn enter_op(
 			op: &expression::Operation,

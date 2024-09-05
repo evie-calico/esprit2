@@ -153,6 +153,7 @@ pub(crate) fn controllable_character<'lua>(
 	keycode: sdl2::keyboard::Keycode,
 	next_character: character::Ref,
 	server: &ServerHandle,
+	console: impl console::Handle,
 	scripts: &resource::Scripts<'lua>,
 	mode: Mode<'lua>,
 	options: &Options,
@@ -222,9 +223,7 @@ pub(crate) fn controllable_character<'lua>(
 			if options.controls.underfoot.contains(keycode) {
 				match server.world().current_floor.get(x as usize, y as usize) {
 					Some(floor::Tile::Floor) => {
-						server
-							.console()
-							.print_unimportant("There's nothing on the ground here.".into());
+						console.print_unimportant("There's nothing on the ground here.".into());
 					}
 					Some(floor::Tile::Exit) => {
 						// TODO: move to server.
@@ -232,19 +231,15 @@ pub(crate) fn controllable_character<'lua>(
 						todo!();
 					}
 					None => {
-						server
-							.console()
-							.print_unimportant("That's the void.".into());
+						console.print_unimportant("That's the void.".into());
 					}
 					Some(floor::Tile::Wall) => (),
 				}
 			}
 
 			if options.controls.talk.contains(keycode) {
-				server.console().say("Luvui".into(), "Meow!".into());
-				server
-					.console()
-					.say("Aris".into(), "I am a kitty :3".into());
+				console.say("Luvui".into(), "Meow!".into());
+				console.say("Aris".into(), "I am a kitty :3".into());
 			}
 
 			if options.controls.autocombat.contains(keycode) {

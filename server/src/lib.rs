@@ -27,19 +27,16 @@ pub struct Player {
 /// Server state
 ///
 /// These fields are public for now but it might make sense to better encapsulate the server in the future.
-pub struct Server<T: console::Handle> {
-	resource_directory: PathBuf,
-
+pub struct Server {
 	pub resources: resource::Manager,
 	pub players: Player,
 
 	// These fields should be kept in sync with the client.
-	pub console: T,
 	pub world: world::Manager,
 }
 
-impl<T: console::Handle> Server<T> {
-	pub fn new(console: T, resource_directory: PathBuf) -> Self {
+impl Server {
+	pub fn new(resource_directory: PathBuf) -> Self {
 		// Game initialization.
 		let resources = match resource::Manager::open(&resource_directory) {
 			Ok(resources) => resources,
@@ -76,20 +73,20 @@ impl<T: console::Handle> Server<T> {
 		);
 
 		Self {
-			resource_directory,
-
 			resources,
 			// Start with no players/connections.
 			players: Player {
 				ping: Instant::now(),
 			},
-
-			console,
 			world,
 		}
 	}
 
-	pub fn tick(&mut self, scripts: &resource::Scripts) -> esprit2::Result<()> {
+	pub fn tick(
+		&mut self,
+		scripts: &resource::Scripts,
+		console: impl console::Handle,
+	) -> esprit2::Result<()> {
 		let character = self.world.next_character();
 		if !character.borrow().player_controlled {
 			let considerations = self.world.consider_turn(&self.resources, scripts)?;
@@ -97,7 +94,7 @@ impl<T: console::Handle> Server<T> {
 				.world
 				.consider_action(scripts, character.clone(), considerations)?;
 			self.world
-				.perform_action(&self.console, &self.resources, scripts, action)?;
+				.perform_action(&console, &self.resources, scripts, action)?;
 		}
 		Ok(())
 	}
@@ -105,7 +102,7 @@ impl<T: console::Handle> Server<T> {
 
 /// Recieve operations
 // TODO: Multiple clients.
-impl<T: console::Handle> Server<T> {
+impl Server {
 	pub fn recv_ping(&mut self) {
 		let ms = self.players.ping.elapsed().as_millis();
 		if ms > 50 {
@@ -116,12 +113,13 @@ impl<T: console::Handle> Server<T> {
 
 	pub fn recv_action(
 		&mut self,
+		console: impl console::Handle,
 		scripts: &resource::Scripts,
 		action: character::Action,
 	) -> esprit2::Result<()> {
 		if self.world.next_character().borrow().player_controlled {
 			self.world
-				.perform_action(&self.console, &self.resources, scripts, action)?;
+				.perform_action(&console, &self.resources, scripts, action)?;
 		}
 		Ok(())
 	}
@@ -129,7 +127,7 @@ impl<T: console::Handle> Server<T> {
 
 /// Send operations.
 // TODO: Multiple clients.
-impl<T: console::Handle> Server<T> {
+impl Server {
 	/// Check if the server is ready to ping this client.
 	///
 	/// # Returns

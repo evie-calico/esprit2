@@ -2,14 +2,16 @@ use crate::prelude::*;
 use paste::paste;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[archive(check_bytes)]
 pub enum MessagePrinter {
 	Console(Color),
 	Dialogue { speaker: Arc<str>, progress: f64 },
 	Combat(combat::Log),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[archive(check_bytes)]
 pub struct Message {
 	pub text: String,
 	pub printer: MessagePrinter,
@@ -58,6 +60,8 @@ macro_rules! impl_console {
 	) => {
 		paste! {
 			#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+			#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+			#[archive(check_bytes)]
 			pub enum Color {
 				$([<$impl_colors:camel>],)*
 			}
@@ -79,6 +83,12 @@ macro_rules! impl_console {
 			}
 
 			$(console_colored_print! { $impl_colors } )*
+		}
+
+		impl<T: Handle> Handle for &T {
+			fn send_message(&self, message: Message) {
+				(*self).send_message(message)
+			}
 		}
 
 		pub struct LuaHandle<T: Handle>(pub T);
