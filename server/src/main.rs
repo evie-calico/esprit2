@@ -1,10 +1,12 @@
 #![feature(maybe_uninit_uninit_array, core_io_borrowed_buf, read_buf)]
 
+use clap::Parser;
 use esprit2::prelude::*;
 use esprit2_server::*;
 use rkyv::Deserialize;
 use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
@@ -30,10 +32,10 @@ struct Instance {
 }
 
 impl Instance {
-	fn new() -> Self {
+	fn new(res: PathBuf) -> Self {
 		let (sender, console_reciever) = mpsc::channel();
 		let console_handle = Console { sender };
-		let server = Server::new("res/".into());
+		let server = Server::new(res);
 		Self {
 			console_reciever,
 			console_handle,
@@ -42,13 +44,25 @@ impl Instance {
 	}
 }
 
+#[derive(clap::Parser)]
+struct Cli {
+	#[clap(short, long)]
+	port: Option<u16>,
+
+	resource_directory: PathBuf,
+}
+
 fn main() {
+	let cli = Cli::parse();
 	tracing_subscriber::fmt::init();
-	let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT))
-		.unwrap_or_else(|msg| {
-			error!("failed to bind listener: {msg}");
-			exit(1);
-		});
+	let listener = TcpListener::bind((
+		Ipv4Addr::new(127, 0, 0, 1),
+		cli.port.unwrap_or(protocol::DEFAULT_PORT),
+	))
+	.unwrap_or_else(|msg| {
+		error!("failed to bind listener: {msg}");
+		exit(1);
+	});
 	let mut connections = Vec::new();
 	info!(
 		"listening for connections on {}",
@@ -57,14 +71,17 @@ fn main() {
 	for stream in listener.incoming() {
 		match stream {
 			Ok(stream) => {
-				connections.push(thread::spawn(move || {
-					let _enter = tracing::error_span!(
-						"client",
-						addr = stream.peer_addr().unwrap().to_string()
-					)
-					.entered();
-					info!("connected");
-					connection(stream)
+				connections.push(thread::spawn({
+					let res = cli.resource_directory.clone();
+					move || {
+						let _enter = tracing::error_span!(
+							"client",
+							addr = stream.peer_addr().unwrap().to_string()
+						)
+						.entered();
+						info!("connected");
+						connection(stream, res);
+					}
 				}));
 
 				connections.retain(|x| !x.is_finished());
@@ -76,18 +93,22 @@ fn main() {
 	}
 }
 
-fn connection(mut stream: TcpStream) {
-	// For now, this spins up a new server for each connection
-	// TODO: Route connections to the same instance.
-	let mut instance = Instance::new();
+fn connection(mut stream: TcpStream, res: PathBuf) {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
 	lua.globals()
 		.get::<&str, mlua::Table>("package")
 		.unwrap()
-		.set("path", "res/scripts/?.lua")
+		.set("path", res.join("scripts/?.lua").to_string_lossy())
 		.unwrap();
+
+	let scripts = resource::Scripts::open(res.join("scripts"), &lua).unwrap();
+
+	// For now, this spins up a new server for each connection
+	// TODO: Route connections to the same instance.
+	let mut instance = Instance::new(res);
+
 	lua.globals()
 		.set(
 			"Console",
@@ -102,7 +123,6 @@ fn connection(mut stream: TcpStream) {
 		.unwrap();
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
-	let scripts = resource::Scripts::open("res/scripts/", &lua).unwrap();
 	instance.server.send_ping();
 	// TODO: how do we start communication?
 	{
