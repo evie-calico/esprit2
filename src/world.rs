@@ -230,19 +230,16 @@ impl Manager {
 		vault: &Vault,
 		resources: &resource::Manager,
 	) -> Result<()> {
+		info!("{vault:?}");
 		let mut in_bounds = true;
 		for (row, y) in vault
 			.tiles
 			.chunks(vault.width)
-			.zip(y as usize..vault.height())
+			.zip(y as usize..(y as usize + vault.height()))
 		{
-			for (tile, x) in row.iter().zip(x as usize..vault.width) {
+			for (tile, x) in row.iter().zip(x as usize..(x as usize + vault.width)) {
 				if let Some(tile) = tile {
-					if let Some(dest) = self.current_floor.get_mut(x, y) {
-						*dest = *tile;
-					} else if in_bounds {
-						in_bounds = false;
-					}
+					self.current_floor.set(x, y, *tile);
 				}
 			}
 		}

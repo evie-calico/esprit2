@@ -1,6 +1,3 @@
-use crate::vault::Vault;
-use tracing::warn;
-
 #[derive(
 	PartialEq,
 	Eq,
@@ -59,11 +56,12 @@ impl Floor {
 		self.map.get(x + y * self.width()).copied()?
 	}
 
-	pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
-		if x >= self.width() || y >= self.height() {
-			return None;
+	pub fn set(&mut self, x: usize, y: usize, tile: impl Into<Option<Tile>>) {
+		if let Some(dest) = self.map.get_mut(x + y * self.width()) {
+			*dest = tile.into();
+		} else {
+			tracing::warn!("failed to place tile oob");
 		}
-		self.map.get_mut(x + y * self.width())?.as_mut()
 	}
 
 	pub fn width(&self) -> usize {
@@ -85,25 +83,5 @@ impl Floor {
 			.copied()
 			.enumerate()
 			.map(|(i, t)| (i % self.width, i / self.width, t))
-	}
-
-	pub fn blit_vault(&mut self, mut x: usize, mut y: usize, vault: &Vault) -> bool {
-		let mut in_bounds = true;
-		for row in vault.tiles.chunks(vault.width) {
-			for tile in row {
-				if let Some(tile) = tile {
-					if let Some(dest) = self.get_mut(x, y) {
-						*dest = *tile;
-					} else if in_bounds {
-						warn!("attempted to place vault out of bounds");
-						in_bounds = false;
-					}
-				}
-				x += 1;
-			}
-			x -= vault.width;
-			y += 1;
-		}
-		in_bounds
 	}
 }
