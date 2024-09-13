@@ -1,8 +1,6 @@
 use crate::vault::Vault;
 use tracing::warn;
 
-// Keeping this very light is probably a good idea.
-// Decorations, like statues and fountains and such, are sporadic and should be stored seperately.
 #[derive(
 	PartialEq,
 	Eq,
@@ -17,6 +15,10 @@ use tracing::warn;
 	rkyv::Deserialize,
 )]
 #[archive(check_bytes)]
+// Keeping this very light is probably a good idea.
+// Decorations, like statues and fountains and such, are sporadic and should be stored seperately.
+// Don't go over 255 variants (reserve one for Option::None), and don't add members; they'll bloat the size of the map.
+#[repr(u8)]
 pub enum Tile {
 	Floor,
 	#[default]
@@ -36,7 +38,7 @@ pub enum Tile {
 #[archive(check_bytes)]
 pub struct Floor {
 	pub width: usize,
-	pub map: Box<[Tile]>,
+	pub map: Box<[Option<Tile>]>,
 }
 
 impl Default for Floor {
@@ -44,7 +46,7 @@ impl Default for Floor {
 		Self {
 			// TODO: Decide default grid size.
 			width: 32,
-			map: Box::new([Tile::Floor; 32 * 32]),
+			map: Box::new([None; 32 * 32]),
 		}
 	}
 }
@@ -54,14 +56,14 @@ impl Floor {
 		if x >= self.width() || y >= self.height() {
 			return None;
 		}
-		self.map.get(x + y * self.width()).copied()
+		self.map.get(x + y * self.width()).copied()?
 	}
 
 	pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut Tile> {
 		if x >= self.width() || y >= self.height() {
 			return None;
 		}
-		self.map.get_mut(x + y * self.width())
+		self.map.get_mut(x + y * self.width())?.as_mut()
 	}
 
 	pub fn width(&self) -> usize {
@@ -72,7 +74,12 @@ impl Floor {
 		self.map.len() / self.width
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (usize, usize, Tile)> + '_ {
+	pub fn iter_tiles(&self) -> impl Iterator<Item = (usize, usize, Tile)> + '_ {
+		self.iter_grid()
+			.filter_map(|(x, y, t)| t.map(|t| (x, y, t)))
+	}
+
+	pub fn iter_grid(&self) -> impl Iterator<Item = (usize, usize, Option<Tile>)> + '_ {
 		self.map
 			.iter()
 			.copied()

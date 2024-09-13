@@ -230,7 +230,24 @@ impl Manager {
 		vault: &Vault,
 		resources: &resource::Manager,
 	) -> Result<()> {
-		if self.current_floor.blit_vault(x as usize, y as usize, vault) {
+		let mut in_bounds = true;
+		for (row, y) in vault
+			.tiles
+			.chunks(vault.width)
+			.zip(y as usize..vault.height())
+		{
+			for (tile, x) in row.iter().zip(x as usize..vault.width) {
+				if let Some(tile) = tile {
+					if let Some(dest) = self.current_floor.get_mut(x, y) {
+						*dest = *tile;
+					} else if in_bounds {
+						in_bounds = false;
+					}
+				}
+			}
+		}
+
+		if in_bounds {
 			for (xoff, yoff, sheet_name) in &vault.characters {
 				let piece = character::Piece {
 					x: x + xoff,

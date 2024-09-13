@@ -13,7 +13,7 @@ pub(crate) fn assign_indicies(world: &world::Manager) -> Vec<Point> {
 		.iter()
 		.cloned()
 		.map(Point::Character)
-		.chain(world.current_floor.iter().filter_map(|(x, y, t)| {
+		.chain(world.current_floor.iter_tiles().filter_map(|(x, y, t)| {
 			if t == floor::Tile::Exit {
 				Some(Point::Exit(x as i32, y as i32))
 			} else {

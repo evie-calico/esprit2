@@ -15,13 +15,23 @@ pub struct Vault {
 	pub tiles: Vec<Option<Tile>>,
 	pub width: usize,
 
-	pub characters: Vec<(i32, i32, String)>,
+	pub characters: Vec<(i32, i32, resource::Id)>,
+	pub edges: Vec<(i32, i32)>,
+}
+
+fn tile_floor() -> Tile {
+	Tile::Floor
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum SymbolMeaning {
 	Tile(Tile),
-	Character(String),
+	Character {
+		sheet: resource::Id,
+		#[serde(default = "tile_floor")]
+		tile: Tile,
+	},
+	Edge(Tile),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -38,6 +48,10 @@ pub enum Error {
 }
 
 impl Vault {
+	pub fn height(&self) -> usize {
+		self.tiles.len() / self.width
+	}
+
 	/// # Errors
 	///
 	/// Returns an error if the file could not be opened or parsed.
@@ -59,16 +73,20 @@ impl Vault {
 
 		let mut tiles = Vec::new();
 		let mut characters = Vec::new();
+		let mut edges = Vec::new();
 
 		for (y, line) in layout.lines().enumerate() {
 			for (x, c) in line.chars().enumerate() {
 				if let Some(action) = metadata.symbols.get(&c) {
 					match action {
 						SymbolMeaning::Tile(t) => tiles.push(Some(*t)),
-						SymbolMeaning::Character(sheet) => {
+						SymbolMeaning::Edge(t) => {
+							tiles.push(Some(*t));
+							edges.push((x as i32, y as i32));
+						}
+						SymbolMeaning::Character { sheet, tile } => {
 							characters.push((x as i32, y as i32, sheet.clone()));
-							// TODO: What if you want a character standing on something else?
-							tiles.push(Some(Tile::Floor));
+							tiles.push(Some(*tile));
 						}
 					}
 				} else {
@@ -89,6 +107,8 @@ impl Vault {
 		Ok(Self {
 			tiles,
 			width,
+
+			edges,
 			characters,
 		})
 	}

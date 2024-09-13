@@ -53,7 +53,7 @@ pub(crate) fn tilemap(
 	camera: &Camera,
 ) {
 	canvas.set_draw_color(Color::WHITE);
-	for (x, y, tile) in world_manager.current_floor.iter() {
+	for (x, y, tile) in world_manager.current_floor.iter_tiles() {
 		match tile {
 			floor::Tile::Floor => (),
 			floor::Tile::Wall => canvas

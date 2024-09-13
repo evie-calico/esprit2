@@ -1,9 +1,14 @@
 [symbols.a]
-Character = "luvui"
+Character = { sheet = "luvui" }
+
+[symbols.d]
+Edge = "Floor"
 
 # Layout
-  x
- x.x
-x.a>x
- x.x
-  x
+  xdx
+ x...x
+x.....x
+d..a..d
+x.....x
+ x...x
+  xdx
