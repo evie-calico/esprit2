@@ -31,7 +31,8 @@ pub enum SymbolMeaning {
 		#[serde(default = "tile_floor")]
 		tile: Tile,
 	},
-	Edge(Tile),
+	Edge,
+	Void,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -77,26 +78,32 @@ impl Vault {
 
 		for (y, line) in layout.lines().enumerate() {
 			for (x, c) in line.chars().enumerate() {
-				if let Some(action) = metadata.symbols.get(&c) {
+				// TODO: default metadata table.
+				let default_action = match c {
+					// This should define symbols for all Tile variants.
+					'.' => Some(SymbolMeaning::Tile(Tile::Floor)),
+					'x' => Some(SymbolMeaning::Tile(Tile::Wall)),
+					'>' => Some(SymbolMeaning::Tile(Tile::Exit)),
+					// ...and for all unit SymbolMeaning variants.
+					' ' => Some(SymbolMeaning::Void),
+					'E' => Some(SymbolMeaning::Edge),
+					_ => None,
+				};
+				if let Some(action) = metadata.symbols.get(&c).or(default_action.as_ref()) {
 					match action {
-						SymbolMeaning::Tile(t) => tiles.push(Some(*t)),
-						SymbolMeaning::Edge(t) => {
-							tiles.push(Some(*t));
-							edges.push((x as i32, y as i32));
+						SymbolMeaning::Edge => edges.push((x as i32, y as i32)),
+						SymbolMeaning::Character { sheet, tile: _ } => {
+							characters.push((x as i32, y as i32, sheet.clone()))
 						}
-						SymbolMeaning::Character { sheet, tile } => {
-							characters.push((x as i32, y as i32, sheet.clone()));
-							tiles.push(Some(*tile));
-						}
+						_ => {}
 					}
-				} else {
-					tiles.push(match c {
-						' ' => None,
-						'.' => Some(Tile::Floor),
-						'x' => Some(Tile::Wall),
-						'>' => Some(Tile::Exit),
-						_ => Err(Error::UnexpectedSymbol(c))?,
+					tiles.push(match action {
+						SymbolMeaning::Edge | SymbolMeaning::Void => None,
+						SymbolMeaning::Tile(t) => Some(*t),
+						SymbolMeaning::Character { sheet: _, tile } => Some(*tile),
 					});
+				} else {
+					Err(Error::UnexpectedSymbol(c))?
 				}
 			}
 			for _ in 0..(width - line.len()) {

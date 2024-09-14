@@ -179,5 +179,5 @@ pub mod prelude {
 	pub use nouns::StrExt;
 	pub use rand::Rng;
 
-	pub use tracing::{debug, error, info};
+	pub use tracing::{debug, error, info, warn};
 }

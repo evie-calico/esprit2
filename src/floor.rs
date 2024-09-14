@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 #[derive(
 	PartialEq,
 	Eq,
@@ -57,10 +59,12 @@ impl Floor {
 	}
 
 	pub fn set(&mut self, x: usize, y: usize, tile: impl Into<Option<Tile>>) {
-		if let Some(dest) = self.map.get_mut(x + y * self.width()) {
+		if x >= self.width() || y >= self.height() {
+			warn!("oob set");
+		} else if let Some(dest) = self.map.get_mut(x + y * self.width()) {
 			*dest = tile.into();
 		} else {
-			tracing::warn!("failed to place tile oob");
+			warn!("failed to place tile oob");
 		}
 	}
 

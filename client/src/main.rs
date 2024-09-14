@@ -28,7 +28,6 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::exit;
 use std::{fs, io};
-use tracing::{error, info, warn};
 use typography::Typography;
 
 fn update_delta(
@@ -258,8 +257,9 @@ pub fn main() {
 	let mut last_time = current_time;
 
 	// Logging initialization.
-	tracing_subscriber::fmt::init();
-
+	tracing_subscriber::fmt()
+		.with_max_level(tracing::Level::TRACE)
+		.init();
 	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {
 		// This is `info` because it's actually very expected for first-time players.

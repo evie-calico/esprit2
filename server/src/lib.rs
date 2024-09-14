@@ -18,7 +18,6 @@ use esprit2::prelude::*;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Instant;
-use tracing::error;
 
 pub struct Player {
 	pub ping: Instant,
@@ -62,15 +61,19 @@ impl Server {
 				error!("failed to initialize world manager: {msg}");
 				exit(1);
 			});
-		world.generate_floor(
-			"default seed",
-			&vault::Set {
-				vaults: vec!["example".into()],
-				density: 4,
-				hall_ratio: 1,
-			},
-			&resources,
-		);
+		world
+			.generate_floor(
+				"default seed",
+				&vault::Set {
+					vaults: vec!["example".into()],
+					density: 4,
+					hall_ratio: 1,
+				},
+				&resources,
+			)
+			.unwrap();
+		world.characters[2].borrow_mut().x = 4;
+		world.characters[2].borrow_mut().y = 4;
 
 		Self {
 			resources,
@@ -106,7 +109,7 @@ impl Server {
 	pub fn recv_ping(&mut self) {
 		let ms = self.players.ping.elapsed().as_millis();
 		if ms > 50 {
-			info!("recieved ping after {ms}ms (slow) from {{client}}")
+			info!("recieved late ping after {ms}ms from {{client}}")
 		}
 		self.players.ping = Instant::now();
 	}

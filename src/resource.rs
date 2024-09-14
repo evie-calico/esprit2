@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -14,6 +13,7 @@ pub enum Error {
 	InvalidKey,
 }
 
+// TODO: trait to implement generic `get` for type-specific IDs
 pub type Id = Box<str>;
 
 pub struct Resource<T>(HashMap<Id, T>);

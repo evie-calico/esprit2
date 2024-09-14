@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use consider::TaggedHeuristics;
 use mlua::LuaSerdeExt;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{seq::SliceRandom, SeedableRng};
 use std::collections::VecDeque;
 
 /// This struct contains all information that is relevant during gameplay.
@@ -147,11 +147,7 @@ impl Manager {
 		})
 	}
 
-	pub fn new_floor(
-		&mut self,
-		resources: &resource::Manager,
-		console: &impl console::Handle,
-	) -> Result<()> {
+	pub fn new_floor(&mut self, console: &impl console::Handle) {
 		self.location.floor += 1;
 		console.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
@@ -178,13 +174,7 @@ impl Manager {
 				);
 			}
 		}
-		let mut rng = rand::thread_rng();
-		self.apply_vault(
-			rng.gen_range(1..8),
-			rng.gen_range(1..8),
-			resources.get_vault("example")?,
-			resources,
-		)
+		// TODO: Generate floor
 	}
 
 	pub fn next_character(&self) -> &character::Ref {
@@ -198,7 +188,12 @@ impl Manager {
 		})
 	}
 
-	pub fn generate_floor(&mut self, seed: &str, set: &vault::Set, resources: &resource::Manager) {
+	pub fn generate_floor(
+		&mut self,
+		seed: &str,
+		set: &vault::Set,
+		resources: &resource::Manager,
+	) -> Result<()> {
 		const SEED_LENGTH: usize = 32;
 
 		let _enter = tracing::error_span!("level gen", seed).entered();
@@ -207,31 +202,78 @@ impl Manager {
 			*seed_byte = str_byte;
 		}
 		let mut rng = rand::rngs::StdRng::from_seed(seed_slice);
-		for _ in 0..set.density {
-			let x = rng.gen_range(0..self.current_floor.width as i32);
-			let y =
-				rng.gen_range(0..(self.current_floor.map.len() / self.current_floor.width) as i32);
-			match set.vaults.choose(&mut rng).map(|k| {
-				resources
-					.get_vault(k)
-					.and_then(|vault| self.apply_vault(x, y, vault, resources))
-			}) {
-				Some(Ok(())) => (),
-				Some(Err(msg)) => error!("{msg}"),
-				None => error!("vault set has no vaults"),
+
+		let mut edges = vec![(4, 4)];
+
+		'placement: for _ in 0..set.density {
+			// This loop allows for retries each time placement fails.
+			// These retries are safe because edges are always discarded whether or not they succeed,
+			// meaning a full board will eventually exhaust its edges.
+			'edges: loop {
+				debug!("attempting placement at one of: {edges:?}");
+				// partial_shuffle swaps the randomly selected edge with the last edge,
+				// returning the remaining halves in reverse order.
+				let (placement_edge, _) = edges.partial_shuffle(&mut rng, 1);
+				// This slice should only ever be 0 or 1 elements.
+				let Some((px, py)) = placement_edge.first().copied() else {
+					// If there are no remaining edges, we cannot place any more vaults.
+					break 'placement;
+				};
+				// Remove the placement edge we chose.
+				edges.pop();
+				let Some(vault_id) = set.vaults.choose(&mut rng) else {
+					warn!("set has no vaults");
+					break 'placement;
+				};
+				let vault = resources.get_vault(vault_id)?;
+				// for every possible edge of the vault (shuffled), check if it fits.
+				let mut potential_edges = vault.edges.clone();
+				potential_edges.shuffle(&mut rng);
+				for (i, (ex, ey)) in potential_edges.iter().enumerate() {
+					// adjust the placment position so that px, py and ex, ey overlap.
+					let x = px - ex;
+					let y = py - ey;
+					if self.try_apply_vault(x, y, vault, resources)? {
+						debug!(x, y, "placed vault");
+						for (px, py) in potential_edges
+							.iter()
+							.take(i)
+							.chain(potential_edges.iter().skip(i + 1))
+						{
+							edges.push((x + px, y + py));
+						}
+						break 'edges;
+					}
+				}
 			}
 		}
+
+		Ok(())
 	}
 
-	pub fn apply_vault(
+	pub fn try_apply_vault(
 		&mut self,
 		x: i32,
 		y: i32,
 		vault: &Vault,
 		resources: &resource::Manager,
-	) -> Result<()> {
-		info!("{vault:?}");
-		let mut in_bounds = true;
+	) -> Result<bool> {
+		if x < 0 || y < 0 {
+			warn!("vaults cannot be placed at negative coordinates yet");
+			return Ok(false);
+		}
+		for (row, y) in vault
+			.tiles
+			.chunks(vault.width)
+			.zip(y as usize..(y as usize + vault.height()))
+		{
+			for (tile, x) in row.iter().zip(x as usize..(x as usize + vault.width)) {
+				if tile.is_some() && self.current_floor.get(x, y).is_some() {
+					return Ok(false);
+				}
+			}
+		}
+
 		for (row, y) in vault
 			.tiles
 			.chunks(vault.width)
@@ -244,17 +286,16 @@ impl Manager {
 			}
 		}
 
-		if in_bounds {
-			for (xoff, yoff, sheet_name) in &vault.characters {
-				let piece = character::Piece {
-					x: x + xoff,
-					y: y + yoff,
-					..character::Piece::new(resources.get_sheet(sheet_name)?.clone())
-				};
-				self.characters.push_front(character::Ref::new(piece));
-			}
+		for (xoff, yoff, sheet_name) in &vault.characters {
+			let piece = character::Piece {
+				x: x + xoff,
+				y: y + yoff,
+				..character::Piece::new(resources.get_sheet(sheet_name)?.clone())
+			};
+			self.characters.push_front(character::Ref::new(piece));
 		}
-		Ok(())
+
+		Ok(true)
 	}
 }
 
