@@ -22,8 +22,7 @@ local neutral_messages = {
 local failure_messages = {
 	"{Address} resisted being squished",
 	-- This will be correct for all pronouns except "it", which will appear as "itsself".
-	-- TODO: Enemies use object pronouns; fix this with optional {s}.
-	"{Address} gently braces {them}self against the wall",
+	"{Address} gently braces {self} against the wall",
 	"{Address} slides down the wall, hitting the ground unscatched",
 }
 

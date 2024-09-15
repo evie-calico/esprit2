@@ -58,24 +58,44 @@ impl<T: AsRef<str>> StrExt for T {
 
 	fn replace_nouns(&self, nouns: &Nouns) -> String {
 		static PRONOUN_TABLE: LazyLock<AhoCorasick> = LazyLock::new(|| {
+			// "they" makes an ideal default because it has a unique word for all pronoun forms.
+			// {are}/{Are} are provided for the neutral state form (it is cute / they are cute).
+			// {s} is provided for the neutral verb form (it pounces / they pounce).
 			AhoCorasick::new([
-				"{they}", "{them}", "{their}", "{theirs}", "{are}", "{They}", "{Them}", "{Their}",
-				"{Theirs}", "{Are}",
+				"{they}",
+				"{them}",
+				"{their}",
+				"{theirs}",
+				"{themself}",
+				"{are}",
+				"{They}",
+				"{Them}",
+				"{Their}",
+				"{Theirs}",
+				"{Themself}",
+				"{Are}",
+				"{s}",
 			])
 			.expect("aho corasick table must be valid")
 		});
 		let replacements = match nouns.pronouns {
 			Pronouns::Female => &[
-				"she", "her", "her", "hers", "is", "She", "Her", "Her", "Hers", "Is",
+				"she", "her", "her", "hers", "herself", "is", "She", "Her", "Her", "Hers",
+				"Herself", "Is", "s",
 			],
 			Pronouns::Male => &[
-				"he", "him", "his", "his", "is", "He", "Him", "His", "His", "Is",
+				"he", "him", "his", "his", "himself", "is", "He", "Him", "His", "His", "Himself",
+				"Is", "s",
 			],
+			// This pronoun does not represent plurality, but neutrality,
+			// so "themself" is always the correct pronoun */
 			Pronouns::Neutral => &[
-				"they", "them", "their", "theirs", "are", "They", "Them", "Their", "Theirs", "Are",
+				"they", "them", "their", "theirs", "themself", "are", "They", "Them", "Their",
+				"Theirs", "Themself", "Are", "",
 			],
 			Pronouns::Object => &[
-				"it", "its", "its", "its", "is", "It", "Its", "Its", "Its", "Is",
+				"it", "its", "its", "its", "itself", "is", "It", "Its", "Its", "Its", "Itself",
+				"Is", "s",
 			],
 		};
 		let name = &[&*nouns.name];
