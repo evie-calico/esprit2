@@ -78,7 +78,6 @@ impl Vault {
 
 		for (y, line) in layout.lines().enumerate() {
 			for (x, c) in line.chars().enumerate() {
-				// TODO: default metadata table.
 				let default_action = match c {
 					// This should define symbols for all Tile variants.
 					'.' => Some(SymbolMeaning::Tile(Tile::Floor)),
