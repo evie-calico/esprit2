@@ -109,7 +109,7 @@ impl Server {
 	pub fn recv_ping(&mut self) {
 		let ms = self.players.ping.elapsed().as_millis();
 		if ms > 50 {
-			info!("recieved late ping after {ms}ms from {{client}}")
+			info!(client = "client", ms, "recieved late ping")
 		}
 		self.players.ping = Instant::now();
 	}

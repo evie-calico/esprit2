@@ -42,6 +42,7 @@ impl Debuff {
 		})
 	}
 
+	// TODO: This function is uneccessary.
 	pub fn get(&self) -> Option<character::Stats> {
 		let stats = self
 			.get_script()
@@ -90,10 +91,7 @@ impl Status {
 				*magnitude = magnitude.saturating_add(amount)
 			}
 			Effect::StaticDebuff(_) => {
-				warn!(
-					"attempted to increase the magnitude of \"{}\" but it had none",
-					self.name
-				);
+				warn!(name = self.name, "increased magnitude of a static debuff");
 			}
 		}
 	}

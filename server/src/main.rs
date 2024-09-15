@@ -54,7 +54,13 @@ struct Cli {
 
 fn main() {
 	let cli = Cli::parse();
-	tracing_subscriber::fmt::init();
+	// Logging initialization.
+	tracing_subscriber::fmt()
+		.with_max_level(tracing::Level::TRACE)
+		.with_thread_names(true)
+		// Your service manager's logs should already have time.
+		.without_time()
+		.init();
 	let listener = TcpListener::bind((
 		Ipv4Addr::new(127, 0, 0, 1),
 		cli.port.unwrap_or(protocol::DEFAULT_PORT),
@@ -66,6 +72,7 @@ fn main() {
 	let mut connections = Vec::new();
 	info!(
 		"listening for connections on {}",
+		// TODO: It might be worth formatting this to a string and putting it in a tracing span.
 		listener.local_addr().unwrap()
 	);
 	for stream in listener.incoming() {
@@ -85,7 +92,10 @@ fn main() {
 				}));
 
 				connections.retain(|x| !x.is_finished());
-				info!("{} live instances", connections.len());
+				info!(
+					live_instances = connections.len(),
+					"established new connection"
+				);
 			}
 			// TODO: What errors may occur? How should they be handled?
 			Err(msg) => error!("failed to read incoming stream: {msg}"),
@@ -160,7 +170,7 @@ fn connection(mut stream: TcpStream, res: PathBuf) {
 			.unwrap();
 		// This check has to happen after recieving packets to be as charitable to the client as possible.
 		if instance.server.players.ping.elapsed() > TIMEOUT {
-			info!("{{player}} disconnected by timeout");
+			info!(player = "player", "disconnected by timeout");
 			return;
 		}
 		instance

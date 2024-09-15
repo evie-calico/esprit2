@@ -60,11 +60,11 @@ impl Floor {
 
 	pub fn set(&mut self, x: usize, y: usize, tile: impl Into<Option<Tile>>) {
 		if x >= self.width() || y >= self.height() {
-			warn!("oob set");
+			warn!("vaults cannot be placed at negative coordinates yet");
 		} else if let Some(dest) = self.map.get_mut(x + y * self.width()) {
 			*dest = tile.into();
 		} else {
-			warn!("failed to place tile oob");
+			panic!("attempted to place a tile out of bounds");
 		}
 	}
 
