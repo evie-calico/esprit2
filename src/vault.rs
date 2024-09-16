@@ -3,7 +3,7 @@ use crate::prelude::*;
 use std::{collections::HashMap, fs, path::Path};
 
 pub struct Set {
-	pub vaults: Vec<String>,
+	pub vaults: Vec<resource::Vault>,
 	/// Nodes per floor
 	pub density: u32,
 	/// ratio of halls to vaults.
@@ -15,7 +15,7 @@ pub struct Vault {
 	pub tiles: Vec<Option<Tile>>,
 	pub width: usize,
 
-	pub characters: Vec<(i32, i32, resource::Id)>,
+	pub characters: Vec<(i32, i32, resource::Sheet)>,
 	pub edges: Vec<(i32, i32)>,
 }
 
@@ -27,7 +27,7 @@ fn tile_floor() -> Tile {
 pub enum SymbolMeaning {
 	Tile(Tile),
 	Character {
-		sheet: resource::Id,
+		sheet: resource::Sheet,
 		#[serde(default = "tile_floor")]
 		tile: Tile,
 	},

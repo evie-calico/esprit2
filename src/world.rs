@@ -65,7 +65,7 @@ impl PartyReference {
 
 // this is probably uneccessary and just makes main.rs look nicer
 pub struct PartyReferenceBase {
-	pub sheet: &'static str,
+	pub sheet: resource::Sheet,
 	pub accent_color: Color,
 }
 
@@ -100,7 +100,7 @@ impl Manager {
 			accent_color,
 		} in party_blueprint
 		{
-			let sheet = resource_manager.get_sheet(sheet)?;
+			let sheet = resource_manager.get(&sheet)?;
 			let character = character::Ref::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
@@ -222,11 +222,11 @@ impl Manager {
 				};
 				// Remove the placement edge we chose.
 				edges.pop();
-				let Some(vault_id) = set.vaults.choose(&mut rng) else {
+				let Some(vault) = set.vaults.choose(&mut rng) else {
 					warn!("set has no vaults");
 					break 'placement;
 				};
-				let vault = resources.get_vault(vault_id)?;
+				let vault = resources.get(vault)?;
 				// for every possible edge of the vault (shuffled), check if it fits.
 				let mut potential_edges = vault.edges.clone();
 				potential_edges.shuffle(&mut rng);
@@ -287,11 +287,11 @@ impl Manager {
 			}
 		}
 
-		for (xoff, yoff, sheet_name) in &vault.characters {
+		for (xoff, yoff, sheet) in &vault.characters {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new(resources.get_sheet(sheet_name)?.clone())
+				..character::Piece::new(resources.get(sheet)?.clone())
 			};
 			self.characters.push_front(character::Ref::new(piece));
 		}
@@ -325,7 +325,7 @@ impl Manager {
 		}
 
 		for attack_id in next_character.borrow().sheet.attacks.iter() {
-			let attack = resources.get_attack(attack_id)?;
+			let attack = resources.get(attack_id)?;
 			if let Some(on_consider) = &attack.on_consider {
 				let attack_heuristics: mlua::Table = scripts
 					.sandbox(on_consider)?
@@ -349,7 +349,7 @@ impl Manager {
 		}
 
 		for spell_id in next_character.borrow().sheet.spells.iter() {
-			let spell = resources.get_spell(spell_id)?;
+			let spell = resources.get(spell_id)?;
 			if let (spell::Castable::Yes, Some(on_consider)) = (
 				spell.castable_by(&next_character.borrow()),
 				&spell.on_consider,
@@ -456,14 +456,11 @@ impl Manager {
 					}
 				}
 			}
-			character::Action::Attack(attack, arguments) => self.attack(
-				scripts,
-				resources.get_attack(&attack)?,
-				next_character,
-				arguments,
-			)?,
+			character::Action::Attack(attack, arguments) => {
+				self.attack(scripts, resources.get(&attack)?, next_character, arguments)?
+			}
 			character::Action::Cast(spell, arguments) => self.cast(
-				resources.get_spell(&spell)?,
+				resources.get(&spell)?,
 				next_character,
 				scripts,
 				arguments,

@@ -67,8 +67,8 @@ impl mlua::UserData for RequestConstructor {
 }
 
 pub(crate) enum PartialAction<'lua> {
-	Attack(resource::Id, character::Ref, mlua::Thread<'lua>),
-	Spell(resource::Id, character::Ref, mlua::Thread<'lua>),
+	Attack(resource::Attack, character::Ref, mlua::Thread<'lua>),
+	Spell(resource::Spell, character::Ref, mlua::Thread<'lua>),
 }
 
 impl<'lua> PartialAction<'lua> {
@@ -411,10 +411,10 @@ pub(crate) fn controllable_character<'lua>(
 fn gather_attack_inputs<'lua>(
 	resources: &resource::Manager,
 	scripts: &resource::Scripts<'lua>,
-	attack_id: Box<str>,
+	attack_id: resource::Attack,
 	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
-	let attack = resources.get_attack(&attack_id)?;
+	let attack = resources.get(&attack_id)?;
 	let thread = scripts
 		.sandbox(&attack.on_input)?
 		.insert("UseTime", attack.use_time)?
@@ -431,10 +431,10 @@ fn gather_attack_inputs<'lua>(
 fn gather_spell_inputs<'lua>(
 	resources: &resource::Manager,
 	scripts: &resource::Scripts<'lua>,
-	spell_id: Box<str>,
+	spell_id: resource::Spell,
 	next_character: character::Ref,
 ) -> Result<Response<'lua>, Error> {
-	let spell = resources.get_spell(&spell_id)?;
+	let spell = resources.get(&spell_id)?;
 	let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
 	let thread = scripts
 		.sandbox(&spell.on_input)?

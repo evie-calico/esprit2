@@ -13,8 +13,85 @@ pub enum Error {
 	InvalidKey,
 }
 
-// TODO: trait to implement generic `get` for type-specific IDs
-pub type Id = Box<str>;
+type Id = Box<str>;
+
+pub trait ResourceId<Manager> {
+	type Resource;
+	fn get<'resources>(&self, resources: &'resources Manager)
+		-> Result<&'resources Self::Resource>;
+}
+
+macro_rules! impl_resource {
+	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt $(impl$(<$($next_lifetime:lifetime),*>)? $NextName:ident as $NextResource:ty where ($next_self:ident, $next_resources:ident: $NextManager:ty) $next_body:tt)+) => {
+		impl_resource! {
+			impl<$($lifetime),*> $Name as $Resource where ($self, $resources: $Manager) $body
+		}
+		impl_resource! {
+			$(impl$(<$($next_lifetime),*>)? $NextName as $NextResource where ($next_self, $next_resources: $NextManager) $next_body)+
+		}
+	};
+	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt ) => {
+		#[derive(
+			Clone, Debug,
+			serde::Serialize, serde::Deserialize,
+			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
+			mlua::FromLua,
+		)]
+		#[archive(check_bytes)]
+		pub struct $Name(Id);
+
+		impl $Name {
+			pub fn new(id: &str) -> Self {
+				id.into()
+			}
+		}
+
+		impl<T: Into<Id>> From<T> for $Name {
+			fn from(s: T) -> Self {
+				Self(s.into())
+			}
+		}
+
+		impl$(<$($lifetime),*>)? ResourceId<$Manager> for $Name {
+			type Resource = $Resource;
+			fn get<'resources>(
+				&$self,
+				$resources: &'resources $Manager,
+			) -> Result<&'resources Self::Resource> {
+				#[allow(unused_braces)]
+				$body
+			}
+		}
+
+		impl mlua::UserData for $Name {}
+	};
+}
+
+impl_resource! {
+	impl Sheet as character::Sheet where (self, resources: resource::Manager) {
+		resources.sheets.get(&self.0)
+	}
+
+	impl Status as status::Status where (self, resources: resource::Manager) {
+		resources.statuses.get(&self.0)
+	}
+
+	impl Attack as Rc<attack::Attack> where (self, resources: resource::Manager) {
+		resources.attacks.get(&self.0)
+	}
+
+	impl Spell as Rc<spell::Spell> where (self, resources: resource::Manager) {
+		resources.spells.get(&self.0)
+	}
+
+	impl Vault as vault::Vault where (self, resources: resource::Manager) {
+		resources.vaults.get(&self.0)
+	}
+
+	impl<'lua> Script as mlua::Function<'lua> where (self, resources: resource::Scripts<'lua>) {
+		resources.scripts.get(&self.0)
+	}
+}
 
 pub struct Resource<T>(HashMap<Id, T>);
 
@@ -58,13 +135,13 @@ impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
 /// meaning outside code doesn't need to store permanent references to resources.
 pub struct Manager {
 	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	attacks: Resource<Rc<Attack>>,
+	attacks: Resource<Rc<attack::Attack>>,
 	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	spells: Resource<Rc<Spell>>,
+	spells: Resource<Rc<spell::Spell>>,
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
 	sheets: Resource<character::Sheet>,
-	statuses: Rc<Resource<Status>>,
-	vaults: Resource<Vault>,
+	statuses: Rc<Resource<status::Status>>,
+	vaults: Resource<vault::Vault>,
 }
 
 impl mlua::UserData for Manager {}
@@ -152,7 +229,7 @@ impl Manager {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let vaults = register(&path.join("vaults"), &|path| Vault::open(path))?;
+		let vaults = register(&path.join("vaults"), &|path| vault::Vault::open(path))?;
 
 		Ok(Self {
 			attacks,
@@ -163,53 +240,12 @@ impl Manager {
 		})
 	}
 
-	pub fn statuses_handle(&self) -> Handle<Status> {
+	pub fn statuses_handle(&self) -> Handle<status::Status> {
 		Handle(self.statuses.clone())
 	}
 
-	/// Return the given sheet.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the sheet could not be found.
-	pub fn get_sheet(&self, key: &str) -> Result<&character::Sheet> {
-		self.sheets.get(key)
-	}
-
-	/// Return the given status.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the status could not be found.
-	pub fn get_status(&self, key: &str) -> Result<&Status> {
-		self.statuses.get(key)
-	}
-
-	/// Return the given attack.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the attack could not be found.
-	pub fn get_attack(&self, key: &str) -> Result<&Rc<Attack>> {
-		self.attacks.get(key)
-	}
-
-	/// Return the given spell.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the spell could not be found.
-	pub fn get_spell(&self, key: &str) -> Result<&Rc<Spell>> {
-		self.spells.get(key)
-	}
-
-	/// Return the given vault.
-	///
-	/// # Errors
-	///
-	/// Returns an error if the vault could not be found.
-	pub fn get_vault(&self, key: &str) -> Result<&Vault> {
-		self.vaults.get(key)
+	pub fn get<T: ResourceId<Self>>(&self, id: &T) -> Result<&T::Resource> {
+		id.get(self)
 	}
 }
 
@@ -267,18 +303,20 @@ impl<'lua> Scripts<'lua> {
 		})
 	}
 
-	pub fn function(&self, key: &str) -> Result<&mlua::Function<'lua>> {
-		self.scripts.get(key)
+	pub fn function(&self, key: &Script) -> Result<&mlua::Function<'lua>> {
+		key.get(self)
 	}
 
-	pub fn sandbox<'scripts>(&'scripts self, key: &str) -> Result<SandboxBuilder<'lua, 'scripts>> {
-		let function = self.scripts.get(key)?;
+	pub fn sandbox<'scripts>(
+		&'scripts self,
+		key: &Script,
+	) -> Result<SandboxBuilder<'lua, 'scripts>> {
 		let environment = self.runtime.create_table()?;
 		// This is cloning a reference, which is a lot cheaper than creating a new table.
 		environment.set_metatable(Some(self.sandbox_metatable.clone()));
 		Ok(SandboxBuilder {
 			runtime: self.runtime,
-			function,
+			function: self.function(key)?,
 			environment,
 		})
 	}

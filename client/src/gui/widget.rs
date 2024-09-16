@@ -161,7 +161,7 @@ pub(crate) fn spell_menu(
 		.sheet
 		.spells
 		.iter()
-		.map(|k| resources.get_spell(k))
+		.map(|k| resources.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(spell) = spell else {
@@ -189,7 +189,7 @@ pub(crate) fn attack_menu(
 		.sheet
 		.attacks
 		.iter()
-		.map(|k| resources.get_attack(k))
+		.map(|k| resources.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(attack) = attack else {

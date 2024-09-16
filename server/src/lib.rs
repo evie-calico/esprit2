@@ -48,11 +48,11 @@ impl Server {
 		// Create a piece for the player, and register it with the world manager.
 		let party_blueprint = [
 			world::PartyReferenceBase {
-				sheet: "luvui",
+				sheet: "luvui".into(),
 				accent_color: (0xDA, 0x2D, 0x5C, 0xFF),
 			},
 			world::PartyReferenceBase {
-				sheet: "aris",
+				sheet: "aris".into(),
 				accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 			},
 		];

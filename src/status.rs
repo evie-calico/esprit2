@@ -29,7 +29,7 @@ pub enum Duration {
 pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
-	on_debuff: resource::Id,
+	on_debuff: String,
 }
 
 impl Debuff {
@@ -37,7 +37,7 @@ impl Debuff {
 		thread_local! { static LUA: mlua::Lua = mlua::Lua::new() }
 		LUA.with(|lua| {
 			lua.globals().set("magnitude", self.magnitude)?;
-			let stats = lua.from_value(lua.load(&*self.on_debuff).eval()?)?;
+			let stats = lua.from_value(lua.load(&self.on_debuff).eval()?)?;
 			Ok(stats)
 		})
 	}

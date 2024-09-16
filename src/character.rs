@@ -382,8 +382,8 @@ pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(resource::Id, ActionArgs),
-	Cast(resource::Id, ActionArgs),
+	Attack(resource::Attack, ActionArgs),
+	Cast(resource::Spell, ActionArgs),
 }
 
 #[derive(
@@ -459,7 +459,7 @@ mod sheet {
 	#[alua(method = stats)]
 	#[archive(check_bytes)]
 	pub struct Sheet {
-		pub icon: resource::Id,
+		pub icon: Box<str>,
 		/// Note that this includes the character's name.
 		#[alua(get)]
 		pub nouns: Nouns,
@@ -482,12 +482,12 @@ mod sheet {
 		pub speed: Aut,
 
 		#[alua(get)]
-		pub attacks: Vec<resource::Id>,
+		pub attacks: Vec<resource::Attack>,
 		#[alua(get)]
-		pub spells: Vec<resource::Id>,
+		pub spells: Vec<resource::Spell>,
 
 		/// Script to decide on an action from a list of considerations
-		pub on_consider: resource::Id,
+		pub on_consider: resource::Script,
 	}
 }
 

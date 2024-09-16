@@ -151,7 +151,7 @@ pub struct Spell {
 	pub level: u8,
 
 	/// Script to execute upon casting the spell.
-	pub on_cast: resource::Id,
+	pub on_cast: resource::Script,
 	/// Script to return all possible spell actions.
 	///
 	/// Returns an array of `consider::Consideration`s for each possible usage of the spell.
@@ -161,8 +161,8 @@ pub struct Spell {
 	/// When an on_consider script is about to be called, it's fed a list of characters that are potential targets for the spell.
 	/// If a spell parameter named "range" exists, the script will only be provided with characters within this range.
 	/// Otherwise, consideration scripts are expected to filter targets themselves.
-	pub on_consider: Option<resource::Id>,
-	pub on_input: resource::Id,
+	pub on_consider: Option<resource::Script>,
+	pub on_input: resource::Script,
 }
 
 #[derive(Clone, Copy, Debug)]
