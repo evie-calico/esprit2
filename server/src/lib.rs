@@ -72,8 +72,6 @@ impl Server {
 				&resources,
 			)
 			.unwrap();
-		world.characters[2].borrow_mut().x = 4;
-		world.characters[2].borrow_mut().y = 4;
 
 		Self {
 			resources,
