@@ -432,7 +432,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 		..
 	} = piece;
 	let name = &nouns.name;
-	let character::StatOutcomes {
+	let Ok(character::StatOutcomes {
 		stats:
 			character::Stats {
 				heart,
@@ -444,7 +444,10 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 			},
 		buffs,
 		debuffs,
-	} = piece.stat_outcomes();
+	}) = piece.stat_outcomes()
+	else {
+		return;
+	};
 
 	let font = &player_window.typography.normal;
 	let get_color = |buff, debuff| {
@@ -558,7 +561,7 @@ fn character_status(gui: &mut gui::Context, status: &Status) {
 
 	match &status.effect {
 		status::Effect::Debuff(debuff) => {
-			if let Some(stats) = debuff.get() {
+			if let Ok(stats) = debuff.get() {
 				print_stats(stats);
 			}
 		}

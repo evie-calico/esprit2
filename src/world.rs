@@ -147,7 +147,7 @@ impl Manager {
 		})
 	}
 
-	pub fn new_floor(&mut self, console: &impl console::Handle) {
+	pub fn new_floor(&mut self, console: &impl console::Handle) -> Result<()> {
 		self.location.floor += 1;
 		console.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
@@ -162,7 +162,7 @@ impl Manager {
 			i.x = 0;
 			i.y = 0;
 			// Rest
-			i.rest();
+			i.rest()?;
 			// Award experience
 			i.sheet.experience += 40;
 			while i.sheet.experience >= 100 {
@@ -175,6 +175,7 @@ impl Manager {
 			}
 		}
 		// TODO: Generate floor
+		Ok(())
 	}
 
 	pub fn next_character(&self) -> &character::Ref {

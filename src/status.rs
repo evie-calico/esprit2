@@ -33,22 +33,13 @@ pub struct Debuff {
 }
 
 impl Debuff {
-	fn get_script(&self) -> Result<character::Stats> {
+	pub fn get(&self) -> Result<character::Stats> {
 		thread_local! { static LUA: mlua::Lua = mlua::Lua::new() }
 		LUA.with(|lua| {
 			lua.globals().set("magnitude", self.magnitude)?;
 			let stats = lua.from_value(lua.load(&*self.on_debuff).eval()?)?;
 			Ok(stats)
 		})
-	}
-
-	// TODO: This function is uneccessary.
-	pub fn get(&self) -> Option<character::Stats> {
-		let stats = self
-			.get_script()
-			.map_err(|msg| error!("failed to calculate debuff: {msg}"))
-			.unwrap_or_default();
-		Some(stats)
 	}
 }
 
@@ -96,10 +87,10 @@ impl Status {
 		}
 	}
 
-	pub fn on_debuff(&self) -> Option<character::Stats> {
+	pub fn on_debuff(&self) -> Result<Option<character::Stats>> {
 		match &self.effect {
-			Effect::Debuff(debuff) => debuff.get(),
-			Effect::StaticDebuff(debuff) => Some(*debuff),
+			Effect::Debuff(debuff) => debuff.get().map(Some),
+			Effect::StaticDebuff(debuff) => Ok(Some(*debuff)),
 		}
 	}
 }

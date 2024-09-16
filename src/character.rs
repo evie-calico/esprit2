@@ -191,7 +191,9 @@ impl mlua::UserData for Ref {
 			}
 		}
 		fields.add_field_method_get("sheet", |_, this| Ok(this.borrow().sheet.clone()));
-		fields.add_field_method_get("stats", |_, this| Ok(this.borrow().stats()));
+		fields.add_field_method_get("stats", |_, this| {
+			this.borrow().stats().map_err(mlua::Error::runtime)
+		});
 		fields.add_field_method_get("alliance", |_, this| Ok(this.borrow().alliance as u32));
 		get!(hp, sp, x, y);
 		set!(hp, sp, x, y);
@@ -278,21 +280,24 @@ impl Piece {
 			.retain(|_, status| !matches!(status.duration, status::Duration::Turn));
 	}
 
-	pub fn rest(&mut self) {
-		let stats = self.stats();
-		self.restore_hp(stats.heart as u32 / 2);
-		self.restore_sp(stats.soul as u32);
+	pub fn rest(&mut self) -> Result<()> {
+		let stats = self.stats()?;
+		self.restore_hp(stats.heart as u32 / 2)?;
+		self.restore_sp(stats.soul as u32)?;
 		// Remove any status effects lasting until the next rest.
 		self.statuses
 			.retain(|_, status| !matches!(status.duration, status::Duration::Rest));
+		Ok(())
 	}
 
-	pub fn restore_hp(&mut self, amount: u32) {
-		self.hp = i32::min(self.hp + amount as i32, self.stats().heart as i32);
+	pub fn restore_hp(&mut self, amount: u32) -> Result<()> {
+		self.hp = i32::min(self.hp + amount as i32, self.stats()?.heart as i32);
+		Ok(())
 	}
 
-	pub fn restore_sp(&mut self, amount: u32) {
-		self.sp = i32::min(self.sp + amount as i32, self.stats().soul as i32);
+	pub fn restore_sp(&mut self, amount: u32) -> Result<()> {
+		self.sp = i32::min(self.sp + amount as i32, self.stats()?.soul as i32);
+		Ok(())
 	}
 }
 
@@ -304,16 +309,20 @@ pub struct StatOutcomes {
 }
 
 impl Piece {
-	pub fn stats(&self) -> Stats {
-		self.stat_outcomes().stats
+	pub fn stats(&self) -> Result<Stats> {
+		self.stat_outcomes().map(|x| x.stats)
 	}
 
-	pub fn stat_outcomes(&self) -> StatOutcomes {
+	pub fn stat_outcomes(&self) -> Result<StatOutcomes> {
 		let buffs = Stats::default();
 		let mut debuffs = Stats::default();
 
-		for debuff in self.statuses.values().filter_map(|x| x.on_debuff()) {
-			debuffs = debuffs + debuff;
+		for debuff in self
+			.statuses
+			.values()
+			.filter_map(|x| x.on_debuff().transpose())
+		{
+			debuffs = debuffs + debuff?;
 		}
 
 		let mut stats = self.sheet.stats();
@@ -324,11 +333,11 @@ impl Piece {
 		stats.magic = stats.magic.saturating_sub(debuffs.magic) + buffs.magic;
 		stats.resistance = stats.resistance.saturating_sub(debuffs.resistance) + buffs.resistance;
 
-		StatOutcomes {
+		Ok(StatOutcomes {
 			stats,
 			buffs,
 			debuffs,
-		}
+		})
 	}
 }
 
