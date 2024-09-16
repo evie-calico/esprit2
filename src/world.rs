@@ -332,7 +332,7 @@ impl Manager {
 					.insert("UseTime", attack.use_time)?
 					.insert(
 						"Magnitude",
-						u32::evalv(&attack.magnitude, &*next_character.borrow()),
+						u32::evalv(&attack.magnitude, &*next_character.borrow())?,
 					)?
 					.insert("User", next_character.clone())?
 					.world(self, ())?;
@@ -545,7 +545,7 @@ impl Manager {
 		arguments: character::ActionArgs,
 	) -> Result<Option<Aut>> {
 		// Calculate damage
-		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow());
+		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow())?;
 
 		let thread = scripts
 			.sandbox(&attack.on_use)?

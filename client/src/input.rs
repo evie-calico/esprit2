@@ -420,7 +420,7 @@ fn gather_attack_inputs<'lua>(
 		.insert("UseTime", attack.use_time)?
 		.insert(
 			"Magnitude",
-			u32::evalv(&attack.magnitude, &*next_character.borrow()),
+			u32::evalv(&attack.magnitude, &*next_character.borrow())?,
 		)?
 		.insert("User", next_character.clone())?
 		.thread()?;

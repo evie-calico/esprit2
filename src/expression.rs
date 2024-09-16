@@ -31,7 +31,7 @@ pub enum Error {
 	#[error("variable \"{0}\" not defined")]
 	MissingVariable(String),
 	#[error("result ({0}) out of range for {1}")]
-	OutOfRange(Integer, String),
+	OutOfRange(Integer, &'static str),
 }
 
 impl Operation {
@@ -171,41 +171,23 @@ impl TryFrom<String> for Expression {
 }
 
 pub trait Evaluate<'variables>: Sized {
-	fn eval(expression: &Expression) -> Self {
+	fn eval(expression: &Expression) -> Result<Self, Error> {
 		Self::evalv(expression, &())
 	}
 
-	fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self;
+	fn evalv(expression: &Expression, variables: &'variables impl Variables)
+		-> Result<Self, Error>;
 }
 
 macro_rules! impl_int {
 	($type:ident) => {
 		impl<'variables> Evaluate<'variables> for $type {
-			fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self {
-				expression
-					.root
-					.eval(expression, variables)
-					.unwrap_or_else(|msg| {
-						error!("failed to evalutate `{}`: {msg}", expression.source);
-						0
-					})
-					.try_into()
-					.unwrap_or_else(|msg| {
-						error!(
-							"failed to convert expression to {}: {msg}",
-							stringify!($type)
-						);
-						0
-					})
-			}
-		}
-
-		impl<'variables> Evaluate<'variables> for Result<$type, Error> {
-			fn evalv(expression: &Expression, variables: &'variables impl Variables) -> Self {
-				expression.root.eval(expression, variables).and_then(|x| {
-					x.try_into()
-						.map_err(|_| Error::OutOfRange(x, stringify!($type).into()))
-				})
+			fn evalv(
+				expression: &Expression,
+				variables: &'variables impl Variables,
+			) -> Result<Self, Error> {
+				let value = expression.root.eval(expression, variables)?;
+				$type::try_from(value).map_err(|_| Error::OutOfRange(value, stringify!($type)))
 			}
 		}
 	};
