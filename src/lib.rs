@@ -4,7 +4,8 @@
 	let_chains,
 	once_cell_try,
 	maybe_uninit_fill,
-	anonymous_lifetime_in_impl_trait
+	anonymous_lifetime_in_impl_trait,
+	int_roundings
 )]
 
 pub mod astar;

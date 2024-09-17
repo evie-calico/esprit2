@@ -221,7 +221,7 @@ pub(crate) fn controllable_character<'lua>(
 			};
 
 			if options.controls.underfoot.contains(keycode) {
-				match server.world().current_floor.get(x as usize, y as usize) {
+				match server.world().current_floor.get(x, y) {
 					Some(floor::Tile::Floor) => {
 						console.print_unimportant("There's nothing on the ground here.".into());
 					}

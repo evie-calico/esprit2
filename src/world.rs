@@ -256,16 +256,12 @@ impl Manager {
 		vault: &Vault,
 		resources: &resource::Manager,
 	) -> Result<bool> {
-		if x < 0 || y < 0 {
-			warn!("vaults cannot be placed at negative coordinates yet");
-			return Ok(false);
-		}
 		for (row, y) in vault
 			.tiles
 			.chunks(vault.width)
-			.zip(y as usize..(y as usize + vault.height()))
+			.zip(y..(y + vault.height() as i32))
 		{
-			for (tile, x) in row.iter().zip(x as usize..(x as usize + vault.width)) {
+			for (tile, x) in row.iter().zip(x..(x + vault.width as i32)) {
 				if tile.is_some() && self.current_floor.get(x, y).is_some() {
 					return Ok(false);
 				}
@@ -275,11 +271,11 @@ impl Manager {
 		for (row, y) in vault
 			.tiles
 			.chunks(vault.width)
-			.zip(y as usize..(y as usize + vault.height()))
+			.zip(y..(y + vault.height() as i32))
 		{
-			for (tile, x) in row.iter().zip(x as usize..(x as usize + vault.width)) {
+			for (tile, x) in row.iter().zip(x..(x + vault.width as i32)) {
 				if let Some(tile) = tile {
-					self.current_floor.set(x, y, *tile);
+					*self.current_floor.get_mut(x, y) = Some(*tile);
 				}
 			}
 		}
@@ -425,27 +421,19 @@ impl Manager {
 				if let Some(direction) = OrdDir::from_offset(target_x - x, target_y - y) {
 					self.move_piece(&next_character, direction, console)?
 				} else {
-					let mut dijkstra = astar::DijkstraMap::target(
-						self.current_floor.width(),
-						self.current_floor.height(),
-						&[(target_x, target_y)],
-					);
-					if let Ok(x) = x.try_into()
-						&& let Ok(y) = y.try_into()
-					{
-						dijkstra.explore(x, y, |x, y, base| {
-							if let Some(character) = self.get_character_at(x as i32, y as i32)
-								&& character.as_ptr() != next_character.as_ptr()
-								&& character.borrow().alliance == next_character.borrow().alliance
-							{
-								return astar::IMPASSABLE;
-							}
-							match self.current_floor.get(x, y) {
-								Some(floor::Tile::Floor) | Some(floor::Tile::Exit) => base + 1,
-								Some(floor::Tile::Wall) | None => astar::IMPASSABLE,
-							}
-						});
-					}
+					let mut dijkstra = astar::Floor::target(&[(target_x, target_y)]);
+					dijkstra.explore(x, y, |x, y, base| {
+						if let Some(character) = self.get_character_at(x, y)
+							&& character.as_ptr() != next_character.as_ptr()
+							&& character.borrow().alliance == next_character.borrow().alliance
+						{
+							return astar::IMPASSABLE;
+						}
+						match self.current_floor.get(x, y) {
+							Some(floor::Tile::Floor) | Some(floor::Tile::Exit) => base + 1,
+							Some(floor::Tile::Wall) | None => astar::IMPASSABLE,
+						}
+					});
 					if let Some(direction) = dijkstra.step(x, y) {
 						self.move_piece(&next_character, direction, console)?
 					} else {
@@ -574,7 +562,7 @@ impl Manager {
 			)
 		};
 
-		let tile = self.current_floor.get(x as usize, y as usize);
+		let tile = self.current_floor.get(x, y);
 		match tile {
 			Some(Tile::Floor) | Some(Tile::Exit) => {
 				let mut character = character.borrow_mut();
@@ -641,7 +629,7 @@ impl Manager {
 						}
 					}
 					LuaRequest::Tile { x, y } => {
-						let tile = self.current_floor.get(x as usize, y as usize);
+						let tile = self.current_floor.get(x, y);
 						value = thread.resume(
 							tile.map(|x| lua.to_value(&x))
 								.transpose()?

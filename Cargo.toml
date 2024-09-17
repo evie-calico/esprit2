@@ -9,6 +9,9 @@ members = ["client", "server"]
 # It shouldn't be an issue to default to client since it uses the engine and server.
 default-members = ["client"]
 
+[workspace.dependencies]
+rkyv = { git = "https://github.com/rkyv/rkyv.git" }
+
 [workspace.lints]
 clippy.module_name_repetitions = "warn"
 clippy.items_after_statements = "warn"
@@ -26,8 +29,9 @@ pest_derive = "2.7.10"
 
 # Serialization
 serde = { version = "1.0.196", features = ["derive", "rc"] }
+serde_with = "3.9.0"
 toml = "0.8.10"
-rkyv = "0.8.5"
+rkyv.workspace = true
 
 # Error handling + logging
 thiserror = "1.0.57"

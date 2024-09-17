@@ -53,21 +53,21 @@ pub(crate) fn tilemap(
 	camera: &Camera,
 ) {
 	canvas.set_draw_color(Color::WHITE);
-	for (x, y, tile) in world_manager.current_floor.iter_tiles() {
+	for (x, y, tile) in world_manager.current_floor.iter() {
 		match tile {
 			floor::Tile::Floor => (),
 			floor::Tile::Wall => canvas
 				.fill_rect(Rect::new(
-					(x as i32) * ITILE_SIZE - camera.x,
-					(y as i32) * ITILE_SIZE - camera.y,
+					x * ITILE_SIZE - camera.x,
+					y * ITILE_SIZE - camera.y,
 					TILE_SIZE,
 					TILE_SIZE,
 				))
 				.unwrap(),
 			floor::Tile::Exit => canvas
 				.draw_rect(Rect::new(
-					(x as i32) * ITILE_SIZE + 2 - camera.x,
-					(y as i32) * ITILE_SIZE + 2 - camera.y,
+					x * ITILE_SIZE + 2 - camera.x,
+					y * ITILE_SIZE + 2 - camera.y,
 					TILE_SIZE - 4,
 					TILE_SIZE - 4,
 				))

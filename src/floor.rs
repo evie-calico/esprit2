@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use std::collections::HashMap;
 
 #[derive(
 	PartialEq,
@@ -24,6 +24,41 @@ pub enum Tile {
 	Exit,
 }
 
+const CHUNK_SIZE: usize = 16;
+
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Eq,
+	PartialEq,
+	Hash,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+#[rkyv(derive(Clone, Copy, Debug, Eq, PartialEq, Hash))]
+pub struct ChunkId(i32, i32);
+
+impl ChunkId {
+	fn from_absolute(x: i32, y: i32) -> Self {
+		Self(
+			x.div_floor(CHUNK_SIZE as i32),
+			y.div_floor(CHUNK_SIZE as i32),
+		)
+	}
+
+	fn to_absolute(self, index: usize) -> (i32, i32) {
+		(
+			self.0 * CHUNK_SIZE as i32 + (index % CHUNK_SIZE) as i32,
+			self.1 * CHUNK_SIZE as i32 + (index / CHUNK_SIZE) as i32,
+		)
+	}
+}
+
+#[serde_with::serde_as]
 #[derive(
 	Clone,
 	Debug,
@@ -33,57 +68,58 @@ pub enum Tile {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-pub struct Floor {
-	pub width: usize,
-	pub map: Box<[Option<Tile>]>,
+pub struct Chunk {
+	#[serde_as(as = "[_; CHUNK_SIZE * CHUNK_SIZE]")]
+	map: [Option<Tile>; CHUNK_SIZE * CHUNK_SIZE],
 }
 
-impl Default for Floor {
+impl Default for Chunk {
 	fn default() -> Self {
 		Self {
-			// TODO: Decide default grid size.
-			width: 32,
-			map: Box::new([None; 32 * 32]),
+			map: [None; CHUNK_SIZE * CHUNK_SIZE],
 		}
 	}
+}
+
+#[derive(
+	Clone,
+	Debug,
+	Default,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+pub struct Floor {
+	pub chunks: HashMap<ChunkId, Chunk>,
 }
 
 impl Floor {
-	pub fn get(&self, x: usize, y: usize) -> Option<Tile> {
-		if x >= self.width() || y >= self.height() {
-			return None;
-		}
-		self.map.get(x + y * self.width()).copied()?
+	pub fn get(&self, x: i32, y: i32) -> Option<Tile> {
+		let chunk_id = ChunkId::from_absolute(x, y);
+		let chunk = self.chunks.get(&chunk_id)?;
+		chunk.map[(x - chunk_id.0 * CHUNK_SIZE as i32
+			+ (y - chunk_id.1 * CHUNK_SIZE as i32) * CHUNK_SIZE as i32) as usize]
 	}
 
-	pub fn set(&mut self, x: usize, y: usize, tile: impl Into<Option<Tile>>) {
-		if x >= self.width() || y >= self.height() {
-			warn!("vaults cannot be placed at negative coordinates yet");
-		} else if let Some(dest) = self.map.get_mut(x + y * self.width()) {
-			*dest = tile.into();
-		} else {
-			panic!("attempted to place a tile out of bounds");
-		}
+	pub fn get_mut(&mut self, x: i32, y: i32) -> &mut Option<Tile> {
+		let chunk_id = ChunkId::from_absolute(x, y);
+		let chunk = self.chunks.entry(chunk_id).or_default();
+		&mut chunk.map[(x - chunk_id.0 * CHUNK_SIZE as i32
+			+ (y - chunk_id.1 * CHUNK_SIZE as i32) * CHUNK_SIZE as i32) as usize]
 	}
 
-	pub fn width(&self) -> usize {
-		self.width
-	}
-
-	pub fn height(&self) -> usize {
-		self.map.len() / self.width
-	}
-
-	pub fn iter_tiles(&self) -> impl Iterator<Item = (usize, usize, Tile)> + '_ {
-		self.iter_grid()
-			.filter_map(|(x, y, t)| t.map(|t| (x, y, t)))
-	}
-
-	pub fn iter_grid(&self) -> impl Iterator<Item = (usize, usize, Option<Tile>)> + '_ {
-		self.map
+	/// This is not ordered!
+	pub fn iter(&self) -> impl Iterator<Item = (i32, i32, Tile)> + '_ {
+		self.chunks
 			.iter()
-			.copied()
-			.enumerate()
-			.map(|(i, t)| (i % self.width, i / self.width, t))
+			.flat_map(|(id, c)| {
+				c.map.into_iter().enumerate().map(|(i, t)| {
+					let (x, y) = id.to_absolute(i);
+					(x, y, t)
+				})
+			})
+			.filter_map(|(x, y, t)| t.map(|t| (x, y, t)))
 	}
 }
