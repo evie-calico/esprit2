@@ -22,18 +22,16 @@ use std::io;
 pub const DEFAULT_PORT: u16 = 48578;
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum ClientPacket {
 	Ping(String),
 	Action(character::Action),
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum ServerPacket<'a> {
-	Ping(#[with(rkyv::with::RefAsBox)] &'a str),
+	Ping(#[rkyv(with = rkyv::with::InlineAsBox)] &'a str),
 	World {
-		#[with(rkyv::with::Inline)]
+		#[rkyv(with = rkyv::with::Inline)]
 		world: &'a world::Manager,
 	},
 	Message(console::Message),
@@ -42,7 +40,7 @@ pub enum ServerPacket<'a> {
 #[derive(Clone, Default, Debug)]
 pub struct PacketReciever {
 	len: [Option<u8>; 4],
-	packet_buffer: rkyv::AlignedVec,
+	packet_buffer: rkyv::util::AlignedVec,
 }
 
 impl PacketReciever {
@@ -53,7 +51,7 @@ impl PacketReciever {
 	pub fn recv(
 		&mut self,
 		stream: impl io::Read,
-		f: impl FnOnce(rkyv::AlignedVec),
+		f: impl FnOnce(rkyv::util::AlignedVec),
 	) -> io::Result<()> {
 		let mut bytes = stream.bytes();
 		for (len, byte) in self.len.iter_mut().filter(|x| x.is_none()).zip(&mut bytes) {
@@ -64,7 +62,7 @@ impl PacketReciever {
 				self.packet_buffer.push(i?)
 			}
 			if packet_len == self.packet_buffer.len() {
-				let mut packet = rkyv::AlignedVec::new();
+				let mut packet = rkyv::util::AlignedVec::new();
 				std::mem::swap(&mut packet, &mut self.packet_buffer);
 				f(packet);
 				*self = Self::default();

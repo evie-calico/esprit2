@@ -3,7 +3,6 @@
 	path_file_prefix,
 	let_chains,
 	once_cell_try,
-	new_uninit,
 	maybe_uninit_fill,
 	anonymous_lifetime_in_impl_trait
 )]

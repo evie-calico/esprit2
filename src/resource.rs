@@ -37,7 +37,6 @@ macro_rules! impl_resource {
 			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 			mlua::FromLua,
 		)]
-		#[archive(check_bytes)]
 		pub struct $Name(Id);
 
 		impl $Name {

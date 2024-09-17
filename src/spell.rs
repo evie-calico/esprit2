@@ -13,7 +13,6 @@ use std::collections::HashMap;
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub enum Energy {
 	/// Positive energy, like heat.
 	Positive,
@@ -33,7 +32,6 @@ pub enum Energy {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub enum Harmony {
 	/// Spells with unconventional, unpredictable effects.
 	Chaos,
@@ -54,7 +52,6 @@ pub enum Harmony {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 // This gives the Skillset a cool toml representation.
 #[serde(untagged)]
 pub enum Skillset {
@@ -113,7 +110,6 @@ impl mlua::UserData for Affinity {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 #[serde(untagged)]
 pub enum Parameter {
 	Integer(i32),
@@ -129,7 +125,6 @@ pub enum Parameter {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Spell {
 	pub name: String,
 	pub description: String,

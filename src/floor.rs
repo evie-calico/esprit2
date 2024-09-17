@@ -13,7 +13,6 @@ use crate::prelude::*;
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 // Keeping this very light is probably a good idea.
 // Decorations, like statues and fountains and such, are sporadic and should be stored seperately.
 // Don't go over 255 variants (reserve one for Option::None), and don't add members; they'll bloat the size of the map.
@@ -34,7 +33,6 @@ pub enum Tile {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Floor {
 	pub width: usize,
 	pub map: Box<[Option<Tile>]>,

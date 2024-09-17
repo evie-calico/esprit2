@@ -3,7 +3,6 @@ use paste::paste;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum MessagePrinter {
 	Console(Color),
 	Dialogue { speaker: Arc<str>, progress: f64 },
@@ -11,7 +10,6 @@ pub enum MessagePrinter {
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub struct Message {
 	pub text: String,
 	pub printer: MessagePrinter,
@@ -61,7 +59,6 @@ macro_rules! impl_console {
 		paste! {
 			#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 			#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-			#[archive(check_bytes)]
 			pub enum Color {
 				$([<$impl_colors:camel>],)*
 			}

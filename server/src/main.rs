@@ -3,7 +3,6 @@
 use clap::Parser;
 use esprit2::prelude::*;
 use esprit2_server::*;
-use rkyv::Deserialize;
 use std::io::Write;
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -137,7 +136,7 @@ fn connection(mut stream: TcpStream, res: PathBuf) {
 	// TODO: how do we start communication?
 	{
 		// Give the client an unintial world state.
-		let packet = rkyv::to_bytes::<_, 4096>(&protocol::ServerPacket::World {
+		let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
 			world: &instance.server.world,
 		})
 		.unwrap();
@@ -150,15 +149,14 @@ fn connection(mut stream: TcpStream, res: PathBuf) {
 	loop {
 		packet_reciever
 			.recv(&mut stream, |packet| {
-				let packet = rkyv::check_archived_root::<protocol::ClientPacket>(&packet).unwrap();
+				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 				match packet {
 					protocol::ArchivedClientPacket::Ping(id) => {
 						instance.server.recv_ping();
 					}
 					protocol::ArchivedClientPacket::Action(action_archive) => {
-						let mut deserializer = rkyv::de::deserializers::SharedDeserializeMap::new();
 						let action: character::Action =
-							action_archive.deserialize(&mut deserializer).unwrap();
+							rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
 						instance
 							.server
 							.recv_action(&instance.console_handle, &scripts, action)
@@ -186,7 +184,7 @@ fn connection(mut stream: TcpStream, res: PathBuf) {
 			&& !awaiting_input
 		{
 			awaiting_input = true;
-			let packet = rkyv::to_bytes::<_, 4096>(&protocol::ServerPacket::World {
+			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
 				world: &instance.server.world,
 			})
 			.unwrap();
@@ -196,7 +194,8 @@ fn connection(mut stream: TcpStream, res: PathBuf) {
 		}
 
 		for i in instance.console_reciever.try_iter() {
-			let packet = rkyv::to_bytes::<_, 4096>(&protocol::ServerPacket::Message(i)).unwrap();
+			let packet =
+				rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::Message(i)).unwrap();
 			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
 			stream.write_all(&packet_len).unwrap();
 			stream.write_all(&packet).unwrap();

@@ -4,7 +4,6 @@
 	let_chains,
 	int_roundings,
 	core_io_borrowed_buf,
-	new_uninit,
 	read_buf
 )]
 
@@ -21,7 +20,6 @@ use console::Console;
 use esprit2::prelude::*;
 use esprit2_server::{protocol, Server};
 use options::Options;
-use rkyv::Deserialize;
 use sdl2::rect::Rect;
 use std::io::{prelude::*, BorrowedBuf};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -100,11 +98,11 @@ impl ServerHandle {
 		// SAFETY: read_buf_exact always fills the entire buffer.
 		let packet = unsafe { packet.assume_init() };
 		// Parse the ping and print its message
-		let packet = rkyv::check_archived_root::<protocol::ServerPacket>(&packet).unwrap();
+		let packet =
+			rkyv::access::<protocol::ArchivedServerPacket, rkyv::rancor::Failure>(&packet).unwrap();
 		let world_cache = match packet {
 			protocol::ArchivedServerPacket::World { world } => {
-				let mut deserializer = rkyv::de::deserializers::SharedDeserializeMap::new();
-				world.deserialize(&mut deserializer).unwrap()
+				rkyv::deserialize::<world::Manager, rkyv::rancor::Error>(world).unwrap()
 			}
 			_ => {
 				todo!();
@@ -157,28 +155,27 @@ impl ServerHandle {
 				world_cache,
 				..
 			} => {
-				let packet =
-					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Ping("meow".into())).unwrap();
+				let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ClientPacket::Ping(
+					"meow".into(),
+				))
+				.unwrap();
 				stream
 					.write_all(&(packet.len() as u32).to_le_bytes())
 					.unwrap();
 				stream.write_all(&packet).unwrap();
 				match packet_reciever.recv(stream, |packet| {
-					let packet =
-						rkyv::check_archived_root::<protocol::ServerPacket>(&packet).unwrap();
+					let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 					match packet {
 						protocol::ArchivedServerPacket::Ping(_) => todo!(),
 						protocol::ArchivedServerPacket::World { world } => {
-							let mut deserializer =
-								rkyv::de::deserializers::SharedDeserializeMap::new();
-							*world_cache = world.deserialize(&mut deserializer).unwrap();
+							*world_cache =
+								rkyv::deserialize::<world::Manager, rkyv::rancor::Error>(world)
+									.unwrap()
 						}
 						protocol::ArchivedServerPacket::Message(message) => {
-							let mut deserializer =
-								rkyv::de::deserializers::SharedDeserializeMap::new();
-							console
-								.history
-								.push(message.deserialize(&mut deserializer).unwrap());
+							console.history.push(
+								rkyv::deserialize::<_, rkyv::rancor::Error>(message).unwrap(),
+							);
 						}
 					}
 				}) {
@@ -208,9 +205,10 @@ impl ServerHandle {
 				resources,
 				..
 			} => {
-				let packet =
-					rkyv::to_bytes::<_, 16>(&protocol::ClientPacket::Action(action.clone()))
-						.unwrap();
+				let packet = rkyv::to_bytes::<rkyv::rancor::Error>(
+					&protocol::ClientPacket::Action(action.clone()),
+				)
+				.unwrap();
 				stream
 					.write_all(&(packet.len() as u32).to_le_bytes())
 					.unwrap();

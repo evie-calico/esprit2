@@ -27,7 +27,7 @@ pest_derive = "2.7.10"
 # Serialization
 serde = { version = "1.0.196", features = ["derive", "rc"] }
 toml = "0.8.10"
-rkyv = { version = "0.7.44", features = ["validation"] }
+rkyv = "0.8.5"
 
 # Error handling + logging
 thiserror = "1.0.57"

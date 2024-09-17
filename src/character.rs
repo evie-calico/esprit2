@@ -94,18 +94,16 @@ impl<F: rkyv::Archive> ArchiveWith<RefCell<F>> for InlineRefCell {
 	type Archived = F::Archived;
 	type Resolver = F::Resolver;
 
-	#[inline]
-	unsafe fn resolve_with(
+	fn resolve_with(
 		field: &RefCell<F>,
-		pos: usize,
 		resolver: Self::Resolver,
-		out: *mut Self::Archived,
+		out: rkyv::Place<Self::Archived>,
 	) {
-		(*field.borrow()).resolve(pos, resolver, out);
+		(*field.borrow()).resolve(resolver, out);
 	}
 }
 
-impl<F: rkyv::Serialize<S>, S: rkyv::Fallible + ?Sized> SerializeWith<RefCell<F>, S>
+impl<F: rkyv::Serialize<S>, S: rkyv::rancor::Fallible + ?Sized> SerializeWith<RefCell<F>, S>
 	for InlineRefCell
 {
 	#[inline]
@@ -114,8 +112,8 @@ impl<F: rkyv::Serialize<S>, S: rkyv::Fallible + ?Sized> SerializeWith<RefCell<F>
 	}
 }
 
-impl<F: rkyv::Archive, D: rkyv::Fallible + ?Sized> DeserializeWith<F::Archived, RefCell<F>, D>
-	for InlineRefCell
+impl<F: rkyv::Archive, D: rkyv::rancor::Fallible + ?Sized>
+	DeserializeWith<F::Archived, RefCell<F>, D> for InlineRefCell
 where
 	F::Archived: rkyv::Deserialize<F, D>,
 {
@@ -139,8 +137,7 @@ where
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
-struct InnerRef(#[with(InlineRefCell)] RefCell<character::Piece>);
+struct InnerRef(#[rkyv(with = InlineRefCell)] RefCell<character::Piece>);
 
 #[derive(
 	Clone,
@@ -152,7 +149,6 @@ struct InnerRef(#[with(InlineRefCell)] RefCell<character::Piece>);
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Ref(Rc<InnerRef>);
 
 impl Ref {
@@ -229,7 +225,6 @@ impl mlua::UserData for Ref {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Piece {
 	pub sheet: Sheet,
 
@@ -350,7 +345,6 @@ impl Piece {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 #[serde(untagged)]
 pub enum ActionArg {
 	Boolean(bool),
@@ -369,7 +363,6 @@ pub enum ActionArg {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 
 /// Anything a character piece can "do".
@@ -378,7 +371,6 @@ pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 /// The information here should be enough to perform the action, but in the event it isn't
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
@@ -399,7 +391,6 @@ pub enum Action {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 #[repr(u32)]
 pub enum Alliance {
 	Friendly,
@@ -457,7 +448,6 @@ mod sheet {
 		rkyv::Deserialize,
 	)]
 	#[alua(method = stats)]
-	#[archive(check_bytes)]
 	pub struct Sheet {
 		pub icon: Box<str>,
 		/// Note that this includes the character's name.
@@ -530,7 +520,6 @@ impl expression::Variables for Sheet {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]

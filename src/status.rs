@@ -10,7 +10,6 @@ use mlua::LuaSerdeExt;
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub enum Duration {
 	Rest,
 	Turn,
@@ -25,7 +24,6 @@ pub enum Duration {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Debuff {
 	#[serde(skip)]
 	magnitude: u32,
@@ -52,7 +50,6 @@ impl Debuff {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub enum Effect {
 	StaticDebuff(character::Stats),
 	Debuff(Debuff),
@@ -67,7 +64,6 @@ pub enum Effect {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Status {
 	pub name: String,
 	pub icon: String,

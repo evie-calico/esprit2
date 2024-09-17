@@ -10,7 +10,6 @@ use std::fmt;
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 #[serde(tag = "type")]
 pub enum Log {
 	/// An attack that dealt damage

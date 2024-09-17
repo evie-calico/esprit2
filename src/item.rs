@@ -8,7 +8,6 @@
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Piece {
 	pub item: Item,
 	pub x: i32,
@@ -25,7 +24,6 @@ pub struct Piece {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Item {
 	pub name: String,
 }

@@ -8,7 +8,6 @@ use std::collections::VecDeque;
 #[derive(
 	Debug, serde::Serialize, serde::Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
@@ -46,7 +45,6 @@ impl Default for Level {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
 	pub piece: character::Ref,
@@ -78,7 +76,6 @@ pub struct PartyReferenceBase {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[archive(check_bytes)]
 pub struct Location {
 	/// Which level is currently loaded.
 	pub level: String,

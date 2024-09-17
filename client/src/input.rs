@@ -76,7 +76,7 @@ impl<'lua> PartialAction<'lua> {
 		self,
 		lua: &'lua mlua::Lua,
 		arg: impl mlua::IntoLuaMulti<'lua>,
-	) -> esprit2::Result<Response> {
+	) -> esprit2::Result<Response<'lua>> {
 		match self {
 			PartialAction::Attack(attack, next_character, thread) => {
 				let value = thread.resume(arg)?;
