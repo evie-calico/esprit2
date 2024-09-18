@@ -239,9 +239,6 @@ pub fn main() {
 		.position_centered()
 		.build()
 		.unwrap();
-
-	video_subsystem.vulkan_load_library_default().unwrap();
-
 	let mut canvas = window
 		.into_canvas()
 		.accelerated()
