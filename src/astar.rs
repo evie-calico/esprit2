@@ -1,7 +1,5 @@
 //! "A* & co has been overdone a million times."
 
-use tracing::trace;
-
 use crate::prelude::*;
 use std::collections::HashMap;
 
@@ -113,7 +111,6 @@ impl Floor {
 	pub fn target(targets: &[(i32, i32)]) -> Self {
 		let mut map = Self::default();
 		for (x, y) in targets.iter().cloned() {
-			trace!(x, y, "targetting");
 			map.explore_tile(x, y, 0);
 		}
 		map
@@ -138,7 +135,6 @@ impl Floor {
 				if tile != IMPASSABLE {
 					let distance = evaluate_tile(ax, ay, base_distance);
 					if distance < tile {
-						trace!(x = ax, y = ay, distance, "exploring");
 						self.explore_tile(ax, ay, distance);
 					}
 					if ax == x && ay == y {
