@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use sdl2::rect::Rect;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
 use std::process::exit;
 
 pub struct State<'texture> {
@@ -161,17 +159,10 @@ impl<'texture> State<'texture> {
 	pub fn draw<'lua>(
 		&mut self,
 		input_mode: &mut input::Mode<'lua>,
-		canvas: &mut Canvas<Window>,
-		canvas_size: (u32, u32),
+		ctx: &mut gui::Context,
 		textures: &'texture texture::Manager,
-		typography: &Typography,
 		options: &Options,
 	) {
-		// Clear the screen.
-		canvas.set_draw_color((20, 20, 20));
-		canvas.clear();
-		canvas.set_viewport(Rect::new(0, 0, canvas_size.0, canvas_size.1));
-
 		// Render World
 		let width = 480;
 		let height = 320;
@@ -190,12 +181,12 @@ impl<'texture> State<'texture> {
 			camera.focus_character(&focused_character.borrow());
 		}
 
-		let texture_creator = canvas.texture_creator();
+		let texture_creator = ctx.canvas.texture_creator();
 		let mut world_texture = texture_creator
 			.create_texture_target(texture_creator.default_pixel_format(), width, height)
 			.unwrap();
 
-		canvas
+		ctx.canvas
 			.with_texture_canvas(&mut world_texture, |canvas| {
 				canvas.set_draw_color((20, 20, 20));
 				canvas.clear();
@@ -205,16 +196,16 @@ impl<'texture> State<'texture> {
 			})
 			.unwrap();
 
-		canvas
+		ctx.canvas
 			.copy(
 				&world_texture,
 				None,
 				Rect::new(
-					(canvas_size.0 as i32
+					(ctx.rect.width() as i32
 						- options.ui.pamphlet_width as i32
 						- width as i32 * options.board.scale as i32)
 						/ 2,
-					(canvas_size.1 as i32
+					(ctx.rect.height() as i32
 						- options.ui.console_height as i32
 						- height as i32 * options.board.scale as i32)
 						/ 2,
@@ -225,17 +216,13 @@ impl<'texture> State<'texture> {
 			.unwrap();
 
 		// Render User Interface
-		canvas.set_viewport(None);
+		ctx.canvas.set_viewport(None);
 
-		let mut menu = gui::Context::new(
-			canvas,
-			typography,
-			Rect::new(
-				0,
-				(canvas_size.1 - options.ui.console_height) as i32,
-				canvas_size.0 - options.ui.pamphlet_width,
-				options.ui.console_height,
-			),
+		let mut menu = ctx.view(
+			0,
+			(ctx.rect.height() - options.ui.console_height) as i32,
+			ctx.rect.width() - options.ui.pamphlet_width,
+			options.ui.console_height,
 		);
 		gui::widget::menu(
 			&mut menu,
@@ -248,15 +235,11 @@ impl<'texture> State<'texture> {
 		);
 
 		// Draw pamphlet
-		let mut pamphlet_ctx = gui::Context::new(
-			canvas,
-			typography,
-			Rect::new(
-				(canvas_size.0 - options.ui.pamphlet_width) as i32,
-				0,
-				options.ui.pamphlet_width,
-				canvas_size.1,
-			),
+		let mut pamphlet_ctx = ctx.view(
+			(ctx.rect.width() - options.ui.pamphlet_width) as i32,
+			0,
+			options.ui.pamphlet_width,
+			ctx.rect.height(),
 		);
 
 		self.cloudy_wave.draw(
@@ -272,7 +255,5 @@ impl<'texture> State<'texture> {
 			textures,
 			&mut self.soul_jar,
 		);
-
-		canvas.present();
 	}
 }

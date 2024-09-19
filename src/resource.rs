@@ -32,12 +32,12 @@ macro_rules! impl_resource {
 	};
 	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt ) => {
 		#[derive(
-			Clone, Debug,
+			Clone, Debug, Eq, PartialEq,
 			serde::Serialize, serde::Deserialize,
 			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 			mlua::FromLua,
 		)]
-		pub struct $Name(Id);
+		pub struct $Name(Box<str>);
 
 		impl $Name {
 			pub fn new(id: &str) -> Self {
@@ -45,7 +45,7 @@ macro_rules! impl_resource {
 			}
 		}
 
-		impl<T: Into<Id>> From<T> for $Name {
+		impl<T: Into<Box<str>>> From<T> for $Name {
 			fn from(s: T) -> Self {
 				Self(s.into())
 			}
@@ -62,7 +62,13 @@ macro_rules! impl_resource {
 			}
 		}
 
-		impl mlua::UserData for $Name {}
+		impl ::std::fmt::Display for $Name {
+			fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+				f.write_str(&self.0)
+			}
+		}
+
+		impl ::mlua::UserData for $Name {}
 	};
 }
 

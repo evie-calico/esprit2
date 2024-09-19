@@ -4,9 +4,9 @@ use crate::prelude::*;
 use esprit2::prelude::*;
 use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, TextureCreator, TextureQuery};
+use sdl2::render::{Canvas, Texture, TextureQuery};
 use sdl2::ttf::Font;
-use sdl2::video::{Window, WindowContext};
+use sdl2::video::Window;
 use std::ops::Range;
 
 pub mod widget;
@@ -16,8 +16,6 @@ const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 pub struct Context<'canvas, 'ttf_module, 'rwops> {
 	pub canvas: &'canvas mut Canvas<Window>,
 	pub typography: &'ttf_module Typography<'ttf_module, 'rwops>,
-	/// Used by draw_text to store textures of fonts before drawing them.
-	font_texture_creator: TextureCreator<WindowContext>,
 	pub rect: Rect,
 	/// These values control the position of the cursor.
 	pub x: i32,
@@ -43,16 +41,22 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		typography: &'ttf_module Typography<'ttf_module, 'rwops>,
 		rect: Rect,
 	) -> Self {
-		let font_texture_creator = canvas.texture_creator();
 		Self {
 			canvas,
 			typography,
-			font_texture_creator,
 			rect,
 			y: rect.y,
 			x: rect.x,
 			orientation: Orientation::Vertical,
 		}
+	}
+
+	pub fn view(&mut self, x: i32, y: i32, width: u32, height: u32) -> Context {
+		Context::new(
+			self.canvas,
+			self.typography,
+			Rect::new(self.x + x, self.y + y, width, height),
+		)
 	}
 
 	pub fn relocate(&mut self, rect: Rect) {
@@ -116,6 +120,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 	pub fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
 		let font = &self.typography.normal;
 		let color = self.typography.color;
+		let texture_creator = self.canvas.texture_creator();
 		let mut largest_margin = 0;
 		let mut cursor = 0;
 		for (margin, content) in list
@@ -125,13 +130,13 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 					.render(margin)
 					.blended(color)
 					.unwrap()
-					.as_texture(&self.font_texture_creator)
+					.as_texture(&texture_creator)
 					.unwrap();
 				let content = font
 					.render(content)
 					.blended(color)
 					.unwrap()
-					.as_texture(&self.font_texture_creator)
+					.as_texture(&texture_creator)
 					.unwrap();
 				largest_margin = margin.query().width.max(largest_margin);
 
@@ -227,11 +232,12 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		font: &Font,
 		justification: Justification,
 	) {
+		let texture_creator = self.canvas.texture_creator();
 		let font_texture = font
 			.render(s)
 			.blended(color)
 			.unwrap()
-			.as_texture(&self.font_texture_creator)
+			.as_texture(&texture_creator)
 			.unwrap();
 		let TextureQuery { width, height, .. } = font_texture.query();
 		self.canvas
@@ -256,11 +262,12 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 	}
 
 	pub fn opposing_labels(&mut self, s1: &str, s2: &str, color: Color, font: &Font) {
+		let texture_creator = self.canvas.texture_creator();
 		let font_texture = font
 			.render(s1)
 			.blended(color)
 			.unwrap()
-			.as_texture(&self.font_texture_creator)
+			.as_texture(&texture_creator)
 			.unwrap();
 		let TextureQuery { width, height, .. } = font_texture.query();
 		self.canvas
@@ -275,7 +282,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 			.render(s2)
 			.blended(color)
 			.unwrap()
-			.as_texture(&self.font_texture_creator)
+			.as_texture(&texture_creator)
 			.unwrap();
 		let TextureQuery { width, height, .. } = font_texture.query();
 		self.canvas

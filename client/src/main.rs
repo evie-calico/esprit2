@@ -21,6 +21,7 @@ mod state;
 
 pub use console_impl::Console;
 pub use options::Options;
+use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
 pub use typography::Typography;
 
@@ -190,18 +191,20 @@ pub fn main() {
 			}
 		};
 
+		let canvas_size = canvas.window().size();
+		let viewport = Rect::new(0, 0, canvas_size.0, canvas_size.1);
+		canvas.set_draw_color((20, 20, 20));
+		canvas.clear();
+		canvas.set_viewport(viewport);
+
+		let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
+
 		match &mut state {
 			State::World(input_mode, world_state) => {
-				let canvas_size = canvas.window().size();
-				world_state.draw(
-					input_mode,
-					&mut canvas,
-					canvas_size,
-					&textures,
-					&typography,
-					&options,
-				);
+				world_state.draw(input_mode, &mut gui, &textures, &options);
 			}
 		};
+
+		canvas.present();
 	}
 }
