@@ -1,7 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
-use crate::input;
-use crate::texture;
+use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::gfx::primitives::DrawRenderer;
@@ -328,7 +327,7 @@ impl CloudTrail {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct CloudyWave {
+pub struct CloudyWave {
 	timer: f64,
 }
 

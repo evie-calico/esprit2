@@ -1,5 +1,4 @@
-use crate::select;
-use crate::{options::Options, ServerHandle};
+use crate::prelude::*;
 use esprit2::prelude::*;
 use mlua::FromLua;
 use mlua::LuaSerdeExt;
@@ -110,7 +109,7 @@ impl<'lua> PartialAction<'lua> {
 	}
 }
 
-pub(crate) struct Cursor<'lua> {
+pub struct Cursor<'lua> {
 	pub(crate) origin: (i32, i32),
 	pub(crate) position: (i32, i32),
 	pub(crate) range: u32,
@@ -119,17 +118,17 @@ pub(crate) struct Cursor<'lua> {
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub(crate) struct Prompt<'lua> {
+pub struct Prompt<'lua> {
 	pub(crate) message: String,
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub(crate) struct DirectionPrompt<'lua> {
+pub struct DirectionPrompt<'lua> {
 	pub(crate) message: String,
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub(crate) enum Mode<'lua> {
+pub enum Mode<'lua> {
 	Normal,
 	// Select modes
 	Select,
@@ -142,8 +141,6 @@ pub(crate) enum Mode<'lua> {
 }
 
 pub(crate) enum Response<'lua> {
-	Fullscreen,
-	Debug,
 	Select(select::Point),
 	Act(character::Action),
 	Partial(PartialAction<'lua>, Request),
@@ -160,12 +157,6 @@ pub(crate) fn controllable_character<'lua>(
 ) -> Result<(Mode<'lua>, Option<Response<'lua>>)> {
 	match mode {
 		Mode::Normal => {
-			if options.controls.debug.contains(keycode) {
-				return Ok((mode, Some(Response::Debug)));
-			}
-			if options.controls.fullscreen.contains(keycode) {
-				return Ok((mode, Some(Response::Fullscreen)));
-			}
 			let directions = [
 				(&options.controls.left, -1, 0),
 				(&options.controls.right, 1, 0),

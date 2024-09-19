@@ -2,6 +2,12 @@ use esprit2::prelude::*;
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
+pub struct Dummy;
+
+impl console::Handle for Dummy {
+	fn send_message(&self, _message: console::Message) {}
+}
+
 #[derive(Debug, Clone)]
 pub struct Handle {
 	sender: mpsc::Sender<console::Message>,

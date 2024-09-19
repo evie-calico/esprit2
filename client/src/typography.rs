@@ -7,7 +7,6 @@ use tracing::error;
 pub struct Typography<'ttf_module, 'rwops> {
 	pub normal: Font<'ttf_module, 'rwops>,
 	pub annotation: Font<'ttf_module, 'rwops>,
-	#[expect(dead_code)]
 	pub title: Font<'ttf_module, 'rwops>,
 
 	pub color: Color,

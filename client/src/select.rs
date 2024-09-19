@@ -1,13 +1,13 @@
 use esprit2::prelude::*;
 
 #[derive(Clone, Debug)]
-pub(crate) enum Point {
+pub enum Point {
 	Character(character::Ref),
 	Exit(i32, i32),
 }
 
 /// Compiles all potential points of interest into a list.
-pub(crate) fn assign_indicies(world: &world::Manager) -> Vec<Point> {
+pub fn assign_indicies(world: &world::Manager) -> Vec<Point> {
 	world
 		.characters
 		.iter()

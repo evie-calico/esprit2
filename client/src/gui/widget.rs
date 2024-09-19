@@ -1,20 +1,18 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
-use crate::console::Console;
-use crate::options::Options;
-use crate::{draw, gui, input, texture};
+use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
 
 #[derive(Clone, Default, Debug)]
-pub(crate) struct PartyReferenceDrawState {
+pub struct PartyReferenceDrawState {
 	pub(crate) cloud: draw::CloudState,
 	pub(crate) cloud_trail: draw::CloudTrail,
 }
 
-pub(crate) struct SoulJar<'texture> {
+pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
 	light_texture: Texture<'texture>,
 }
@@ -31,14 +29,14 @@ impl<'texture> SoulJar<'texture> {
 		})
 	}
 
-	pub(crate) fn tick(&mut self, delta: f32) {
+	pub fn tick(&mut self, delta: f32) {
 		for i in &mut self.souls {
 			i.tick(delta);
 		}
 	}
 }
 
-pub(crate) fn menu(
+pub fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
 	input_mode: &input::Mode,
@@ -200,8 +198,8 @@ pub(crate) fn attack_menu(
 	}
 }
 
-pub(crate) struct Pamphlet {
-	pub(crate) party_member_clouds: Vec<PartyReferenceDrawState>,
+pub struct Pamphlet {
+	pub party_member_clouds: Vec<PartyReferenceDrawState>,
 }
 
 impl Pamphlet {

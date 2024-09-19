@@ -168,6 +168,7 @@ pub mod prelude {
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
+	pub use resource::Resource;
 	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use status::Status;
