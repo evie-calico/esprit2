@@ -9,6 +9,24 @@ This is a sequel to Esprit for the Game Boy.
 - Magic system
 - Freeplay roguelike mode where you can make a character and play with no story.
 
+## Dependencies
+
+The `mlua` and `sdl2` libraries provide bindings to their respective C libraries.
+These libraries and the tools required to link them must be installed to build esprit2.
+
+- sdl2
+- sdl2_image
+- sdl2_ttf
+- sdl2_gfx
+- luajit
+
+In addition, the following tools *may* be required to link these programs:
+- make
+- pkg-config
+
+If you have any trouble while compiling with a program not on this list, please open an issue.
+It's not easy to tell what's required by the cargo build scripts for these crates.
+
 ## Client
 
 The client crate (what you run to play the game) is stored in the [client/](client/) directory,

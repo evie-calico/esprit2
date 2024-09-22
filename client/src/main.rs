@@ -21,6 +21,7 @@ mod state;
 
 pub use console_impl::Console;
 pub use options::Options;
+use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
 pub use typography::Typography;
@@ -140,7 +141,11 @@ pub fn main() {
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
-	let mut state = State::world(cli.address.as_deref(), &lua, &textures);
+	// let mut state = State::world(cli.address.as_deref(), &lua, &textures);
+	let mut state = State::Login(String::new());
+
+	let text_input = video_subsystem.text_input();
+	text_input.start();
 
 	let mut fps = 60.0;
 	let mut fps_timer = 0.0;
@@ -163,9 +168,30 @@ pub fn main() {
 						}
 					}
 				}
-
 				_ => {
 					state = match state {
+						State::Login(mut host) => match event {
+							Event::TextInput { text, .. } => {
+								host.push_str(&text);
+								State::Login(host)
+							}
+							Event::KeyDown {
+								keycode: Some(Keycode::BACKSPACE),
+								..
+							} => {
+								host.pop();
+								State::Login(host)
+							}
+							Event::KeyDown {
+								keycode: Some(Keycode::RETURN),
+								..
+							} => State::world(
+								Some(host.as_str()).filter(|x| !x.is_empty()),
+								&lua,
+								&textures,
+							),
+							_ => State::Login(host),
+						},
 						State::World(mut input_mode, mut world_state) => {
 							input_mode = world_state.input(input_mode, event, &scripts, &options);
 							State::World(input_mode, world_state)
@@ -185,6 +211,7 @@ pub fn main() {
 		}
 
 		state = match state {
+			s @ State::Login(_) => s,
 			State::World(mut input_mode, mut world_state) => {
 				world_state.tick(delta, &mut input_mode, &scripts);
 				State::World(input_mode, world_state)
@@ -200,6 +227,12 @@ pub fn main() {
 		let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
 
 		match &mut state {
+			State::Login(user) => {
+				gui.horizontal();
+				gui.label("Connect to server: ");
+				gui.label(user);
+				gui.vertical();
+			}
 			State::World(input_mode, world_state) => {
 				world_state.draw(input_mode, &mut gui, &textures, &options);
 			}

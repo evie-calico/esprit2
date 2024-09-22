@@ -10,7 +10,8 @@ members = ["client", "server"]
 default-members = ["client"]
 
 [workspace.dependencies]
-rkyv = { git = "https://github.com/rkyv/rkyv.git" }
+rkyv = "0.8.8"
+mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize"] }
 
 [workspace.lints]
 clippy.module_name_repetitions = "warn"
@@ -21,7 +22,7 @@ clippy.unwrap_used = "warn"
 [dependencies]
 # Lua scripting
 alua = { version = "0.1.3", features = ["userdata"] }
-mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize", "vendored"] }
+mlua.workspace = true
 
 # Parser generator for expression.rs
 pest = "2.7.10"

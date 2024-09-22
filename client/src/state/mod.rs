@@ -4,6 +4,7 @@ use esprit2_server::protocol;
 pub mod world;
 
 pub enum State<'lua, 'texture> {
+	Login(String),
 	World(input::Mode<'lua>, world::State<'texture>),
 }
 

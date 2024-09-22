@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 esprit2.path = "../"
-mlua = "0.9.9"
+mlua.workspace = true
 rand = "0.8.5"
 serde = "1.0.208"
 thiserror = "1.0.63"

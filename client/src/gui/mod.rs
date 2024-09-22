@@ -232,6 +232,9 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		font: &Font,
 		justification: Justification,
 	) {
+		if s.is_empty() {
+			return;
+		}
 		let texture_creator = self.canvas.texture_creator();
 		let font_texture = font
 			.render(s)
