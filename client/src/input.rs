@@ -2,7 +2,141 @@ use crate::prelude::*;
 use esprit2::prelude::*;
 use mlua::FromLua;
 use mlua::LuaSerdeExt;
+use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+
+pub enum Signal<T> {
+	None,
+	Cancel,
+	Yield(T),
+}
+
+#[derive(Debug, Default)]
+pub struct LineInput {
+	pub line: String,
+	pub submitted: bool,
+}
+
+impl std::ops::Deref for LineInput {
+	type Target = str;
+
+	fn deref(&self) -> &Self::Target {
+		self.line.as_str()
+	}
+}
+
+impl LineInput {
+	/// Returns `true` when closed.
+	///
+	/// # Panics
+	///
+	/// Panics when recieving an empty set of leaves.
+	pub fn dispatch<T>(
+		&mut self,
+		event: &Event,
+		options: &Options,
+		submit: impl FnOnce(&str) -> Signal<T>,
+	) -> Signal<T> {
+		if self.submitted {
+			let signal = submit(&self.line);
+			if let Signal::Cancel = signal {
+				self.submitted = false;
+			} else {
+				return signal;
+			}
+		} else {
+			match event {
+				Event::TextInput { text, .. } => self.line.push_str(text),
+				Event::KeyDown {
+					keycode: Some(Keycode::BACKSPACE),
+					..
+				} => {
+					self.line.pop();
+				}
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.confirm.contains(*keycode) => {
+					self.submitted = true;
+				}
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.escape.contains(*keycode) => return Signal::Cancel,
+				_ => {}
+			}
+		}
+		Signal::None
+	}
+}
+
+pub trait RadioBacker {
+	fn inc(&mut self) -> bool;
+	fn dec(&mut self) -> bool;
+	fn index(&self) -> usize;
+}
+
+/// A dialogue describing a list of things and whether or not they have been selected.
+#[derive(Debug, Default)]
+pub struct Radio<Backer: RadioBacker> {
+	/// Tracks the currently "hovered" option.
+	pub backer: Backer,
+	/// Whether or not the radio is currently "submitted".
+	///
+	/// An unsubmitted radio consumes events,
+	/// using them to translate the cursor.
+	pub submitted: bool,
+}
+
+impl<Backer: RadioBacker> Radio<Backer> {
+	/// Returns `true` when closed.
+	///
+	/// # Panics
+	///
+	/// Panics when recieving an empty set of leaves.
+	pub fn dispatch<T>(
+		&mut self,
+		event: &Event,
+		options: &Options,
+		submit: impl FnOnce(&Backer) -> Signal<T>,
+	) -> Signal<T> {
+		if self.submitted {
+			let signal = submit(&self.backer);
+			if let Signal::Cancel = signal {
+				self.submitted = false;
+			} else {
+				return signal;
+			}
+		} else {
+			match event {
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.down.contains(*keycode) => {
+					self.backer.inc();
+				}
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.up.contains(*keycode) => {
+					self.backer.dec();
+				}
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.confirm.contains(*keycode) => {
+					self.submitted = true;
+				}
+				Event::KeyDown {
+					keycode: Some(keycode),
+					..
+				} if options.controls.escape.contains(*keycode) => return Signal::Cancel,
+				_ => {}
+			}
+		}
+		Signal::None
+	}
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct SinWave(u16);

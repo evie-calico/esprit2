@@ -4,24 +4,23 @@
 	let_chains,
 	int_roundings,
 	core_io_borrowed_buf,
-	read_buf
+	read_buf,
+	trait_alias
 )]
 
 pub mod console_impl;
 pub mod draw;
 pub mod gui;
 pub mod input;
+pub mod menu;
 pub mod options;
 pub mod select;
 pub mod texture;
 pub mod typography;
 
-mod server_handle;
-mod state;
-
+use clap::Parser;
 pub use console_impl::Console;
 pub use options::Options;
-use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
 pub use typography::Typography;
@@ -30,10 +29,13 @@ pub mod prelude {
 	pub use super::*;
 }
 
+mod server_handle;
+mod world_state;
+
 use esprit2::prelude::*;
-use state::State;
 use std::process::exit;
 use std::{fs, io};
+use world_state::State as WorldState;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -48,14 +50,23 @@ fn update_delta(
 		/ 1000.0
 }
 
+#[derive(Debug, Clone)]
+pub enum RootMenuResponse {
+	OpenSingleplayer,
+	OpenMultiplayer { host: String },
+}
+
 #[derive(clap::Parser)]
 struct Cli {
-	address: Option<Box<str>>,
+	#[clap(long)]
+	username: Option<Box<str>>,
+
+	host: Option<Box<str>>,
 }
 
 #[allow(clippy::unwrap_used, reason = "SDL")]
 pub fn main() {
-	let cli = <Cli as clap::Parser>::parse();
+	let cli = Cli::parse();
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();
 	let ttf_context = sdl2::ttf::init().unwrap();
@@ -141,8 +152,10 @@ pub fn main() {
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
-	// let mut state = State::world(cli.address.as_deref(), &lua, &textures);
-	let mut state = State::Login(String::new());
+	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> = Some(Box::new(
+		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
+	));
+	let mut world: Option<(input::Mode, WorldState)> = None;
 
 	let text_input = video_subsystem.text_input();
 	text_input.start();
@@ -169,34 +182,29 @@ pub fn main() {
 					}
 				}
 				_ => {
-					state = match state {
-						State::Login(mut host) => match event {
-							Event::TextInput { text, .. } => {
-								host.push_str(&text);
-								State::Login(host)
+					if let Some(menu_state) = &mut menu {
+						match menu_state.event(&event, &options) {
+							input::Signal::None => {}
+							input::Signal::Cancel => break 'game,
+							input::Signal::Yield(RootMenuResponse::OpenSingleplayer) => {
+								world = Some((
+									input::Mode::Normal,
+									WorldState::new(None, &lua, &textures),
+								));
+								menu = None;
 							}
-							Event::KeyDown {
-								keycode: Some(Keycode::BACKSPACE),
-								..
-							} => {
-								host.pop();
-								State::Login(host)
+							input::Signal::Yield(RootMenuResponse::OpenMultiplayer { host }) => {
+								world = Some((
+									input::Mode::Normal,
+									WorldState::new(Some(&host), &lua, &textures),
+								));
+								menu = None;
 							}
-							Event::KeyDown {
-								keycode: Some(Keycode::RETURN),
-								..
-							} => State::world(
-								Some(host.as_str()).filter(|x| !x.is_empty()),
-								&lua,
-								&textures,
-							),
-							_ => State::Login(host),
-						},
-						State::World(mut input_mode, mut world_state) => {
-							input_mode = world_state.input(input_mode, event, &scripts, &options);
-							State::World(input_mode, world_state)
 						}
-					};
+					} else if let Some((mut input_mode, mut world_state)) = world {
+						input_mode = world_state.event(input_mode, event, &scripts, &options);
+						world = Some((input_mode, world_state));
+					}
 				}
 			}
 		}
@@ -210,13 +218,9 @@ pub fn main() {
 			fps = (fps + 1.0 / delta) / 2.0;
 		}
 
-		state = match state {
-			s @ State::Login(_) => s,
-			State::World(mut input_mode, mut world_state) => {
-				world_state.tick(delta, &mut input_mode, &scripts);
-				State::World(input_mode, world_state)
-			}
-		};
+		if let Some((input_mode, world)) = &mut world {
+			world.tick(delta, input_mode, &scripts);
+		}
 
 		let canvas_size = canvas.window().size();
 		let viewport = Rect::new(0, 0, canvas_size.0, canvas_size.1);
@@ -226,17 +230,12 @@ pub fn main() {
 
 		let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
 
-		match &mut state {
-			State::Login(user) => {
-				gui.horizontal();
-				gui.label("Connect to server: ");
-				gui.label(user);
-				gui.vertical();
-			}
-			State::World(input_mode, world_state) => {
-				world_state.draw(input_mode, &mut gui, &textures, &options);
-			}
-		};
+		if let Some(menu) = &menu {
+			menu.draw(&mut gui, &textures);
+		}
+		if let Some((input_mode, world)) = &world {
+			world.draw(input_mode, &mut gui, &textures, &options);
+		}
 
 		canvas.present();
 	}

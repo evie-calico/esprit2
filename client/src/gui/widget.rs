@@ -5,6 +5,7 @@ use esprit2::prelude::*;
 use rand::Rng;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Texture;
+use std::cell::RefCell;
 
 #[derive(Clone, Default, Debug)]
 pub struct PartyReferenceDrawState {
@@ -14,7 +15,7 @@ pub struct PartyReferenceDrawState {
 
 pub struct SoulJar<'texture> {
 	souls: Vec<Soul>,
-	light_texture: Texture<'texture>,
+	light_texture: RefCell<Texture<'texture>>,
 }
 
 impl<'texture> SoulJar<'texture> {
@@ -25,7 +26,7 @@ impl<'texture> SoulJar<'texture> {
 			.collect();
 		Ok(Self {
 			souls,
-			light_texture: textures.open("light")?,
+			light_texture: RefCell::new(textures.open("light")?),
 		})
 	}
 
@@ -219,7 +220,7 @@ impl Pamphlet {
 		pamphlet: &mut gui::Context,
 		world_manager: &world::Manager,
 		textures: &texture::Manager,
-		soul_jar: &mut SoulJar<'_>,
+		soul_jar: &SoulJar<'_>,
 	) {
 		struct MemberPosition {
 			x: i32,
@@ -310,13 +311,15 @@ impl Pamphlet {
 				let display_size = (display_size - SOUL_SIZE) as f32;
 				let ox = soul.x * display_size;
 				let oy = soul.y * display_size;
-				soul_jar
-					.light_texture
-					.set_color_mod(soul.color.0, soul.color.1, soul.color.2);
+				soul_jar.light_texture.borrow_mut().set_color_mod(
+					soul.color.0,
+					soul.color.1,
+					soul.color.2,
+				);
 				pamphlet
 					.canvas
 					.copy(
-						&soul_jar.light_texture,
+						&soul_jar.light_texture.borrow(),
 						None,
 						Rect::new((bx + ox) as i32, (by + oy) as i32, SOUL_SIZE, SOUL_SIZE),
 					)

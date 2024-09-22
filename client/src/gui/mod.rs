@@ -117,6 +117,25 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(0, (lowest_child - self.y) as u32);
 	}
 
+	pub fn menu<'texture>(
+		&mut self,
+		index: Option<(usize, &Texture<'texture>)>,
+		entries: impl IntoIterator<Item = &str>,
+	) {
+		for (i, label) in entries.into_iter().enumerate() {
+			self.horizontal();
+			if let Some((index, texture)) = index
+				&& index == i
+			{
+				self.htexture(texture, 16);
+			} else {
+				self.advance(16, 0);
+			}
+			self.label(label);
+			self.vertical();
+		}
+	}
+
 	pub fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
 		let font = &self.typography.normal;
 		let color = self.typography.color;
