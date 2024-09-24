@@ -158,26 +158,7 @@ impl console::Handle for Console {
 	}
 }
 
-struct Instance {
-	console_reciever: mpsc::Receiver<console::Message>,
-	console_handle: Console,
-	server: Server,
-}
-
-impl Instance {
-	fn new(res: PathBuf) -> Self {
-		let (sender, console_reciever) = mpsc::channel();
-		let console_handle = Console { sender };
-		let server = Server::new(res);
-		Self {
-			console_reciever,
-			console_handle,
-			server,
-		}
-	}
-}
-
-pub fn connection(mut stream: TcpStream, res: PathBuf) {
+pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 	const TIMEOUT: Duration = Duration::from_secs(10);
 
 	// Create a Lua runtime.
@@ -191,91 +172,87 @@ pub fn connection(mut stream: TcpStream, res: PathBuf) {
 
 	let scripts = resource::Scripts::open(res.join("scripts"), &lua).unwrap();
 
+	let (sender, console_reciever) = mpsc::channel();
+	let console_handle = Console { sender };
 	// For now, this spins up a new server for each connection
 	// TODO: Route connections to the same instance.
-	let mut instance = Instance::new(res);
+	let mut server = Server::new(res);
 
 	lua.globals()
-		.set(
-			"Console",
-			console::LuaHandle(instance.console_handle.clone()),
-		)
+		.set("Console", console::LuaHandle(console_handle.clone()))
 		.unwrap();
 	lua.globals()
-		.set("Status", instance.server.resources.statuses_handle())
+		.set("Status", server.resources.statuses_handle())
 		.unwrap();
 	lua.globals()
 		.set("Heuristic", consider::HeuristicConstructor)
 		.unwrap();
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
-	instance.server.send_ping();
-	// TODO: how do we start communication?
-	{
-		// Give the client an unintial world state.
-		let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
-			world: &instance.server.world,
-		})
-		.unwrap();
-		let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-		stream.write_all(&packet_len).unwrap();
-		stream.write_all(&packet).unwrap();
-	}
-	let mut packet_reciever = protocol::PacketReciever::default();
+	let mut clients = Vec::new();
 	let mut awaiting_input = false;
 	loop {
-		packet_reciever
-			.recv(&mut stream, |packet| {
-				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
-				match packet {
-					protocol::ArchivedClientPacket::Ping(id) => {
-						instance.server.recv_ping();
-					}
-					protocol::ArchivedClientPacket::Action(action_archive) => {
-						let action: character::Action =
-							rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
-						instance
-							.server
-							.recv_action(&instance.console_handle, &scripts, action)
-							.unwrap();
-						awaiting_input = false;
-					}
-				}
-			})
-			.unwrap();
-		// This check has to happen after recieving packets to be as charitable to the client as possible.
-		if instance.server.players.ping.elapsed() > TIMEOUT {
-			info!(player = "player", "disconnected by timeout");
-			return;
-		}
-		instance
-			.server
-			.tick(&scripts, &instance.console_handle)
-			.unwrap();
-		if instance
-			.server
-			.world
-			.next_character()
-			.borrow()
-			.player_controlled
-			&& !awaiting_input
-		{
-			awaiting_input = true;
+		for mut client in router.try_iter() {
+			// TODO: how do we start communication?
+			server.send_ping();
+			// Give the client an intial world state.
 			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
-				world: &instance.server.world,
+				world: &server.world,
 			})
 			.unwrap();
 			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-			stream.write_all(&packet_len).unwrap();
-			stream.write_all(&packet).unwrap();
+			client.write_all(&packet_len).unwrap();
+			client.write_all(&packet).unwrap();
+			let packet_reciever = protocol::PacketReciever::default();
+			clients.push((client, packet_reciever));
 		}
 
-		for i in instance.console_reciever.try_iter() {
-			let packet =
-				rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::Message(i)).unwrap();
-			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-			stream.write_all(&packet_len).unwrap();
-			stream.write_all(&packet).unwrap();
+		for (client, packet_reciever) in &mut clients {
+			packet_reciever
+				.recv(&mut *client, |packet| {
+					let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+					match packet {
+						protocol::ArchivedClientPacket::Ping(id) => {
+							server.recv_ping();
+						}
+						protocol::ArchivedClientPacket::Action(action_archive) => {
+							let action: character::Action =
+								rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive)
+									.unwrap();
+							server
+								.recv_action(&console_handle, &scripts, action)
+								.unwrap();
+							awaiting_input = false;
+						}
+					}
+				})
+				.unwrap();
+			// This check has to happen after recieving packets to be as charitable to the client as possible.
+			if server.players.ping.elapsed() > TIMEOUT {
+				info!(player = "player", "disconnected by timeout");
+				break;
+			}
+			server.tick(&scripts, &console_handle).unwrap();
+			if server.world.next_character().borrow().player_controlled && !awaiting_input {
+				awaiting_input = true;
+				let packet =
+					rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
+						world: &server.world,
+					})
+					.unwrap();
+				let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
+				client.write_all(&packet_len).unwrap();
+				client.write_all(&packet).unwrap();
+			}
+
+			for i in console_reciever.try_iter() {
+				let packet =
+					rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::Message(i))
+						.unwrap();
+				let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
+				client.write_all(&packet_len).unwrap();
+				client.write_all(&packet).unwrap();
+			}
 		}
 	}
 }

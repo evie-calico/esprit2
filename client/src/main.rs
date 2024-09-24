@@ -37,6 +37,7 @@ mod world_state;
 use esprit2::prelude::*;
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::process::exit;
+use std::sync::mpsc;
 use std::{fs, io, thread};
 use world_state::State as WorldState;
 
@@ -273,16 +274,16 @@ fn singular_host(listener: TcpListener) {
 		addr = listener.local_addr().unwrap().to_string()
 	)
 	.entered();
+	let (router, reciever) = mpsc::channel();
+	let connection = thread::spawn(move || {
+		esprit2_server::connection(reciever, options::resource_directory().clone())
+	});
 	info!("listening for connections");
 	for stream in listener.incoming() {
 		match stream {
+			// No routing necessary, just forward all streams to the instance.
 			Ok(stream) => {
-				let _enter =
-					tracing::error_span!("client", addr = stream.peer_addr().unwrap().to_string())
-						.entered();
-				info!("connected");
-				esprit2_server::connection(stream, options::resource_directory().clone());
-				info!("disconnected");
+				router.send(stream).unwrap();
 			}
 			// TODO: What errors may occur? How should they be handled?
 			Err(msg) => error!("failed to read incoming stream: {msg}"),

@@ -45,18 +45,18 @@ fn main() {
 	for stream in listener.incoming() {
 		match stream {
 			Ok(stream) => {
+				let (router, reciever) = mpsc::channel();
 				connections.push(thread::spawn({
 					let res = cli.resource_directory.clone();
 					move || {
-						let _enter = tracing::error_span!(
-							"client",
-							addr = stream.peer_addr().unwrap().to_string()
-						)
-						.entered();
-						info!("connected");
-						connection(stream, res);
+						connection(reciever, res);
 					}
 				}));
+				info!(
+					addr = stream.peer_addr().unwrap().to_string(),
+					"client connected"
+				);
+				router.send(stream).unwrap();
 
 				connections.retain(|x| !x.is_finished());
 				info!(
