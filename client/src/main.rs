@@ -24,6 +24,7 @@ use esprit2_server::protocol;
 pub use options::Options;
 use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
+use tracing::error_span;
 pub use typography::Typography;
 
 pub mod prelude {
@@ -34,8 +35,9 @@ mod server_handle;
 mod world_state;
 
 use esprit2::prelude::*;
+use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::process::exit;
-use std::{fs, io};
+use std::{fs, io, thread};
 use world_state::State as WorldState;
 
 fn update_delta(
@@ -157,6 +159,7 @@ pub fn main() {
 		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
 	));
 	let mut world: Option<(input::Mode, WorldState)> = None;
+	let mut internal_server: Option<thread::JoinHandle<()>> = None;
 
 	let text_input = video_subsystem.text_input();
 	text_input.start();
@@ -188,7 +191,14 @@ pub fn main() {
 							input::Signal::None => {}
 							input::Signal::Cancel => break 'game,
 							input::Signal::Yield(RootMenuResponse::OpenSingleplayer) => {
-								todo!();
+								// TODO: handle and display connection errors.
+								let (address, server) = spawn_instance();
+								internal_server = Some(server);
+								world = Some((
+									input::Mode::Normal,
+									WorldState::new(address, &lua, &textures).unwrap(),
+								));
+								menu = None;
 							}
 							input::Signal::Yield(RootMenuResponse::OpenMultiplayer { host }) => {
 								world = Some((
@@ -241,5 +251,41 @@ pub fn main() {
 		}
 
 		canvas.present();
+	}
+
+	// TODO: join the internal server thread.
+}
+
+fn spawn_instance() -> (SocketAddr, thread::JoinHandle<()>) {
+	let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 0)).unwrap();
+	let address = listener.local_addr().unwrap();
+	(
+		address,
+		thread::spawn(move || {
+			singular_host(listener);
+		}),
+	)
+}
+
+fn singular_host(listener: TcpListener) {
+	let _span = error_span!(
+		"internal server",
+		addr = listener.local_addr().unwrap().to_string()
+	)
+	.entered();
+	info!("listening for connections");
+	for stream in listener.incoming() {
+		match stream {
+			Ok(stream) => {
+				let _enter =
+					tracing::error_span!("client", addr = stream.peer_addr().unwrap().to_string())
+						.entered();
+				info!("connected");
+				esprit2_server::connection(stream, options::resource_directory().clone());
+				info!("disconnected");
+			}
+			// TODO: What errors may occur? How should they be handled?
+			Err(msg) => error!("failed to read incoming stream: {msg}"),
+		}
 	}
 }
