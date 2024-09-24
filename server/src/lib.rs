@@ -17,18 +17,29 @@ pub mod protocol;
 use esprit2::prelude::*;
 use protocol::{PacketReceiver, PacketSender};
 use std::collections::VecDeque;
-use std::io::{self, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use std::{io, thread};
 
 pub struct Client {
-	pub ping: Instant,
 	pub stream: TcpStream,
 	pub receiver: PacketReceiver,
 	pub senders: VecDeque<PacketSender>,
+
+	pub ping: Instant,
+}
+
+impl Client {
+	pub fn send(&mut self) -> io::Result<()> {
+		while let Some(sender) = self.senders.front_mut() {
+			sender.send(&mut self.stream)?;
+			self.senders.pop_front();
+		}
+		Ok(())
+	}
 }
 
 /// Server state
@@ -91,7 +102,7 @@ impl Server {
 		&mut self,
 		scripts: &resource::Scripts,
 		console: impl console::Handle,
-	) -> esprit2::Result<()> {
+	) -> esprit2::Result<bool> {
 		let character = self.world.next_character();
 		if !character.borrow().player_controlled {
 			let considerations = self.world.consider_turn(&self.resources, scripts)?;
@@ -100,8 +111,10 @@ impl Server {
 				.consider_action(scripts, character.clone(), considerations)?;
 			self.world
 				.perform_action(&console, &self.resources, scripts, action)?;
+			Ok(true)
+		} else {
+			Ok(false)
 		}
-		Ok(())
 	}
 }
 
@@ -191,27 +204,32 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
 	loop {
-		for mut stream in router.try_iter() {
-			// Give the client an intial world state.
-			// TODO: don't special-case this.
-			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
-				world: &server.world,
-			})
-			.unwrap();
-			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-			stream.write_all(&packet_len).unwrap();
-			stream.write_all(&packet).unwrap();
-			let receiver = protocol::PacketReceiver::default();
-
-			server.clients.push(Client {
-				ping: Instant::now(),
+		for stream in router.try_iter() {
+			stream.set_nonblocking(true).unwrap();
+			let client = Client {
 				stream,
-				receiver,
-				senders: VecDeque::new(),
-			});
+				receiver: protocol::PacketReceiver::default(),
+				// Give the client an intial world state.
+				// TODO: don't special-case this.
+				senders: VecDeque::from([PacketSender::new(
+					&(protocol::ServerPacket::World {
+						world: &server.world,
+					}),
+				)]),
+
+				ping: Instant::now(),
+			};
+			server.clients.push(client);
 		}
 
 		for client in &mut server.clients {
+			match client.send() {
+				Ok(()) => {}
+				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+				Err(e) => {
+					error!("failed to write to client stream: {e}");
+				}
+			}
 			let result = client.receiver.recv(&mut client.stream, |packet| {
 				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 				match packet {
@@ -247,26 +265,26 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 			// This check has to happen after recieving packets to be as charitable to the client as possible.
 			if client.ping.elapsed() > TIMEOUT {
 				info!(player = "player", "disconnected by timeout");
-				break;
 			}
-			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
-				world: &server.world,
-			})
-			.unwrap();
-			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-			client.stream.write_all(&packet_len).unwrap();
-			client.stream.write_all(&packet).unwrap();
-
 			for i in console_reciever.try_iter() {
-				let packet =
-					rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::Message(i))
-						.unwrap();
-				let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-				client.stream.write_all(&packet_len).unwrap();
-				client.stream.write_all(&packet).unwrap();
+				client
+					.senders
+					.push_back(PacketSender::new(&protocol::ServerPacket::Message(i)));
 			}
 		}
 
-		server.tick(&scripts, &console_handle).unwrap();
+		if server.tick(&scripts, &console_handle).unwrap() {
+			for client in &mut server.clients {
+				client
+					.senders
+					.push_back(PacketSender::new(&protocol::ServerPacket::World {
+						world: &server.world,
+					}));
+			}
+		} else {
+			// Very short sleep, just to avoid busy waiting.
+			// Please let me know if there's a way I can wait for TCP traffic.
+			thread::sleep(Duration::from_millis(1));
+		}
 	}
 }

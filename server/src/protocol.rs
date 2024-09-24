@@ -49,11 +49,7 @@ impl PacketReceiver {
 		Some(u32::from_le_bytes([self.len[0]?, self.len[1]?, self.len[2]?, self.len[3]?]) as usize)
 	}
 
-	pub fn recv(
-		&mut self,
-		stream: impl io::Read,
-		f: impl FnOnce(rkyv::util::AlignedVec),
-	) -> io::Result<()> {
+	pub fn recv(&mut self, stream: impl io::Read, f: impl FnOnce(AlignedVec)) -> io::Result<()> {
 		let mut bytes = stream.bytes();
 		for (len, byte) in self.len.iter_mut().filter(|x| x.is_none()).zip(&mut bytes) {
 			*len = Some(byte?);
@@ -73,7 +69,7 @@ impl PacketReceiver {
 	}
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct PacketSender {
 	len_progress: usize,
 	packet_progress: usize,
@@ -81,6 +77,14 @@ pub struct PacketSender {
 }
 
 impl PacketSender {
+	pub fn new(packet: &ServerPacket) -> Self {
+		let packet = rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap();
+		PacketSender {
+			len_progress: 0,
+			packet_progress: 0,
+			packet,
+		}
+	}
 	pub fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
 		let len_bytes = (self.packet.len() as u32).to_le_bytes();
 		while self.len_progress < len_bytes.len() {
