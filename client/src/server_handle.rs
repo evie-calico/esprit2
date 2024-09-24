@@ -23,7 +23,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 /// it will send an complete copy of the world state back to the client, which it *must* accept.
 pub struct ServerHandle {
 	stream: TcpStream,
-	packet_reciever: protocol::PacketReciever,
+	packet_receiver: protocol::PacketReceiver,
 	world_cache: world::Manager,
 }
 
@@ -55,7 +55,7 @@ impl ServerHandle {
 		};
 		Self {
 			stream,
-			packet_reciever: protocol::PacketReciever::default(),
+			packet_receiver: protocol::PacketReceiver::default(),
 			world_cache,
 		}
 	}
@@ -77,7 +77,7 @@ impl ServerHandle {
 			.write_all(&(packet.len() as u32).to_le_bytes())
 			.unwrap();
 		self.stream.write_all(&packet).unwrap();
-		match self.packet_reciever.recv(&self.stream, |packet| {
+		match self.packet_receiver.recv(&self.stream, |packet| {
 			let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 			match packet {
 				protocol::ArchivedServerPacket::Ping(_) => todo!(),

@@ -12,6 +12,7 @@
 //! For more information about `rkyv`'s data format: [https://rkyv.org/](https://rkyv.org/)
 
 use esprit2::prelude::*;
+use rkyv::util::AlignedVec;
 use std::io;
 
 /// Default port for esprit servers to listen on.
@@ -38,12 +39,12 @@ pub enum ServerPacket<'a> {
 }
 
 #[derive(Clone, Default, Debug)]
-pub struct PacketReciever {
+pub struct PacketReceiver {
 	len: [Option<u8>; 4],
 	packet_buffer: rkyv::util::AlignedVec,
 }
 
-impl PacketReciever {
+impl PacketReceiver {
 	pub fn packet_len(&self) -> Option<usize> {
 		Some(u32::from_le_bytes([self.len[0]?, self.len[1]?, self.len[2]?, self.len[3]?]) as usize)
 	}
@@ -67,6 +68,26 @@ impl PacketReciever {
 				f(packet);
 				*self = Self::default();
 			}
+		}
+		Ok(())
+	}
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct PacketSender {
+	len_progress: usize,
+	packet_progress: usize,
+	packet: AlignedVec,
+}
+
+impl PacketSender {
+	pub fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
+		let len_bytes = (self.packet.len() as u32).to_le_bytes();
+		while self.len_progress < len_bytes.len() {
+			self.len_progress += stream.write(&len_bytes[self.len_progress..])?;
+		}
+		while self.packet_progress < self.packet.len() {
+			self.packet_progress += stream.write(&self.packet[self.packet_progress..])?;
 		}
 		Ok(())
 	}

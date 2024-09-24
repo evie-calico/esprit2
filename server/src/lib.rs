@@ -15,25 +15,29 @@
 pub mod protocol;
 
 use esprit2::prelude::*;
-use std::io::Write;
+use protocol::{PacketReceiver, PacketSender};
+use std::collections::VecDeque;
+use std::io::{self, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-pub struct Player {
+pub struct Client {
 	pub ping: Instant,
+	pub stream: TcpStream,
+	pub receiver: PacketReceiver,
+	pub senders: VecDeque<PacketSender>,
 }
 
 /// Server state
 ///
 /// These fields are public for now but it might make sense to better encapsulate the server in the future.
 pub struct Server {
-	pub resources: resource::Manager,
-	pub players: Player,
+	pub clients: Vec<Client>,
 
-	// These fields should be kept in sync with the client.
+	pub resources: resource::Manager,
 	pub world: world::Manager,
 }
 
@@ -78,10 +82,7 @@ impl Server {
 
 		Self {
 			resources,
-			// Start with no players/connections.
-			players: Player {
-				ping: Instant::now(),
-			},
+			clients: Vec::new(),
 			world,
 		}
 	}
@@ -107,12 +108,12 @@ impl Server {
 /// Recieve operations
 // TODO: Multiple clients.
 impl Server {
-	pub fn recv_ping(&mut self) {
-		let ms = self.players.ping.elapsed().as_millis();
+	pub fn recv_ping(&self, client: &mut Client) {
+		let ms = client.ping.elapsed().as_millis();
 		if ms > 50 {
 			info!(client = "client", ms, "recieved late ping")
 		}
-		self.players.ping = Instant::now();
+		client.ping = Instant::now();
 	}
 
 	pub fn recv_action(
@@ -136,8 +137,8 @@ impl Server {
 	///
 	/// # Returns
 	/// `Some(())` if a ping packet should be sent.
-	pub fn send_ping(&mut self) -> Option<()> {
-		self.players.ping = Instant::now();
+	pub fn send_ping(&mut self, client: &mut Client) -> Option<()> {
+		client.ping = Instant::now();
 		Some(())
 	}
 
@@ -189,70 +190,83 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 		.unwrap();
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
-	let mut clients = Vec::new();
-	let mut awaiting_input = false;
 	loop {
-		for mut client in router.try_iter() {
-			// TODO: how do we start communication?
-			server.send_ping();
+		for mut stream in router.try_iter() {
 			// Give the client an intial world state.
+			// TODO: don't special-case this.
 			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
 				world: &server.world,
 			})
 			.unwrap();
 			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-			client.write_all(&packet_len).unwrap();
-			client.write_all(&packet).unwrap();
-			let packet_reciever = protocol::PacketReciever::default();
-			clients.push((client, packet_reciever));
+			stream.write_all(&packet_len).unwrap();
+			stream.write_all(&packet).unwrap();
+			let receiver = protocol::PacketReceiver::default();
+
+			server.clients.push(Client {
+				ping: Instant::now(),
+				stream,
+				receiver,
+				senders: VecDeque::new(),
+			});
 		}
 
-		for (client, packet_reciever) in &mut clients {
-			packet_reciever
-				.recv(&mut *client, |packet| {
-					let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
-					match packet {
-						protocol::ArchivedClientPacket::Ping(id) => {
-							server.recv_ping();
+		for client in &mut server.clients {
+			let result = client.receiver.recv(&mut client.stream, |packet| {
+				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+				match packet {
+					protocol::ArchivedClientPacket::Ping(id) => {
+						let ms = client.ping.elapsed().as_millis();
+						if ms > 50 {
+							info!(client = "client", ms, "recieved late ping")
 						}
-						protocol::ArchivedClientPacket::Action(action_archive) => {
-							let action: character::Action =
-								rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive)
-									.unwrap();
+						client.ping = Instant::now();
+					}
+					protocol::ArchivedClientPacket::Action(action_archive) => {
+						let action: character::Action =
+							rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
+						let console = &console_handle;
+						let scripts: &resource::Scripts = &scripts;
+						if server.world.next_character().borrow().player_controlled {
 							server
-								.recv_action(&console_handle, &scripts, action)
+								.world
+								.perform_action(console, &server.resources, scripts, action)
 								.unwrap();
-							awaiting_input = false;
 						}
 					}
-				})
-				.unwrap();
+				}
+			});
+			match result {
+				Ok(()) => {}
+				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+				Err(e) => {
+					error!("failed to read client stream: {e}");
+				}
+			}
+
 			// This check has to happen after recieving packets to be as charitable to the client as possible.
-			if server.players.ping.elapsed() > TIMEOUT {
+			if client.ping.elapsed() > TIMEOUT {
 				info!(player = "player", "disconnected by timeout");
 				break;
 			}
-			server.tick(&scripts, &console_handle).unwrap();
-			if server.world.next_character().borrow().player_controlled && !awaiting_input {
-				awaiting_input = true;
-				let packet =
-					rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
-						world: &server.world,
-					})
-					.unwrap();
-				let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-				client.write_all(&packet_len).unwrap();
-				client.write_all(&packet).unwrap();
-			}
+			let packet = rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::World {
+				world: &server.world,
+			})
+			.unwrap();
+			let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
+			client.stream.write_all(&packet_len).unwrap();
+			client.stream.write_all(&packet).unwrap();
 
 			for i in console_reciever.try_iter() {
 				let packet =
 					rkyv::to_bytes::<rkyv::rancor::Error>(&protocol::ServerPacket::Message(i))
 						.unwrap();
 				let packet_len = u32::try_from(packet.len()).unwrap().to_le_bytes();
-				client.write_all(&packet_len).unwrap();
-				client.write_all(&packet).unwrap();
+				client.stream.write_all(&packet_len).unwrap();
+				client.stream.write_all(&packet).unwrap();
 			}
 		}
+
+		server.tick(&scripts, &console_handle).unwrap();
 	}
 }

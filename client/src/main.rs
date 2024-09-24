@@ -258,7 +258,8 @@ pub fn main() {
 }
 
 fn spawn_instance() -> (SocketAddr, thread::JoinHandle<()>) {
-	let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), 0)).unwrap();
+	let listener =
+		TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT)).unwrap();
 	let address = listener.local_addr().unwrap();
 	(
 		address,
