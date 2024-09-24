@@ -282,9 +282,9 @@ pub(crate) enum Response<'lua> {
 
 pub(crate) fn controllable_character<'lua>(
 	keycode: sdl2::keyboard::Keycode,
-	next_character: character::Ref,
-	server: &ServerHandle,
+	world: &world::Manager,
 	console: impl console::Handle,
+	resources: &resource::Manager,
 	scripts: &resource::Scripts<'lua>,
 	mode: Mode<'lua>,
 	options: &Options,
@@ -304,12 +304,17 @@ pub(crate) fn controllable_character<'lua>(
 			for (triggers, xoff, yoff) in directions {
 				if triggers.contains(keycode) {
 					let (x, y) = {
-						let next_character = next_character.borrow();
+						let next_character = world.next_character().borrow();
 						(next_character.x + xoff, next_character.y + yoff)
 					};
-					if server.world().get_character_at(x, y).is_some() {
-						if let Some(default_attack) =
-							next_character.borrow().sheet.attacks.first().cloned()
+					if world.get_character_at(x, y).is_some() {
+						if let Some(default_attack) = world
+							.next_character()
+							.borrow()
+							.sheet
+							.attacks
+							.first()
+							.cloned()
 						{
 							return Ok((
 								mode,
@@ -341,12 +346,12 @@ pub(crate) fn controllable_character<'lua>(
 			}
 
 			let (x, y) = {
-				let next_character = next_character.borrow();
+				let next_character = world.next_character().borrow();
 				(next_character.x, next_character.y)
 			};
 
 			if options.controls.underfoot.contains(keycode) {
-				match server.world().current_floor.get(x, y) {
+				match world.current_floor.get(x, y) {
 					Some(floor::Tile::Floor) => {
 						console.print_unimportant("There's nothing on the ground here.".into());
 					}
@@ -368,10 +373,10 @@ pub(crate) fn controllable_character<'lua>(
 			}
 
 			if options.controls.autocombat.contains(keycode) {
-				let considerations = server.world().consider_turn(server.resources(), scripts)?;
-				let action = server.world().consider_action(
+				let considerations = world.consider_turn(resources, scripts)?;
+				let action = world.consider_action(
 					scripts,
-					next_character.clone(),
+					world.next_character().clone(),
 					considerations,
 				)?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
@@ -380,7 +385,7 @@ pub(crate) fn controllable_character<'lua>(
 			}
 		}
 		Mode::Select => {
-			let candidates = select::assign_indicies(server.world());
+			let candidates = select::assign_indicies(world);
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
 			if (0..=26).contains(&selected_index)
@@ -398,7 +403,8 @@ pub(crate) fn controllable_character<'lua>(
 
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
-			let attack_id = next_character
+			let attack_id = world
+				.next_character()
 				.borrow()
 				.sheet
 				.attacks
@@ -410,10 +416,10 @@ pub(crate) fn controllable_character<'lua>(
 				Ok((
 					Mode::Normal,
 					Some(gather_attack_inputs(
-						server.resources(),
+						resources,
 						scripts,
 						attack_id,
-						next_character,
+						world.next_character().clone(),
 					)?),
 				))
 			} else {
@@ -427,7 +433,8 @@ pub(crate) fn controllable_character<'lua>(
 
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
-			let spell_id = next_character
+			let spell_id = world
+				.next_character()
 				.borrow()
 				.sheet
 				.spells
@@ -439,10 +446,10 @@ pub(crate) fn controllable_character<'lua>(
 				Ok((
 					Mode::Normal,
 					Some(gather_spell_inputs(
-						server.resources(),
+						resources,
 						scripts,
 						spell_id,
-						next_character,
+						world.next_character().clone(),
 					)?),
 				))
 			} else {

@@ -20,6 +20,7 @@ pub mod typography;
 
 use clap::Parser;
 pub use console_impl::Console;
+use esprit2_server::protocol;
 pub use options::Options;
 use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
@@ -187,16 +188,18 @@ pub fn main() {
 							input::Signal::None => {}
 							input::Signal::Cancel => break 'game,
 							input::Signal::Yield(RootMenuResponse::OpenSingleplayer) => {
-								world = Some((
-									input::Mode::Normal,
-									WorldState::new(None, &lua, &textures),
-								));
-								menu = None;
+								todo!();
 							}
 							input::Signal::Yield(RootMenuResponse::OpenMultiplayer { host }) => {
 								world = Some((
 									input::Mode::Normal,
-									WorldState::new(Some(&host), &lua, &textures),
+									// TODO: handle and display connection errors.
+									WorldState::new(
+										(host, protocol::DEFAULT_PORT),
+										&lua,
+										&textures,
+									)
+									.unwrap(),
 								));
 								menu = None;
 							}
