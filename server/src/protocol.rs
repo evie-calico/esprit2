@@ -24,7 +24,9 @@ pub const DEFAULT_PORT: u16 = 48578;
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum ClientPacket {
-	Ping(String),
+	Ping,
+	Authenticate(String),
+
 	Action(character::Action),
 }
 

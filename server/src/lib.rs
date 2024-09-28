@@ -24,12 +24,19 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::{io, thread};
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+pub struct ClientIdentification(String);
+
 pub struct Client {
 	pub stream: TcpStream,
 	pub receiver: PacketReceiver,
 	pub senders: VecDeque<PacketSender>,
 
 	pub ping: Instant,
+	/// This field remains `None` until the client performs authentication.
+	/// In this state, most client packets will be discarded without response.
+	pub identifier: Option<ClientIdentification>,
+	pub owned_pieces: Vec<character::Ref>,
 }
 
 impl Client {
@@ -218,6 +225,8 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 				)]),
 
 				ping: Instant::now(),
+				identifier: None,
+				owned_pieces: Vec::new(),
 			};
 			server.clients.push(client);
 		}
@@ -233,19 +242,31 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 			let result = client.receiver.recv(&mut client.stream, |packet| {
 				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 				match packet {
-					protocol::ArchivedClientPacket::Ping(id) => {
+					protocol::ArchivedClientPacket::Ping => {
 						let ms = client.ping.elapsed().as_millis();
 						if ms > 50 {
-							info!(client = "client", ms, "recieved late ping")
+							info!(
+								client = client.identifier.as_ref().map(|x| &x.0),
+								ms, "recieved late ping"
+							)
 						}
 						client.ping = Instant::now();
+					}
+					protocol::ArchivedClientPacket::Authenticate(username) => {
+						client.identifier = Some(ClientIdentification(
+							rkyv::deserialize::<_, rkyv::rancor::Error>(username).unwrap(),
+						));
 					}
 					protocol::ArchivedClientPacket::Action(action_archive) => {
 						let action: character::Action =
 							rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
 						let console = &console_handle;
 						let scripts: &resource::Scripts = &scripts;
-						if server.world.next_character().borrow().player_controlled {
+						let next_character = server.world.next_character();
+						if next_character.borrow().player_controlled
+							// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
+							&& client.owned_pieces.contains(next_character)
+						{
 							server
 								.world
 								.perform_action(console, &server.resources, scripts, action)

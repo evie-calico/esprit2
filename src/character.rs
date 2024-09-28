@@ -157,6 +157,14 @@ impl Ref {
 	}
 }
 
+impl PartialEq for Ref {
+	fn eq(&self, other: &Self) -> bool {
+		self.as_ptr() == other.as_ptr()
+	}
+}
+
+impl Eq for Ref {}
+
 impl std::ops::Deref for Ref {
 	type Target = RefCell<character::Piece>;
 
