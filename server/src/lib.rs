@@ -16,7 +16,6 @@ pub mod protocol;
 
 use esprit2::prelude::*;
 use protocol::{PacketReceiver, PacketSender};
-use std::collections::VecDeque;
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::exit;
@@ -30,23 +29,13 @@ pub struct ClientIdentification(String);
 pub struct Client {
 	pub stream: TcpStream,
 	pub receiver: PacketReceiver,
-	pub senders: VecDeque<PacketSender>,
+	pub sender: PacketSender,
 
 	pub ping: Instant,
 	/// This field remains `None` until the client performs authentication.
 	/// In this state, most client packets will be discarded without response.
 	pub identifier: Option<ClientIdentification>,
 	pub owned_pieces: Vec<character::Ref>,
-}
-
-impl Client {
-	pub fn send(&mut self) -> io::Result<()> {
-		while let Some(sender) = self.senders.front_mut() {
-			sender.send(&mut self.stream)?;
-			self.senders.pop_front();
-		}
-		Ok(())
-	}
 }
 
 /// Server state
@@ -213,17 +202,12 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 	loop {
 		for stream in router.try_iter() {
 			stream.set_nonblocking(true).unwrap();
+			let mut sender = PacketSender::default();
+			sender.queue(&protocol::ServerPacket::Ping);
 			let client = Client {
 				stream,
-				receiver: protocol::PacketReceiver::default(),
-				// Give the client an intial world state.
-				// TODO: don't special-case this.
-				senders: VecDeque::from([PacketSender::new(
-					&(protocol::ServerPacket::World {
-						world: &server.world,
-					}),
-				)]),
-
+				receiver: PacketReceiver::default(),
+				sender,
 				ping: Instant::now(),
 				identifier: None,
 				owned_pieces: Vec::new(),
@@ -232,7 +216,7 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 		}
 
 		for client in &mut server.clients {
-			match client.send() {
+			match client.sender.send(&mut client.stream) {
 				Ok(()) => {}
 				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
 				Err(e) => {
@@ -288,19 +272,15 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 				info!(player = "player", "disconnected by timeout");
 			}
 			for i in console_reciever.try_iter() {
-				client
-					.senders
-					.push_back(PacketSender::new(&protocol::ServerPacket::Message(i)));
+				client.sender.queue(&protocol::ServerPacket::Message(i));
 			}
 		}
 
 		if server.tick(&scripts, &console_handle).unwrap() {
 			for client in &mut server.clients {
-				client
-					.senders
-					.push_back(PacketSender::new(&protocol::ServerPacket::World {
-						world: &server.world,
-					}));
+				client.sender.queue(&protocol::ServerPacket::World {
+					world: &server.world,
+				});
 			}
 		} else {
 			// Very short sleep, just to avoid busy waiting.

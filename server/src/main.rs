@@ -3,13 +3,11 @@
 use clap::Parser;
 use esprit2::prelude::*;
 use esprit2_server::*;
-use std::io::Write;
-use std::net::{Ipv4Addr, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, TcpListener};
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
 
 #[derive(clap::Parser)]
 struct Cli {

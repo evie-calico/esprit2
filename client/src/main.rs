@@ -32,14 +32,12 @@ pub mod prelude {
 }
 
 mod server_handle;
-mod world_state;
 
 use esprit2::prelude::*;
 use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::process::exit;
 use std::sync::mpsc;
 use std::{fs, io, thread};
-use world_state::State as WorldState;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -159,7 +157,7 @@ pub fn main() {
 	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> = Some(Box::new(
 		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
 	));
-	let mut world: Option<(input::Mode, WorldState)> = None;
+	let mut world: Option<(input::Mode, ServerHandle)> = None;
 	let mut internal_server: Option<thread::JoinHandle<()>> = None;
 
 	let text_input = video_subsystem.text_input();
@@ -197,7 +195,7 @@ pub fn main() {
 								internal_server = Some(server);
 								world = Some((
 									input::Mode::Normal,
-									WorldState::new(address, &lua, &textures).unwrap(),
+									ServerHandle::new(address, &lua, &textures).unwrap(),
 								));
 								menu = None;
 							}
@@ -205,7 +203,7 @@ pub fn main() {
 								world = Some((
 									input::Mode::Normal,
 									// TODO: handle and display connection errors.
-									WorldState::new(
+									ServerHandle::new(
 										(host, protocol::DEFAULT_PORT),
 										&lua,
 										&textures,
@@ -233,7 +231,7 @@ pub fn main() {
 		}
 
 		if let Some((input_mode, world)) = &mut world {
-			world.tick(delta, input_mode, &scripts);
+			world.tick(delta, input_mode);
 		}
 
 		let canvas_size = canvas.window().size();

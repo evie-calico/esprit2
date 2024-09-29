@@ -13,7 +13,7 @@
 
 use esprit2::prelude::*;
 use rkyv::util::AlignedVec;
-use std::io;
+use std::{collections::VecDeque, io};
 
 /// Default port for esprit servers to listen on.
 ///
@@ -32,7 +32,7 @@ pub enum ClientPacket {
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum ServerPacket<'a> {
-	Ping(#[rkyv(with = rkyv::with::InlineAsBox)] &'a str),
+	Ping,
 	World {
 		#[rkyv(with = rkyv::with::Inline)]
 		world: &'a world::Manager,
@@ -71,23 +71,59 @@ impl PacketReceiver {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct PacketSender {
+#[derive(Debug, Default)]
+pub struct PacketSender(VecDeque<InProgress>);
+
+impl PacketSender {
+	pub fn queue<P>(&mut self, packet: &P)
+	where
+		P: for<'a> rkyv::Serialize<
+			rkyv::api::high::HighSerializer<
+				AlignedVec,
+				rkyv::ser::allocator::ArenaHandle<'a>,
+				rkyv::rancor::Error,
+			>,
+		>,
+	{
+		self.0.push_back(InProgress::new(packet));
+	}
+
+	pub fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
+		while let Some(sender) = self.0.front_mut() {
+			sender.send(&mut stream)?;
+			self.0.pop_front();
+		}
+		Ok(())
+	}
+}
+
+#[derive(Debug)]
+struct InProgress {
 	len_progress: usize,
 	packet_progress: usize,
 	packet: AlignedVec,
 }
 
-impl PacketSender {
-	pub fn new(packet: &ServerPacket) -> Self {
+impl InProgress {
+	fn new<P>(packet: &P) -> Self
+	where
+		P: for<'a> rkyv::Serialize<
+			rkyv::api::high::HighSerializer<
+				AlignedVec,
+				rkyv::ser::allocator::ArenaHandle<'a>,
+				rkyv::rancor::Error,
+			>,
+		>,
+	{
 		let packet = rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap();
-		PacketSender {
+		Self {
 			len_progress: 0,
 			packet_progress: 0,
 			packet,
 		}
 	}
-	pub fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
+
+	fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
 		let len_bytes = (self.packet.len() as u32).to_le_bytes();
 		while self.len_progress < len_bytes.len() {
 			self.len_progress += stream.write(&len_bytes[self.len_progress..])?;
