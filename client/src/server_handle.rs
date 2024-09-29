@@ -163,11 +163,12 @@ impl<'texture> ServerHandle<'texture> {
 	}
 
 	pub fn tick(&mut self, delta: f64, input_mode: &mut input::Mode) {
-		self.sender.queue(&protocol::ClientPacket::Ping);
 		match self.receiver.recv(&self.stream, |packet| {
 			let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 			match packet {
-				protocol::ArchivedServerPacket::Ping => todo!(),
+				protocol::ArchivedServerPacket::Ping => {
+					self.sender.queue(&protocol::ClientPacket::Ping)
+				}
 				protocol::ArchivedServerPacket::World { world } => {
 					match rkyv::deserialize::<world::Manager, rkyv::rancor::Error>(world) {
 						Ok(world) => self.world = Some(world),
@@ -187,6 +188,8 @@ impl<'texture> ServerHandle<'texture> {
 				panic!("{e}");
 			}
 		}
+
+		self.sender.send(&mut self.stream).unwrap();
 
 		for i in &mut self.pamphlet.party_member_clouds {
 			i.cloud.tick(delta);

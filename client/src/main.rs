@@ -157,7 +157,7 @@ pub fn main() {
 	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> = Some(Box::new(
 		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
 	));
-	let mut world: Option<(input::Mode, ServerHandle)> = None;
+	let mut server: Option<(input::Mode, ServerHandle)> = None;
 	let mut internal_server: Option<thread::JoinHandle<()>> = None;
 
 	let text_input = video_subsystem.text_input();
@@ -191,16 +191,16 @@ pub fn main() {
 							input::Signal::Cancel => break 'game,
 							input::Signal::Yield(RootMenuResponse::OpenSingleplayer) => {
 								// TODO: handle and display connection errors.
-								let (address, server) = spawn_instance();
-								internal_server = Some(server);
-								world = Some((
+								let (address, thread) = spawn_instance();
+								internal_server = Some(thread);
+								server = Some((
 									input::Mode::Normal,
 									ServerHandle::new(address, &lua, &textures).unwrap(),
 								));
 								menu = None;
 							}
 							input::Signal::Yield(RootMenuResponse::OpenMultiplayer { host }) => {
-								world = Some((
+								server = Some((
 									input::Mode::Normal,
 									// TODO: handle and display connection errors.
 									ServerHandle::new(
@@ -213,9 +213,9 @@ pub fn main() {
 								menu = None;
 							}
 						}
-					} else if let Some((mut input_mode, mut world_state)) = world {
+					} else if let Some((mut input_mode, mut world_state)) = server {
 						input_mode = world_state.event(input_mode, event, &scripts, &options);
-						world = Some((input_mode, world_state));
+						server = Some((input_mode, world_state));
 					}
 				}
 			}
@@ -230,8 +230,8 @@ pub fn main() {
 			fps = (fps + 1.0 / delta) / 2.0;
 		}
 
-		if let Some((input_mode, world)) = &mut world {
-			world.tick(delta, input_mode);
+		if let Some((input_mode, server)) = &mut server {
+			server.tick(delta, input_mode);
 		}
 
 		let canvas_size = canvas.window().size();
@@ -245,7 +245,7 @@ pub fn main() {
 		if let Some(menu) = &menu {
 			menu.draw(&mut gui, &textures);
 		}
-		if let Some((input_mode, world)) = &world {
+		if let Some((input_mode, world)) = &server {
 			world.draw(input_mode, &mut gui, &textures, &options);
 		}
 

@@ -228,12 +228,13 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 				match packet {
 					protocol::ArchivedClientPacket::Ping => {
 						let ms = client.ping.elapsed().as_millis();
-						if ms > 50 {
+						if ms > 200 {
 							info!(
 								client = client.identifier.as_ref().map(|x| &x.0),
 								ms, "recieved late ping"
 							)
 						}
+						client.sender.queue(&protocol::ServerPacket::Ping);
 						client.ping = Instant::now();
 					}
 					protocol::ArchivedClientPacket::Authenticate(username) => {
@@ -255,6 +256,11 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 								.world
 								.perform_action(console, &server.resources, scripts, action)
 								.unwrap();
+						} else {
+							warn!("client attempted to move piece it did not own");
+							client.sender.queue(&protocol::ServerPacket::World {
+								world: &server.world,
+							});
 						}
 					}
 				}
