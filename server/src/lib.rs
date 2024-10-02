@@ -23,6 +23,14 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::{io, thread};
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error(transparent)]
+	Io(#[from] io::Error),
+	#[error("timeout")]
+	Timeout,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct ClientIdentification(String);
 
@@ -42,8 +50,6 @@ pub struct Client {
 ///
 /// These fields are public for now but it might make sense to better encapsulate the server in the future.
 pub struct Server {
-	pub clients: Vec<Client>,
-
 	pub resources: resource::Manager,
 	pub world: world::Manager,
 }
@@ -87,11 +93,7 @@ impl Server {
 			)
 			.unwrap();
 
-		Self {
-			resources,
-			clients: Vec::new(),
-			world,
-		}
+		Self { resources, world }
 	}
 
 	pub fn tick(
@@ -169,8 +171,6 @@ impl console::Handle for Console {
 }
 
 pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
-	const TIMEOUT: Duration = Duration::from_secs(10);
-
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
@@ -187,6 +187,7 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 	// For now, this spins up a new server for each connection
 	// TODO: Route connections to the same instance.
 	let mut server = Server::new(res);
+	let mut clients = Vec::new();
 
 	lua.globals()
 		.set("Console", console::LuaHandle(console_handle.clone()))
@@ -212,78 +213,28 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 				identifier: None,
 				owned_pieces: Vec::new(),
 			};
-			server.clients.push(client);
+			clients.push(client);
 		}
 
-		for client in &mut server.clients {
-			match client.sender.send(&mut client.stream) {
-				Ok(()) => {}
-				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-				Err(e) => {
-					error!("failed to write to client stream: {e}");
+		let mut i = 0;
+		while i < clients.len() {
+			match client_tick(
+				&mut clients[i],
+				&console_handle,
+				&scripts,
+				&mut server,
+				&console_reciever,
+			) {
+				Ok(()) => i += 1,
+				Err(msg) => {
+					error!("client hangup: {msg}");
+					clients.swap_remove(i);
 				}
-			}
-			let result = client.receiver.recv(&mut client.stream, |packet| {
-				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
-				match packet {
-					protocol::ArchivedClientPacket::Ping => {
-						let ms = client.ping.elapsed().as_millis();
-						if ms > 200 {
-							info!(
-								client = client.identifier.as_ref().map(|x| &x.0),
-								ms, "recieved late ping"
-							)
-						}
-						client.sender.queue(&protocol::ServerPacket::Ping);
-						client.ping = Instant::now();
-					}
-					protocol::ArchivedClientPacket::Authenticate(username) => {
-						client.identifier = Some(ClientIdentification(
-							rkyv::deserialize::<_, rkyv::rancor::Error>(username).unwrap(),
-						));
-					}
-					protocol::ArchivedClientPacket::Action(action_archive) => {
-						let action: character::Action =
-							rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
-						let console = &console_handle;
-						let scripts: &resource::Scripts = &scripts;
-						let next_character = server.world.next_character();
-						if next_character.borrow().player_controlled
-							// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
-							&& client.owned_pieces.contains(next_character)
-						{
-							server
-								.world
-								.perform_action(console, &server.resources, scripts, action)
-								.unwrap();
-						} else {
-							warn!("client attempted to move piece it did not own");
-							client.sender.queue(&protocol::ServerPacket::World {
-								world: &server.world,
-							});
-						}
-					}
-				}
-			});
-			match result {
-				Ok(()) => {}
-				Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-				Err(e) => {
-					error!("failed to read client stream: {e}");
-				}
-			}
-
-			// This check has to happen after recieving packets to be as charitable to the client as possible.
-			if client.ping.elapsed() > TIMEOUT {
-				info!(player = "player", "disconnected by timeout");
-			}
-			for i in console_reciever.try_iter() {
-				client.sender.queue(&protocol::ServerPacket::Message(i));
 			}
 		}
 
 		if server.tick(&scripts, &console_handle).unwrap() {
-			for client in &mut server.clients {
+			for client in &mut clients {
 				client.sender.queue(&protocol::ServerPacket::World {
 					world: &server.world,
 				});
@@ -294,4 +245,76 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 			thread::sleep(Duration::from_millis(1));
 		}
 	}
+}
+
+fn client_tick(
+	client: &mut Client,
+	console_handle: &Console,
+	scripts: &resource::Scripts<'_>,
+	server: &mut Server,
+	console_reciever: &mpsc::Receiver<console::Message>,
+) -> io::Result<()> {
+	const TIMEOUT: Duration = Duration::from_secs(10);
+
+	match client.sender.send(&mut client.stream) {
+		Ok(()) => {}
+		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+		Err(e) => return Err(e),
+	}
+	let result = client.receiver.recv(&mut client.stream, |packet| {
+		let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+		match packet {
+			protocol::ArchivedClientPacket::Ping => {
+				let ms = client.ping.elapsed().as_millis();
+				if ms > 200 {
+					info!(
+						client = client.identifier.as_ref().map(|x| &x.0),
+						ms, "recieved late ping"
+					)
+				}
+				client.sender.queue(&protocol::ServerPacket::Ping);
+				client.ping = Instant::now();
+			}
+			protocol::ArchivedClientPacket::Authenticate(username) => {
+				client.identifier = Some(ClientIdentification(
+					rkyv::deserialize::<_, rkyv::rancor::Error>(username).unwrap(),
+				));
+			}
+			protocol::ArchivedClientPacket::Action(action_archive) => {
+				let action: character::Action =
+					rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
+				let console = console_handle;
+				let scripts: &resource::Scripts = scripts;
+				let next_character = server.world.next_character();
+				// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
+				if next_character.borrow().player_controlled
+					&& client.owned_pieces.contains(next_character)
+				{
+					server
+						.world
+						.perform_action(console, &server.resources, scripts, action)
+						.unwrap();
+				} else {
+					warn!("client attempted to move piece it did not own");
+					client.sender.queue(&protocol::ServerPacket::World {
+						world: &server.world,
+					});
+				}
+			}
+		}
+	});
+	match result {
+		Ok(()) => {}
+		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+		Err(e) => return Err(e),
+	}
+
+	// This check has to happen after recieving packets to be as charitable to the client as possible.
+	if client.ping.elapsed() > TIMEOUT {
+		info!(player = "player", "disconnected by timeout");
+	}
+	for i in console_reciever.try_iter() {
+		client.sender.queue(&protocol::ServerPacket::Message(i));
+	}
+	Ok(())
 }
