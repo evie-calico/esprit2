@@ -12,8 +12,10 @@
 //! For more information about `rkyv`'s data format: [https://rkyv.org/](https://rkyv.org/)
 
 use esprit2::prelude::*;
+use percent_encoding::percent_decode_str;
 use rkyv::util::AlignedVec;
-use std::{collections::VecDeque, io};
+use std::{collections::VecDeque, io, net::ToSocketAddrs, num::ParseIntError, str::Utf8Error};
+use url::Url;
 
 /// Default port for esprit servers to listen on.
 ///
@@ -23,10 +25,64 @@ use std::{collections::VecDeque, io};
 pub const DEFAULT_PORT: u16 = 48578;
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-pub enum ClientPacket {
-	Ping,
-	Authenticate(String),
+pub struct ClientAuthentication {
+	pub username: String,
+}
 
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+pub struct ClientRouting {
+	pub instance_id: usize,
+	pub instance_password: Option<Box<str>>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ClientRoutingError {
+	#[error("malformed url: {0}")]
+	MalformedUrl(#[from] url::ParseError),
+	#[error("missing host")]
+	MissingHost,
+	#[error("missing instance")]
+	MissingInstance,
+	#[error("malformed instance: {0}")]
+	MalformedInstance(#[from] ParseIntError),
+	#[error("malformed password: {0}")]
+	MalformedPassword(#[from] Utf8Error),
+}
+
+impl ClientRouting {
+	pub fn new(url: &str) -> Result<(Self, impl ToSocketAddrs), ClientRoutingError> {
+		use ClientRoutingError as E;
+		let url = Url::parse(url)?;
+		let mut segments = url.path_segments().ok_or(E::MissingInstance)?;
+		let instance_id = segments.next().ok_or(E::MissingInstance)?.parse()?;
+		let instance_password = segments
+			.next()
+			.map(|x| percent_decode_str(x).decode_utf8())
+			.transpose()?
+			.map(|x| x.into());
+		Ok((
+			Self {
+				instance_id,
+				instance_password,
+			},
+			(
+				String::from(
+					percent_decode_str(url.host_str().ok_or(E::MissingHost)?).decode_utf8()?,
+				),
+				url.port().unwrap_or(DEFAULT_PORT),
+			),
+		))
+	}
+}
+
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+pub enum ClientPacket {
+	// Generic packets
+	Ping,
+	// Root packets
+	Authenticate(ClientAuthentication),
+	Route(ClientRouting),
+	// Instance packets
 	Action(character::Action),
 }
 
@@ -37,7 +93,7 @@ pub enum ServerPacket<'a> {
 		#[rkyv(with = rkyv::with::Inline)]
 		world: &'a world::Manager,
 	},
-	Message(console::Message),
+	Message(#[rkyv(with = rkyv::with::Inline)] &'a console::Message),
 }
 
 #[derive(Clone, Default, Debug)]

@@ -208,7 +208,6 @@ impl Manager {
 			// These retries are safe because edges are always discarded whether or not they succeed,
 			// meaning a full board will eventually exhaust its edges.
 			'edges: loop {
-				debug!("attempting placement at one of: {edges:?}");
 				// partial_shuffle swaps the randomly selected edge with the last edge,
 				// returning the remaining halves in reverse order.
 				let (placement_edge, _) = edges.partial_shuffle(&mut rng, 1);
@@ -232,7 +231,6 @@ impl Manager {
 					let x = px - ex;
 					let y = py - ey;
 					if self.try_apply_vault(x, y, vault, resources)? {
-						debug!(x, y, "placed vault");
 						for (px, py) in potential_edges
 							.iter()
 							.take(i)

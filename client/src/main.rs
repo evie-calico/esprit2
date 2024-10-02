@@ -20,7 +20,8 @@ pub mod typography;
 
 use clap::Parser;
 pub use console_impl::Console;
-use esprit2_server::protocol;
+use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
+use esprit2_server::Client;
 pub use options::Options;
 use sdl2::rect::Rect;
 pub use server_handle::ServerHandle;
@@ -34,7 +35,7 @@ pub mod prelude {
 mod server_handle;
 
 use esprit2::prelude::*;
-use std::net::{Ipv4Addr, SocketAddr, TcpListener};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::process::exit;
 use std::sync::mpsc;
 use std::{fs, io, thread};
@@ -54,8 +55,8 @@ fn update_delta(
 
 #[derive(Debug, Clone)]
 pub enum RootMenuResponse {
-	OpenSingleplayer,
-	OpenMultiplayer { host: String },
+	OpenSingleplayer { username: String },
+	OpenMultiplayer { username: String, url: String },
 }
 
 #[derive(clap::Parser)]
@@ -94,6 +95,7 @@ pub fn main() {
 
 	// Logging initialization.
 	tracing_subscriber::fmt()
+		.with_thread_names(true)
 		.with_max_level(tracing::Level::TRACE)
 		.init();
 	let options_path = options::user_directory().join("options.toml");
@@ -189,22 +191,45 @@ pub fn main() {
 						match menu_state.event(&event, &options) {
 							input::Signal::None => {}
 							input::Signal::Cancel => break 'game,
-							input::Signal::Yield(RootMenuResponse::OpenSingleplayer) => {
+							input::Signal::Yield(RootMenuResponse::OpenSingleplayer {
+								username,
+							}) => {
 								// TODO: handle and display connection errors.
 								let (address, thread) = spawn_instance();
+								let stream = TcpStream::connect(address).unwrap();
+								let client_routing = ClientRouting {
+									instance_id: 0,
+									instance_password: None,
+								};
+
 								internal_server = Some(thread);
 								server = Some((
 									input::Mode::Normal,
-									ServerHandle::new(address, &lua, &textures).unwrap(),
+									ServerHandle::new(
+										stream,
+										ClientAuthentication { username },
+										client_routing,
+										&lua,
+										&textures,
+									)
+									.unwrap(),
 								));
 								menu = None;
 							}
-							input::Signal::Yield(RootMenuResponse::OpenMultiplayer { host }) => {
+							input::Signal::Yield(RootMenuResponse::OpenMultiplayer {
+								username,
+								url,
+							}) => {
+								let (client_routing, address) = ClientRouting::new(&url).unwrap();
+								let stream = TcpStream::connect(address).unwrap();
+
 								server = Some((
 									input::Mode::Normal,
 									// TODO: handle and display connection errors.
 									ServerHandle::new(
-										(host, protocol::DEFAULT_PORT),
+										stream,
+										ClientAuthentication { username },
+										client_routing,
 										&lua,
 										&textures,
 									)
@@ -259,30 +284,28 @@ fn spawn_instance() -> (SocketAddr, thread::JoinHandle<()>) {
 	let listener =
 		TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT)).unwrap();
 	let address = listener.local_addr().unwrap();
-	(
-		address,
-		thread::spawn(move || {
+	let thread = thread::Builder::new()
+		.name(String::from("router"))
+		.spawn(move || {
 			singular_host(listener);
-		}),
-	)
+		})
+		.unwrap();
+	(address, thread)
 }
 
 fn singular_host(listener: TcpListener) {
-	let _span = error_span!(
-		"internal server",
-		addr = listener.local_addr().unwrap().to_string()
-	)
-	.entered();
+	let _span = error_span!("", addr = listener.local_addr().unwrap().to_string()).entered();
 	let (router, reciever) = mpsc::channel();
-	let connection = thread::spawn(move || {
-		esprit2_server::connection(reciever, options::resource_directory().clone())
-	});
+	let connection = thread::Builder::new()
+		.name(String::from("instance"))
+		.spawn(move || esprit2_server::instance(reciever, options::resource_directory().clone()));
 	info!("listening for connections");
 	for stream in listener.incoming() {
 		match stream {
 			// No routing necessary, just forward all streams to the instance.
 			Ok(stream) => {
-				router.send(stream).unwrap();
+				info!(peer = stream.peer_addr().unwrap().to_string(), "connected");
+				router.send(Client::new(stream)).unwrap();
 			}
 			// TODO: What errors may occur? How should they be handled?
 			Err(msg) => error!("failed to read incoming stream: {msg}"),

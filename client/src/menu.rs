@@ -49,20 +49,20 @@ pub mod login {
 	pub struct State {
 		pub username: LineInput,
 		pub root_menu: Radio<RootMenu>,
-		pub host: LineInput,
+		pub url: LineInput,
 	}
 
 	impl State {
-		pub fn new(username: Option<&str>, host: Option<&str>) -> Self {
+		pub fn new(username: Option<&str>, url: Option<&str>) -> Self {
 			Self {
 				username: LineInput {
 					line: username.unwrap_or("").to_string(),
 					submitted: username.is_some(),
 				},
 				root_menu: Radio::default(),
-				host: LineInput {
-					line: host.unwrap_or("").to_string(),
-					submitted: host.is_some(),
+				url: LineInput {
+					line: url.unwrap_or("esprit://").to_string(),
+					submitted: url.is_some(),
 				},
 			}
 		}
@@ -74,13 +74,18 @@ pub mod login {
 			event: &sdl2::event::Event,
 			options: &crate::Options,
 		) -> Signal<RootMenuResponse> {
-			self.username.dispatch(event, options, |_| {
+			self.username.dispatch(event, options, |username| {
 				self.root_menu
 					.dispatch(event, options, |backer| match backer {
-						RootMenu::Singleplayer => Signal::Yield(RootMenuResponse::OpenSingleplayer),
-						RootMenu::Multiplayer => self.host.dispatch(event, options, |host| {
+						RootMenu::Singleplayer => {
+							Signal::Yield(RootMenuResponse::OpenSingleplayer {
+								username: username.into(),
+							})
+						}
+						RootMenu::Multiplayer => self.url.dispatch(event, options, |url| {
 							Signal::Yield(RootMenuResponse::OpenMultiplayer {
-								host: host.to_owned(),
+								username: username.into(),
+								url: url.into(),
 							})
 						}),
 					})
@@ -110,7 +115,7 @@ pub mod login {
 					&& self.root_menu.submitted
 				{
 					gui.label("Connect to server: ");
-					gui.label(&self.host);
+					gui.label(&self.url);
 				}
 				gui.vertical();
 			}

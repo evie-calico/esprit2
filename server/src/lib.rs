@@ -15,13 +15,14 @@
 pub mod protocol;
 
 use esprit2::prelude::*;
-use protocol::{PacketReceiver, PacketSender};
+use protocol::{ClientAuthentication, PacketReceiver, PacketSender};
 use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::{io, thread};
+use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -31,19 +32,27 @@ pub enum Error {
 	Timeout,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-pub struct ClientIdentification(String);
-
 pub struct Client {
 	pub stream: TcpStream,
 	pub receiver: PacketReceiver,
 	pub sender: PacketSender,
 
 	pub ping: Instant,
-	/// This field remains `None` until the client performs authentication.
-	/// In this state, most client packets will be discarded without response.
-	pub identifier: Option<ClientIdentification>,
-	pub owned_pieces: Vec<character::Ref>,
+	pub authentication: Option<ClientAuthentication>,
+	pub owned_pieces: Vec<Uuid>,
+}
+
+impl Client {
+	pub fn new(stream: TcpStream) -> Self {
+		Self {
+			stream,
+			receiver: PacketReceiver::default(),
+			sender: PacketSender::default(),
+			ping: Instant::now(),
+			authentication: None,
+			owned_pieces: Vec::new(),
+		}
+	}
 }
 
 /// Server state
@@ -170,7 +179,7 @@ impl console::Handle for Console {
 	}
 }
 
-pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
+pub fn instance(router: mpsc::Receiver<Client>, res: PathBuf) {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
@@ -201,35 +210,25 @@ pub fn connection(router: mpsc::Receiver<TcpStream>, res: PathBuf) {
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
 	loop {
-		for stream in router.try_iter() {
-			stream.set_nonblocking(true).unwrap();
-			let mut sender = PacketSender::default();
-			sender.queue(&protocol::ServerPacket::Ping);
-			let client = Client {
-				stream,
-				receiver: PacketReceiver::default(),
-				sender,
-				ping: Instant::now(),
-				identifier: None,
-				owned_pieces: Vec::new(),
-			};
+		for mut client in router.try_iter() {
+			client.sender.queue(&protocol::ServerPacket::Ping);
 			clients.push(client);
 		}
 
 		let mut i = 0;
 		while i < clients.len() {
-			match client_tick(
-				&mut clients[i],
-				&console_handle,
-				&scripts,
-				&mut server,
-				&console_reciever,
-			) {
+			match client_tick(&mut clients[i], &console_handle, &scripts, &mut server) {
 				Ok(()) => i += 1,
 				Err(msg) => {
 					error!("client hangup: {msg}");
 					clients.swap_remove(i);
 				}
+			}
+		}
+
+		for i in console_reciever.try_iter() {
+			for client in &mut clients {
+				client.sender.queue(&protocol::ServerPacket::Message(&i));
 			}
 		}
 
@@ -252,14 +251,20 @@ fn client_tick(
 	console_handle: &Console,
 	scripts: &resource::Scripts<'_>,
 	server: &mut Server,
-	console_reciever: &mpsc::Receiver<console::Message>,
-) -> io::Result<()> {
+) -> Result<(), Error> {
 	const TIMEOUT: Duration = Duration::from_secs(10);
+
+	let _span = tracing::error_span!(
+		"client",
+		"{:?}",
+		client.authentication.as_ref().map(|x| x.username.as_str())
+	)
+	.entered();
 
 	match client.sender.send(&mut client.stream) {
 		Ok(()) => {}
 		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-		Err(e) => return Err(e),
+		Err(e) => Err(e)?,
 	}
 	let result = client.receiver.recv(&mut client.stream, |packet| {
 		let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
@@ -267,18 +272,10 @@ fn client_tick(
 			protocol::ArchivedClientPacket::Ping => {
 				let ms = client.ping.elapsed().as_millis();
 				if ms > 200 {
-					info!(
-						client = client.identifier.as_ref().map(|x| &x.0),
-						ms, "recieved late ping"
-					)
+					info!(ms, "recieved late ping")
 				}
 				client.sender.queue(&protocol::ServerPacket::Ping);
 				client.ping = Instant::now();
-			}
-			protocol::ArchivedClientPacket::Authenticate(username) => {
-				client.identifier = Some(ClientIdentification(
-					rkyv::deserialize::<_, rkyv::rancor::Error>(username).unwrap(),
-				));
 			}
 			protocol::ArchivedClientPacket::Action(action_archive) => {
 				let action: character::Action =
@@ -286,10 +283,9 @@ fn client_tick(
 				let console = console_handle;
 				let scripts: &resource::Scripts = scripts;
 				let next_character = server.world.next_character();
+				// TODO: Uuid-based piece ownership.
 				// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
-				if next_character.borrow().player_controlled
-					&& client.owned_pieces.contains(next_character)
-				{
+				if next_character.borrow().player_controlled {
 					server
 						.world
 						.perform_action(console, &server.resources, scripts, action)
@@ -301,20 +297,25 @@ fn client_tick(
 					});
 				}
 			}
+			protocol::ArchivedClientPacket::Authenticate(auth) => {
+				let client_authentication =
+					rkyv::deserialize::<_, rkyv::rancor::Error>(auth).unwrap();
+				info!(username = client_authentication.username, "authenticated");
+				client.authentication = Some(client_authentication);
+			}
+			// Client is already routed!
+			protocol::ArchivedClientPacket::Route(_route) => {}
 		}
 	});
 	match result {
 		Ok(()) => {}
 		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-		Err(e) => return Err(e),
+		Err(e) => Err(e)?,
 	}
 
 	// This check has to happen after recieving packets to be as charitable to the client as possible.
 	if client.ping.elapsed() > TIMEOUT {
-		info!(player = "player", "disconnected by timeout");
-	}
-	for i in console_reciever.try_iter() {
-		client.sender.queue(&protocol::ServerPacket::Message(i));
+		return Err(Error::Timeout);
 	}
 	Ok(())
 }

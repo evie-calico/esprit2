@@ -26,6 +26,7 @@ fn main() {
 		// Your service manager's logs should already have time.
 		.without_time()
 		.init();
+
 	let listener = TcpListener::bind((
 		Ipv4Addr::new(127, 0, 0, 1),
 		cli.port.unwrap_or(protocol::DEFAULT_PORT),
@@ -34,31 +35,36 @@ fn main() {
 		error!("failed to bind listener: {msg}");
 		exit(1);
 	});
-	let mut connections = Vec::new();
-	info!(
-		"listening for connections on {}",
-		// TODO: It might be worth formatting this to a string and putting it in a tracing span.
-		listener.local_addr().unwrap()
-	);
+
+	let _span =
+		tracing::error_span!("router", addr = listener.local_addr().unwrap().to_string()).entered();
+
+	let mut instances = Vec::new();
+	info!("listening");
 	for stream in listener.incoming() {
 		match stream {
 			Ok(stream) => {
 				let (router, reciever) = mpsc::channel();
-				connections.push(thread::spawn({
-					let res = cli.resource_directory.clone();
-					move || {
-						connection(reciever, res);
-					}
-				}));
+				instances.push(
+					thread::Builder::new()
+						.name(format!("instance {}", instances.len()))
+						.spawn({
+							let res = cli.resource_directory.clone();
+							move || {
+								instance(reciever, res);
+							}
+						})
+						.unwrap(),
+				);
 				info!(
 					addr = stream.peer_addr().unwrap().to_string(),
 					"client connected"
 				);
-				router.send(stream).unwrap();
+				router.send(Client::new(stream)).unwrap();
 
-				connections.retain(|x| !x.is_finished());
+				instances.retain(|x| !x.is_finished());
 				info!(
-					live_instances = connections.len(),
+					live_instances = instances.len(),
 					"established new connection"
 				);
 			}
