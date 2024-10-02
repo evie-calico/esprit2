@@ -243,6 +243,12 @@ pub fn instance(router: mpsc::Receiver<Client>, res: PathBuf) {
 			// Please let me know if there's a way I can wait for TCP traffic.
 			thread::sleep(Duration::from_millis(1));
 		}
+
+		if clients.is_empty() {
+			// TODO: Save to disk
+			info!("no clients remain; closing instance");
+			break;
+		}
 	}
 }
 

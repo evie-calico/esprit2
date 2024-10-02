@@ -59,7 +59,14 @@ pub mod login {
 					line: username.unwrap_or("").to_string(),
 					submitted: username.is_some(),
 				},
-				root_menu: Radio::default(),
+				root_menu: if url.is_some() {
+					Radio {
+						backer: RootMenu::Multiplayer,
+						submitted: true,
+					}
+				} else {
+					Radio::default()
+				},
 				url: LineInput {
 					line: url.unwrap_or("esprit://").to_string(),
 					submitted: url.is_some(),
