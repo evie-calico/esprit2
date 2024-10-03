@@ -237,8 +237,6 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
 
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
 	let console_handle = Console { sender };
-	// For now, this spins up a new server for each connection
-	// TODO: Route connections to the same instance.
 	let mut server = Server::new(res);
 	let mut clients = ClientParty::default();
 

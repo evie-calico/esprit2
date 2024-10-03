@@ -31,7 +31,6 @@ fn main() {
 	// Logging initialization.
 	tracing_subscriber::fmt()
 		.with_max_level(tracing::Level::TRACE)
-		.with_thread_names(true)
 		// Your service manager's logs should already have time.
 		.without_time()
 		.init();
