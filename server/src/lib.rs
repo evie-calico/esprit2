@@ -15,13 +15,16 @@
 pub mod protocol;
 
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, PacketReceiver, PacketSender};
-use std::net::TcpStream;
+use protocol::{ClientAuthentication, PacketStream};
+use rkyv::util::AlignedVec;
+use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
 use std::process::exit;
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use std::{io, thread};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+use tokio::{select, task};
 use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
@@ -32,10 +35,9 @@ pub enum Error {
 	Timeout,
 }
 
+#[derive(Debug)]
 pub struct Client {
-	pub stream: TcpStream,
-	pub receiver: PacketReceiver,
-	pub sender: PacketSender,
+	pub stream: PacketStream,
 
 	pub ping: Instant,
 	pub authentication: Option<ClientAuthentication>,
@@ -45,9 +47,7 @@ pub struct Client {
 impl Client {
 	pub fn new(stream: TcpStream) -> Self {
 		Self {
-			stream,
-			receiver: PacketReceiver::default(),
-			sender: PacketSender::default(),
+			stream: PacketStream::new(stream),
 			ping: Instant::now(),
 			authentication: None,
 			owned_pieces: Vec::new(),
@@ -126,7 +126,6 @@ impl Server {
 }
 
 /// Recieve operations
-// TODO: Multiple clients.
 impl Server {
 	pub fn recv_ping(&self, client: &mut Client) {
 		let ms = client.ping.elapsed().as_millis();
@@ -151,7 +150,6 @@ impl Server {
 }
 
 /// Send operations.
-// TODO: Multiple clients.
 impl Server {
 	/// Check if the server is ready to ping this client.
 	///
@@ -169,8 +167,8 @@ impl Server {
 }
 
 #[derive(Clone, Debug)]
-pub struct Console {
-	sender: mpsc::Sender<console::Message>,
+struct Console {
+	sender: mpsc::UnboundedSender<console::Message>,
 }
 
 impl console::Handle for Console {
@@ -179,7 +177,53 @@ impl console::Handle for Console {
 	}
 }
 
-pub fn instance(router: mpsc::Receiver<Client>, res: PathBuf) {
+type ClientIdentifier = u64;
+
+#[derive(Debug)]
+struct ClientParty {
+	next_id: u64,
+	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<()>)>,
+	packet_sender: mpsc::Sender<(ClientIdentifier, AlignedVec)>,
+	packet_reciever: mpsc::Receiver<(ClientIdentifier, AlignedVec)>,
+}
+
+impl Default for ClientParty {
+	fn default() -> Self {
+		let (packet_sender, packet_reciever) = mpsc::channel(64);
+		Self {
+			next_id: 0,
+			clients: HashMap::new(),
+			packet_sender,
+			packet_reciever,
+		}
+	}
+}
+
+impl ClientParty {
+	fn join(&mut self, mut client: Client) {
+		let mut reciever = client.stream.recv.channel.take().unwrap();
+		let sender = self.packet_sender.clone();
+		let id = self.next_id;
+		let task = task::spawn(async move {
+			loop {
+				sender
+					.send((id, reciever.recv().await.unwrap()))
+					.await
+					.unwrap();
+			}
+		});
+		self.clients.insert(id, (client, task));
+		// I really don't think this will ever be reached,
+		// but if it is the thread should just panic.
+		self.next_id = self.next_id.checked_add(1).expect("out of client ids");
+	}
+
+	fn iter_mut(&mut self) -> impl Iterator<Item = &mut Client> {
+		self.clients.values_mut().map(|(client, _task)| client)
+	}
+}
+
+pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
@@ -191,12 +235,12 @@ pub fn instance(router: mpsc::Receiver<Client>, res: PathBuf) {
 
 	let scripts = resource::Scripts::open(res.join("scripts"), &lua).unwrap();
 
-	let (sender, console_reciever) = mpsc::channel();
+	let (sender, mut console_reciever) = mpsc::unbounded_channel();
 	let console_handle = Console { sender };
 	// For now, this spins up a new server for each connection
 	// TODO: Route connections to the same instance.
 	let mut server = Server::new(res);
-	let mut clients = Vec::new();
+	let mut clients = ClientParty::default();
 
 	lua.globals()
 		.set("Console", console::LuaHandle(console_handle.clone()))
@@ -209,51 +253,62 @@ pub fn instance(router: mpsc::Receiver<Client>, res: PathBuf) {
 		.unwrap();
 	lua.globals().set("Log", combat::LogConstructor).unwrap();
 
-	loop {
-		for mut client in router.try_iter() {
-			client.sender.queue(&protocol::ServerPacket::Ping);
-			clients.push(client);
-		}
+	tokio::runtime::Builder::new_multi_thread()
+		.enable_all()
+		.build()
+		.unwrap()
+		.block_on(async move {
+			loop {
+				select! {
+					Some(client) = router.recv() => {
+						client.stream.send(&protocol::ServerPacket::Ping).await;
+						clients.join(client);
+					}
+					Some(i) = console_reciever.recv() => {
+						for client in clients.iter_mut() {
+							client
+								.stream
+								.send(&protocol::ServerPacket::Message(&i))
+								.await;
+						}
+					}
+					Some((id, packet)) = clients.packet_reciever.recv() => {
+						client_tick(
+							&mut clients.clients.get_mut(&id).unwrap().0,
+							packet,
+							&console_handle,
+							&scripts,
+							&mut server,
+						)
+						.await
+						.unwrap();
+					}
+					_ = tokio::time::sleep(Duration::from_millis(1)) => {}
+				}
 
-		let mut i = 0;
-		while i < clients.len() {
-			match client_tick(&mut clients[i], &console_handle, &scripts, &mut server) {
-				Ok(()) => i += 1,
-				Err(msg) => {
-					error!("client hangup: {msg}");
-					clients.swap_remove(i);
+				if server.tick(&scripts, &console_handle).unwrap() {
+					for client in clients.iter_mut() {
+						client
+							.stream
+							.send(&protocol::ServerPacket::World {
+								world: &server.world,
+							})
+							.await;
+					}
+				}
+
+				if clients.clients.is_empty() {
+					// TODO: Save to disk
+					info!("no clients remain; closing instance");
+					break;
 				}
 			}
-		}
-
-		for i in console_reciever.try_iter() {
-			for client in &mut clients {
-				client.sender.queue(&protocol::ServerPacket::Message(&i));
-			}
-		}
-
-		if server.tick(&scripts, &console_handle).unwrap() {
-			for client in &mut clients {
-				client.sender.queue(&protocol::ServerPacket::World {
-					world: &server.world,
-				});
-			}
-		} else {
-			// Very short sleep, just to avoid busy waiting.
-			// Please let me know if there's a way I can wait for TCP traffic.
-			thread::sleep(Duration::from_millis(1));
-		}
-
-		if clients.is_empty() {
-			// TODO: Save to disk
-			info!("no clients remain; closing instance");
-			break;
-		}
-	}
+		});
 }
 
-fn client_tick(
+async fn client_tick(
 	client: &mut Client,
+	packet: AlignedVec,
 	console_handle: &Console,
 	scripts: &resource::Scripts<'_>,
 	server: &mut Server,
@@ -267,56 +322,46 @@ fn client_tick(
 	)
 	.entered();
 
-	match client.sender.send(&mut client.stream) {
-		Ok(()) => {}
-		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-		Err(e) => Err(e)?,
-	}
-	let result = client.receiver.recv(&mut client.stream, |packet| {
-		let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
-		match packet {
-			protocol::ArchivedClientPacket::Ping => {
-				let ms = client.ping.elapsed().as_millis();
-				if ms > 200 {
-					info!(ms, "recieved late ping")
-				}
-				client.sender.queue(&protocol::ServerPacket::Ping);
-				client.ping = Instant::now();
+	let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+	match packet {
+		protocol::ArchivedClientPacket::Ping => {
+			let ms = client.ping.elapsed().as_millis();
+			if ms > 200 {
+				info!(ms, "recieved late ping")
 			}
-			protocol::ArchivedClientPacket::Action(action_archive) => {
-				let action: character::Action =
-					rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
-				let console = console_handle;
-				let scripts: &resource::Scripts = scripts;
-				let next_character = server.world.next_character();
-				// TODO: Uuid-based piece ownership.
-				// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
-				if next_character.borrow().player_controlled {
-					server
-						.world
-						.perform_action(console, &server.resources, scripts, action)
-						.unwrap();
-				} else {
-					warn!("client attempted to move piece it did not own");
-					client.sender.queue(&protocol::ServerPacket::World {
-						world: &server.world,
-					});
-				}
-			}
-			protocol::ArchivedClientPacket::Authenticate(auth) => {
-				let client_authentication =
-					rkyv::deserialize::<_, rkyv::rancor::Error>(auth).unwrap();
-				info!(username = client_authentication.username, "authenticated");
-				client.authentication = Some(client_authentication);
-			}
-			// Client is already routed!
-			protocol::ArchivedClientPacket::Route(_route) => {}
+			client.stream.send(&protocol::ServerPacket::Ping).await;
+			client.ping = Instant::now();
 		}
-	});
-	match result {
-		Ok(()) => {}
-		Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
-		Err(e) => Err(e)?,
+		protocol::ArchivedClientPacket::Action(action_archive) => {
+			let action: character::Action =
+				rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
+			let console = console_handle;
+			let scripts: &resource::Scripts = scripts;
+			let next_character = server.world.next_character();
+			// TODO: Uuid-based piece ownership.
+			// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
+			if next_character.borrow().player_controlled {
+				server
+					.world
+					.perform_action(console, &server.resources, scripts, action)
+					.unwrap();
+			} else {
+				warn!("client attempted to move piece it did not own");
+				client
+					.stream
+					.send(&protocol::ServerPacket::World {
+						world: &server.world,
+					})
+					.await;
+			}
+		}
+		protocol::ArchivedClientPacket::Authenticate(auth) => {
+			let client_authentication = rkyv::deserialize::<_, rkyv::rancor::Error>(auth).unwrap();
+			info!(username = client_authentication.username, "authenticated");
+			client.authentication = Some(client_authentication);
+		}
+		// Client is already routed!
+		protocol::ArchivedClientPacket::Route(_route) => {}
 	}
 
 	// This check has to happen after recieving packets to be as charitable to the client as possible.

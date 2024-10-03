@@ -8,6 +8,20 @@
 	trait_alias
 )]
 
+mod server_handle;
+
+use clap::Parser;
+use esprit2::prelude::*;
+use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
+use esprit2_server::Client;
+use sdl2::rect::Rect;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::process::exit;
+use std::{fs, io, thread};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
+use tracing::error_span;
+
 pub mod console_impl;
 pub mod draw;
 pub mod gui;
@@ -18,27 +32,14 @@ pub mod select;
 pub mod texture;
 pub mod typography;
 
-use clap::Parser;
-pub use console_impl::Console;
-use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
-use esprit2_server::Client;
-pub use options::Options;
-use sdl2::rect::Rect;
-pub use server_handle::ServerHandle;
-use tracing::error_span;
-pub use typography::Typography;
-
 pub mod prelude {
 	pub use super::*;
 }
 
-mod server_handle;
-
-use esprit2::prelude::*;
-use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::process::exit;
-use std::sync::mpsc;
-use std::{fs, io, thread};
+pub use console_impl::Console;
+pub use options::Options;
+pub use server_handle::ServerHandle;
+pub use typography::Typography;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -68,7 +69,8 @@ struct Cli {
 }
 
 #[allow(clippy::unwrap_used, reason = "SDL")]
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
 	let cli = Cli::parse();
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();
@@ -195,8 +197,8 @@ pub fn main() {
 								username,
 							}) => {
 								// TODO: handle and display connection errors.
-								let (address, thread) = spawn_instance();
-								let stream = TcpStream::connect(address).unwrap();
+								let (address, thread) = spawn_instance().await;
+								let stream = TcpStream::connect(address).await.unwrap();
 								let client_routing = ClientRouting {
 									instance_id: 0,
 									instance_password: None,
@@ -212,6 +214,7 @@ pub fn main() {
 										&lua,
 										&textures,
 									)
+									.await
 									.unwrap(),
 								));
 								menu = None;
@@ -221,7 +224,7 @@ pub fn main() {
 								url,
 							}) => {
 								let (client_routing, address) = ClientRouting::new(&url).unwrap();
-								let stream = TcpStream::connect(address).unwrap();
+								let stream = TcpStream::connect(address).await.unwrap();
 
 								server = Some((
 									input::Mode::Normal,
@@ -233,13 +236,16 @@ pub fn main() {
 										&lua,
 										&textures,
 									)
+									.await
 									.unwrap(),
 								));
 								menu = None;
 							}
 						}
 					} else if let Some((mut input_mode, mut world_state)) = server {
-						input_mode = world_state.event(input_mode, event, &scripts, &options);
+						input_mode = world_state
+							.event(input_mode, event, &scripts, &options)
+							.await;
 						server = Some((input_mode, world_state));
 					}
 				}
@@ -256,7 +262,7 @@ pub fn main() {
 		}
 
 		if let Some((input_mode, server)) = &mut server {
-			server.tick(delta, input_mode);
+			server.tick(delta, input_mode).await;
 		}
 
 		let canvas_size = canvas.window().size();
@@ -280,32 +286,37 @@ pub fn main() {
 	// TODO: join the internal server thread.
 }
 
-fn spawn_instance() -> (SocketAddr, thread::JoinHandle<()>) {
-	let listener =
-		TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT)).unwrap();
+async fn spawn_instance() -> (SocketAddr, thread::JoinHandle<()>) {
+	let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT))
+		.await
+		.unwrap();
 	let address = listener.local_addr().unwrap();
 	let thread = thread::Builder::new()
 		.name(String::from("router"))
 		.spawn(move || {
-			singular_host(listener);
+			tokio::runtime::Builder::new_multi_thread()
+				.enable_all()
+				.build()
+				.unwrap()
+				.block_on(singular_host(listener));
 		})
 		.unwrap();
 	(address, thread)
 }
 
-fn singular_host(listener: TcpListener) {
+async fn singular_host(listener: TcpListener) {
 	let _span = error_span!("", addr = listener.local_addr().unwrap().to_string()).entered();
-	let (router, reciever) = mpsc::channel();
+	let (router, reciever) = mpsc::channel(4);
 	let connection = thread::Builder::new()
 		.name(String::from("instance"))
 		.spawn(move || esprit2_server::instance(reciever, options::resource_directory().clone()));
 	info!("listening for connections");
-	for stream in listener.incoming() {
-		match stream {
+	loop {
+		match listener.accept().await {
 			// No routing necessary, just forward all streams to the instance.
-			Ok(stream) => {
-				info!(peer = stream.peer_addr().unwrap().to_string(), "connected");
-				router.send(Client::new(stream)).unwrap();
+			Ok((stream, peer_addr)) => {
+				info!(peer = peer_addr.to_string(), "connected");
+				router.send(Client::new(stream)).await.unwrap();
 			}
 			// TODO: What errors may occur? How should they be handled?
 			Err(msg) => error!("failed to read incoming stream: {msg}"),

@@ -14,7 +14,15 @@
 use esprit2::prelude::*;
 use percent_encoding::percent_decode_str;
 use rkyv::util::AlignedVec;
-use std::{collections::VecDeque, io, net::ToSocketAddrs, num::ParseIntError, str::Utf8Error};
+use std::{io, num::ParseIntError, str::Utf8Error};
+use tokio::{
+	net::{
+		tcp::{OwnedReadHalf, OwnedWriteHalf},
+		TcpStream, ToSocketAddrs,
+	},
+	sync::mpsc,
+	task,
+};
 use url::Url;
 
 /// Default port for esprit servers to listen on.
@@ -96,42 +104,22 @@ pub enum ServerPacket<'a> {
 	Message(#[rkyv(with = rkyv::with::Inline)] &'a console::Message),
 }
 
-#[derive(Clone, Default, Debug)]
-pub struct PacketReceiver {
-	len: [Option<u8>; 4],
-	packet_buffer: rkyv::util::AlignedVec,
+#[derive(Debug)]
+pub struct PacketStream {
+	pub recv: PacketReceiver,
+	pub send: PacketSender,
 }
 
-impl PacketReceiver {
-	pub fn packet_len(&self) -> Option<usize> {
-		Some(u32::from_le_bytes([self.len[0]?, self.len[1]?, self.len[2]?, self.len[3]?]) as usize)
+impl PacketStream {
+	pub fn new(stream: TcpStream) -> Self {
+		let (read, write) = stream.into_split();
+		Self {
+			recv: PacketReceiver::new(read),
+			send: PacketSender::new(write),
+		}
 	}
 
-	pub fn recv(&mut self, stream: impl io::Read, f: impl FnOnce(AlignedVec)) -> io::Result<()> {
-		let mut bytes = stream.bytes();
-		for (len, byte) in self.len.iter_mut().filter(|x| x.is_none()).zip(&mut bytes) {
-			*len = Some(byte?);
-		}
-		if let Some(packet_len) = self.packet_len() {
-			for i in bytes.take(packet_len - self.packet_buffer.len()) {
-				self.packet_buffer.push(i?)
-			}
-			if packet_len == self.packet_buffer.len() {
-				let mut packet = rkyv::util::AlignedVec::new();
-				std::mem::swap(&mut packet, &mut self.packet_buffer);
-				f(packet);
-				*self = Self::default();
-			}
-		}
-		Ok(())
-	}
-}
-
-#[derive(Debug, Default)]
-pub struct PacketSender(VecDeque<InProgress>);
-
-impl PacketSender {
-	pub fn queue<P>(&mut self, packet: &P)
+	pub async fn send<P>(&self, packet: &P)
 	where
 		P: for<'a> rkyv::Serialize<
 			rkyv::api::high::HighSerializer<
@@ -141,27 +129,87 @@ impl PacketSender {
 			>,
 		>,
 	{
-		self.0.push_back(InProgress::new(packet));
-	}
-
-	pub fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
-		while let Some(sender) = self.0.front_mut() {
-			sender.send(&mut stream)?;
-			self.0.pop_front();
-		}
-		Ok(())
+		let _ = self
+			.send
+			.channel
+			.send(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
+			.await;
 	}
 }
 
 #[derive(Debug)]
-struct InProgress {
-	len_progress: usize,
-	packet_progress: usize,
-	packet: AlignedVec,
+pub struct PacketReceiver {
+	pub channel: Option<mpsc::Receiver<AlignedVec>>,
+	pub task: task::JoinHandle<io::Result<()>>,
 }
 
-impl InProgress {
-	fn new<P>(packet: &P) -> Self
+impl PacketReceiver {
+	pub fn new(read: OwnedReadHalf) -> Self {
+		let (send, channel) = mpsc::channel::<AlignedVec>(8);
+		let task = task::spawn(async move {
+			loop {
+				read.readable().await?;
+				let mut progress = 0;
+				let mut size = [0; 4];
+				while progress < size.len() {
+					match read.try_read(&mut size) {
+						Ok(0) => return Ok(()),
+						Ok(n) => progress += n,
+						Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+						Err(e) => Err(e)?,
+					}
+				}
+				let size = u32::from_le_bytes(size) as usize;
+				let mut progress = 0;
+				let mut packet = AlignedVec::with_capacity(size);
+				packet.resize(size, 0);
+				while progress < packet.len() {
+					match read.try_read(packet.as_mut_slice()) {
+						Ok(0) => return Ok(()),
+						Ok(n) => progress += n,
+						Err(e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+						Err(e) => Err(e)?,
+					}
+				}
+				if send.send(packet).await.is_err() {
+					break;
+				}
+			}
+			Ok(())
+		});
+		Self {
+			channel: Some(channel),
+			task,
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct PacketSender {
+	pub channel: mpsc::Sender<AlignedVec>,
+	pub task: task::JoinHandle<io::Result<()>>,
+}
+
+impl PacketSender {
+	pub fn new(write: OwnedWriteHalf) -> Self {
+		let (channel, mut recv) = mpsc::channel::<AlignedVec>(8);
+		let task = task::spawn(async move {
+			while let Some(packet) = recv.recv().await {
+				let len_bytes = (packet.len() as u32).to_le_bytes();
+				for buffer in [&len_bytes, packet.as_slice()] {
+					let mut progress = 0;
+					while progress < buffer.len() {
+						write.writable().await?;
+						progress += write.try_write(&buffer[progress..])?;
+					}
+				}
+			}
+			Ok(())
+		});
+		Self { channel, task }
+	}
+
+	pub async fn send<P>(&self, packet: &P)
 	where
 		P: for<'a> rkyv::Serialize<
 			rkyv::api::high::HighSerializer<
@@ -171,22 +219,9 @@ impl InProgress {
 			>,
 		>,
 	{
-		let packet = rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap();
-		Self {
-			len_progress: 0,
-			packet_progress: 0,
-			packet,
-		}
-	}
-
-	fn send(&mut self, mut stream: impl io::Write) -> io::Result<()> {
-		let len_bytes = (self.packet.len() as u32).to_le_bytes();
-		while self.len_progress < len_bytes.len() {
-			self.len_progress += stream.write(&len_bytes[self.len_progress..])?;
-		}
-		while self.packet_progress < self.packet.len() {
-			self.packet_progress += stream.write(&self.packet[self.packet_progress..])?;
-		}
-		Ok(())
+		let _ = self
+			.channel
+			.send(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
+			.await;
 	}
 }
