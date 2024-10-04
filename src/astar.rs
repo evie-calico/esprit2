@@ -79,6 +79,7 @@ pub struct Floor {
 }
 
 impl Floor {
+	#[inline(always)]
 	pub fn get(&self, x: i32, y: i32) -> Distance {
 		let chunk_id = ChunkId::from_absolute(x, y);
 		if let Some(chunk) = self.chunks.get(&chunk_id) {
@@ -89,6 +90,7 @@ impl Floor {
 		}
 	}
 
+	#[inline(always)]
 	pub fn get_mut(&mut self, x: i32, y: i32) -> &mut Distance {
 		let chunk_id = ChunkId::from_absolute(x, y);
 		let chunk = self.chunks.entry(chunk_id).or_default();
@@ -99,7 +101,7 @@ impl Floor {
 
 /// Construction
 impl Floor {
-	#[tracing::instrument]
+	#[inline(always)]
 	fn explore_tile(&mut self, x: i32, y: i32, distance: Distance) {
 		*self.get_mut(x, y) = distance;
 		if distance != IMPASSABLE {
@@ -107,7 +109,6 @@ impl Floor {
 		}
 	}
 
-	#[tracing::instrument]
 	pub fn target(targets: &[(i32, i32)]) -> Self {
 		let mut map = Self::default();
 		for (x, y) in targets.iter().cloned() {
@@ -122,9 +123,15 @@ impl Floor {
 		y: i32,
 		evaluate_tile: impl Fn(i32, i32, Distance) -> Distance,
 	) {
-		self.frontier
-			.sort_unstable_by(|a, b| (a.0 - x + a.1 - y).cmp(&(b.0 - x + b.1 - y)).reverse());
-		while let Some(next) = self.frontier.pop() {
+		loop {
+			// TODO: Use a better sorting algorithm since this is sorted until pushed to.
+			self.frontier
+				.sort_unstable_by(|a, b| (a.0 - x + a.1 - y).cmp(&(b.0 - x + b.1 - y)).reverse());
+
+			let Some(next) = self.frontier.pop() else {
+				break;
+			};
+
 			let base_distance = self.get(next.0, next.1);
 			for direction in OrdDir::all().map(OrdDir::as_offset) {
 				// Shorten any nearby paths.
@@ -144,7 +151,7 @@ impl Floor {
 			}
 		}
 	}
-	#[tracing::instrument]
+
 	pub fn step(&mut self, x: i32, y: i32) -> Option<OrdDir> {
 		OrdDir::all()
 			.fold(None, |a: Option<(OrdDir, Distance)>, direction: OrdDir| {

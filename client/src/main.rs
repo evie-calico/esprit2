@@ -262,9 +262,11 @@ pub async fn main() {
 		if let Some((input_mode, server)) = &mut server {
 			server.tick(delta, input_mode).await;
 			if let Some(world) = &mut server.world {
-				world
+				// TODO: Avoid ticking more than once when too late in the frame.
+				while world
 					.tick(&server.resources, &scripts, &server.console)
-					.unwrap();
+					.unwrap()
+				{}
 			}
 		}
 
