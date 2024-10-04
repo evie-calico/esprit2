@@ -32,6 +32,18 @@ use url::Url;
 /// `(character - 'a') % 10`
 pub const DEFAULT_PORT: u16 = 48578;
 
+pub type Checksum = u64;
+
+pub fn checksum(bytes: impl Iterator<Item = u8>) -> Checksum {
+	const CHECKSUM_BYTES: usize = Checksum::BITS as usize / 8;
+	bytes
+		.map(Into::into)
+		.array_chunks::<CHECKSUM_BYTES>()
+		.map(Checksum::from_le_bytes)
+		.reduce(|a, b| a ^ b)
+		.unwrap_or(0)
+}
+
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct ClientAuthentication {
 	pub username: String,
@@ -91,7 +103,7 @@ pub enum ClientPacket {
 	Authenticate(ClientAuthentication),
 	Route(ClientRouting),
 	// Instance packets
-	Action(character::Action),
+	Action { action: character::Action },
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
@@ -129,11 +141,12 @@ impl PacketStream {
 			>,
 		>,
 	{
-		let _ = self
-			.send
-			.channel
-			.send(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
+		self.forward(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
 			.await;
+	}
+
+	pub async fn forward(&self, packet: AlignedVec) {
+		let _ = self.send.channel.send(packet).await;
 	}
 }
 

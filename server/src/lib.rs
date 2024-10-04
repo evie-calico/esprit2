@@ -10,12 +10,12 @@
 //! (though, clients will need to be adapted to support new server implementations
 //! if the protocol changes)
 
-#![feature(anonymous_lifetime_in_impl_trait, once_cell_try)]
+#![feature(anonymous_lifetime_in_impl_trait, once_cell_try, iter_array_chunks)]
 
 pub mod protocol;
 
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, PacketStream};
+use protocol::{ClientAuthentication, PacketStream, ServerPacket};
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
 use std::io;
@@ -31,26 +31,36 @@ use uuid::Uuid;
 pub enum Error {
 	#[error(transparent)]
 	Io(#[from] io::Error),
-	#[error("timeout")]
-	Timeout,
+
+	#[error("failed to serialize packet: {0}")]
+	Ser(rkyv::rancor::Error),
+	#[error("failed to read packet: {0}")]
+	Access(rkyv::rancor::Error),
+	#[error("failed to deserialize packet: {0}")]
+	De(rkyv::rancor::Error),
 }
 
 #[derive(Debug)]
 pub struct Client {
+	pub address: Box<str>,
 	pub stream: PacketStream,
 
 	pub ping: Instant,
 	pub authentication: Option<ClientAuthentication>,
 	pub owned_pieces: Vec<Uuid>,
+	pub requested_world: bool,
 }
 
 impl Client {
 	pub fn new(stream: TcpStream) -> Self {
+		let address = stream.peer_addr().unwrap().to_string().into_boxed_str();
 		Self {
+			address,
 			stream: PacketStream::new(stream),
 			ping: Instant::now(),
 			authentication: None,
 			owned_pieces: Vec::new(),
+			requested_world: true,
 		}
 	}
 }
@@ -103,25 +113,6 @@ impl Server {
 			.unwrap();
 
 		Self { resources, world }
-	}
-
-	pub fn tick(
-		&mut self,
-		scripts: &resource::Scripts,
-		console: impl console::Handle,
-	) -> esprit2::Result<bool> {
-		let character = self.world.next_character();
-		if !character.borrow().player_controlled {
-			let considerations = self.world.consider_turn(&self.resources, scripts)?;
-			let action = self
-				.world
-				.consider_action(scripts, character.clone(), considerations)?;
-			self.world
-				.perform_action(&console, &self.resources, scripts, action)?;
-			Ok(true)
-		} else {
-			Ok(false)
-		}
 	}
 }
 
@@ -271,26 +262,46 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
 						}
 					}
 					Some((id, packet)) = clients.packet_reciever.recv() => {
-						client_tick(
+						if let Err(msg) = client_tick(
 							&mut clients.clients.get_mut(&id).unwrap().0,
 							packet,
 							&console_handle,
 							&scripts,
 							&mut server,
 						)
-						.await
-						.unwrap();
+						.await {
+							error!("client action failed: {msg}");
+						}
 					}
-					_ = tokio::time::sleep(Duration::from_millis(1)) => {}
+					_ = tokio::time::sleep(Duration::from_millis(1)) => {
+					}
 				}
 
-				if server.tick(&scripts, &console_handle).unwrap() {
-					for client in clients.iter_mut() {
+				while server
+					.world
+					.tick(&server.resources, &scripts, &console_handle)
+					.unwrap()
+				{}
+
+				let mut world_packet = None;
+				for client in clients.iter_mut() {
+					if client.requested_world {
+						debug!("");
+						client.requested_world = false;
 						client
 							.stream
-							.send(&protocol::ServerPacket::World {
-								world: &server.world,
-							})
+							.forward(
+								world_packet
+									.get_or_insert_with(|| {
+										rkyv::to_bytes::<rkyv::rancor::Error>(
+											&ServerPacket::World {
+												world: &server.world,
+											},
+										)
+										.unwrap()
+									})
+									.clone(),
+							)
 							.await;
 					}
 				}
@@ -311,28 +322,25 @@ async fn client_tick(
 	scripts: &resource::Scripts<'_>,
 	server: &mut Server,
 ) -> Result<(), Error> {
-	const TIMEOUT: Duration = Duration::from_secs(10);
-
-	let _span = tracing::error_span!(
+	let span = tracing::error_span!(
 		"client",
-		"{:?}",
-		client.authentication.as_ref().map(|x| x.username.as_str())
-	)
-	.entered();
+		addr = client.address,
+		username = tracing::field::Empty,
+	);
+	if let Some(auth) = &client.authentication {
+		span.record("username", &auth.username);
+	}
+	let _span = span.entered();
 
-	let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+	let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).map_err(Error::Access)?;
 	match packet {
 		protocol::ArchivedClientPacket::Ping => {
-			let ms = client.ping.elapsed().as_millis();
-			if ms > 200 {
-				info!(ms, "recieved late ping")
-			}
 			client.stream.send(&protocol::ServerPacket::Ping).await;
 			client.ping = Instant::now();
 		}
-		protocol::ArchivedClientPacket::Action(action_archive) => {
+		protocol::ArchivedClientPacket::Action { action } => {
 			let action: character::Action =
-				rkyv::deserialize::<_, rkyv::rancor::Error>(action_archive).unwrap();
+				rkyv::deserialize::<_, rkyv::rancor::Error>(action).map_err(Error::De)?;
 			let console = console_handle;
 			let scripts: &resource::Scripts = scripts;
 			let next_character = server.world.next_character();
@@ -354,17 +362,13 @@ async fn client_tick(
 			}
 		}
 		protocol::ArchivedClientPacket::Authenticate(auth) => {
-			let client_authentication = rkyv::deserialize::<_, rkyv::rancor::Error>(auth).unwrap();
+			let client_authentication =
+				rkyv::deserialize::<_, rkyv::rancor::Error>(auth).map_err(Error::De)?;
 			info!(username = client_authentication.username, "authenticated");
 			client.authentication = Some(client_authentication);
 		}
 		// Client is already routed!
 		protocol::ArchivedClientPacket::Route(_route) => {}
-	}
-
-	// This check has to happen after recieving packets to be as charitable to the client as possible.
-	if client.ping.elapsed() > TIMEOUT {
-		return Err(Error::Timeout);
 	}
 	Ok(())
 }

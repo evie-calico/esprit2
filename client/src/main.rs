@@ -261,6 +261,11 @@ pub async fn main() {
 
 		if let Some((input_mode, server)) = &mut server {
 			server.tick(delta, input_mode).await;
+			if let Some(world) = &mut server.world {
+				world
+					.tick(&server.resources, &scripts, &server.console)
+					.unwrap();
+			}
 		}
 
 		let canvas_size = canvas.window().size();
@@ -286,6 +291,8 @@ pub async fn main() {
 		drop(internal_server.instance);
 		internal_server.router.abort();
 	}
+
+	exit(0);
 }
 
 struct InternalServer {

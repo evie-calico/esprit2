@@ -292,6 +292,25 @@ impl Manager {
 }
 
 impl Manager {
+	/// Returns whether or not world has permission to perform an action internally.
+	/// If false, no work is dpne.
+	pub fn tick(
+		&mut self,
+		resources: &resource::Manager,
+		scripts: &resource::Scripts,
+		console: impl console::Handle,
+	) -> Result<bool> {
+		let character = self.next_character();
+		if !character.borrow().player_controlled {
+			let considerations = self.consider_turn(resources, scripts)?;
+			let action = self.consider_action(scripts, character.clone(), considerations)?;
+			self.perform_action(&console, resources, scripts, action)?;
+			Ok(true)
+		} else {
+			Ok(false)
+		}
+	}
+
 	pub fn consider_turn(
 		&self,
 		resources: &resource::Manager,

@@ -39,6 +39,12 @@ impl Default for Console {
 	}
 }
 
+impl console::Handle for Console {
+	fn send_message(&self, message: console::Message) {
+		let _ = self.handle.sender.send(message);
+	}
+}
+
 impl Console {
 	pub fn update(&mut self, delta: f64) {
 		for message in self.message_reciever.try_iter() {

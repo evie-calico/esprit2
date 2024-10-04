@@ -1,6 +1,6 @@
 local considerations = ...
 
-local risk_averse = math.random(3) ~= 3
+local risk_averse = false
 
 local function correct_risk(score, risky)
 	if risky then if risk_averse then return -score else return 0 end end

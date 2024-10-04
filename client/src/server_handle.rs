@@ -7,7 +7,7 @@ use tokio::net::TcpStream;
 pub struct ServerHandle<'texture> {
 	stream: PacketStream,
 
-	world: Option<world::Manager>,
+	pub world: Option<world::Manager>,
 	pub resources: resource::Manager,
 	pub console: Console,
 	pub soul_jar: gui::widget::SoulJar<'texture>,
@@ -80,12 +80,16 @@ impl<'texture> ServerHandle<'texture> {
 		scripts: &resource::Scripts<'_>,
 		action: character::Action,
 	) -> esprit2::Result<()> {
+		let world = self.world.as_mut().expect("world must be present");
+		world.perform_action(
+			console_impl::Dummy,
+			&self.resources,
+			scripts,
+			action.clone(),
+		)?;
 		self.stream
-			.send(&protocol::ClientPacket::Action(action.clone()))
+			.send(&protocol::ClientPacket::Action { action })
 			.await;
-		if let Some(world) = &mut self.world {
-			world.perform_action(console_impl::Dummy, &self.resources, scripts, action)?;
-		}
 		Ok(())
 	}
 
@@ -113,7 +117,7 @@ impl<'texture> ServerHandle<'texture> {
 		match input::controllable_character(
 			keycode,
 			world,
-			&self.console.handle,
+			&self.console,
 			&self.resources,
 			scripts,
 			input_mode,
@@ -168,7 +172,7 @@ impl<'texture> ServerHandle<'texture> {
 			let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
 			match packet {
 				protocol::ArchivedServerPacket::Ping => {
-					self.stream.send(&protocol::ClientPacket::Ping).await;
+					// self.stream.send(&protocol::ClientPacket::Ping).await;
 				}
 				protocol::ArchivedServerPacket::World { world } => {
 					match rkyv::deserialize::<world::Manager, rkyv::rancor::Error>(world) {
