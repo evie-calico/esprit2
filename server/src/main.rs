@@ -12,9 +12,9 @@ use std::mem::MaybeUninit;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::process::exit;
-use std::sync::mpsc;
 use std::thread::{self, JoinHandle};
 use tokio::net::TcpListener;
+use tokio::sync::mpsc;
 
 #[derive(clap::Parser)]
 struct Cli {
@@ -26,7 +26,7 @@ struct Cli {
 	resource_directory: PathBuf,
 }
 
-#[tracing::main]
+#[tokio::main]
 async fn main() {
 	let cli = Cli::parse();
 	// Logging initialization.
@@ -57,7 +57,7 @@ async fn main() {
 		let stream = listener.accept().await;
 		match stream {
 			Ok((stream, address)) => {
-				let (router, reciever) = mpsc::channel();
+				let (router, reciever) = mpsc::channel(4);
 				if let Some((i, instance)) = instances
 					.iter_mut()
 					.enumerate()
@@ -76,7 +76,7 @@ async fn main() {
 							.unwrap(),
 					);
 					info!(peer = address.to_string(), "connected");
-					router.send(Client::new(stream)).unwrap();
+					router.send(Client::new(stream)).await.unwrap();
 				} else {
 					todo!()
 				}
