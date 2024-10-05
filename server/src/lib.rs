@@ -14,8 +14,6 @@
 
 use esprit2::prelude::*;
 use protocol::{ClientAuthentication, PacketStream, ServerPacket};
-use rkyv::rancor::Source;
-use rkyv::rancor::{self, ResultExt};
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
 use std::io;
@@ -129,10 +127,18 @@ impl console::Handle for Console {
 
 type ClientIdentifier = u64;
 
+#[derive(Debug, thiserror::Error)]
+enum ClientPartyError {
+	#[error("packet reciever channel closed")]
+	RecieverChannel,
+	#[error("packet sender channel closed")]
+	SenderChannel,
+}
+
 #[derive(Debug)]
 struct ClientParty {
 	next_id: u64,
-	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<Result<(), rancor::BoxedError>>)>,
+	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<Result<(), ClientPartyError>>)>,
 	packet_sender: mpsc::Sender<(ClientIdentifier, AlignedVec)>,
 	packet_reciever: mpsc::Receiver<(ClientIdentifier, AlignedVec)>,
 }
@@ -165,20 +171,12 @@ impl ClientParty {
 		let sender = self.packet_sender.clone();
 		let id = self.next_id;
 		let task = task::spawn(async move {
-			#[derive(Debug, thiserror::Error)]
-			#[error("packet reciever channel disconnected")]
-			struct RecieverError;
+			use ClientPartyError as E;
 			loop {
 				sender
-					.send((
-						id,
-						reciever
-							.recv()
-							.await
-							.ok_or_else(|| rancor::BoxedError::new(RecieverError))?,
-					))
+					.send((id, reciever.recv().await.ok_or(E::RecieverChannel)?))
 					.await
-					.into_error()?;
+					.map_err(|_| E::SenderChannel)?;
 			}
 		});
 		self.clients.insert(id, (client, task));

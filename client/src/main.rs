@@ -14,6 +14,7 @@ use clap::Parser;
 use esprit2::prelude::*;
 use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
 use esprit2_server::Client;
+use rkyv::rancor::{self, ResultExt};
 use sdl2::rect::Rect;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::process::exit;
@@ -197,7 +198,7 @@ pub(crate) async fn main() {
 								username,
 							}) => {
 								// TODO: handle and display connection errors.
-								let new_server = InternalServer::new().await;
+								let new_server = InternalServer::new().await.unwrap();
 								let stream = TcpStream::connect(new_server.address).await.unwrap();
 								let client_routing = ClientRouting {
 									instance_id: 0,
@@ -243,7 +244,8 @@ pub(crate) async fn main() {
 					} else if let Some((mut input_mode, mut world_state)) = server {
 						input_mode = world_state
 							.event(input_mode, event, &scripts, &options)
-							.await;
+							.await
+							.unwrap();
 						server = Some((input_mode, world_state));
 					}
 				}
@@ -260,7 +262,7 @@ pub(crate) async fn main() {
 		}
 
 		if let Some((input_mode, server)) = &mut server {
-			server.tick(delta, input_mode).await;
+			server.tick(delta, input_mode).await.unwrap();
 			if let Some(world) = &mut server.world {
 				// TODO: Avoid ticking more than once when too late in the frame.
 				while world
@@ -304,18 +306,18 @@ struct InternalServer {
 }
 
 impl InternalServer {
-	async fn new() -> InternalServer {
+	async fn new() -> Result<InternalServer, rancor::BoxedError> {
 		let listener = TcpListener::bind((Ipv4Addr::new(127, 0, 0, 1), protocol::DEFAULT_PORT))
 			.await
-			.unwrap();
-		let address = listener.local_addr().unwrap();
+			.into_trace("while binding TCP listener")?;
+		let address = listener.local_addr().expect("missing local addr");
 		let (router, reciever) = mpsc::channel(4);
 		let instance = thread::Builder::new()
 			.name(String::from("instance"))
 			.spawn(move || {
 				esprit2_server::instance(reciever, options::resource_directory().clone())
 			})
-			.unwrap();
+			.into_trace("while spawning instance thread")?;
 		let router = task::spawn(
 			async move {
 				loop {
@@ -323,7 +325,10 @@ impl InternalServer {
 						// No routing necessary, just forward all streams to the instance.
 						Ok((stream, peer_addr)) => {
 							info!(peer = peer_addr.to_string(), "connected");
-							router.send(Client::new(stream)).await.unwrap();
+							if router.send(Client::new(stream)).await.is_err() {
+								warn!("recieved connection after instance reciever channel closed");
+								break;
+							}
 						}
 						// TODO: What errors may occur? How should they be handled?
 						Err(msg) => error!("failed to read incoming stream: {msg}"),
@@ -332,10 +337,10 @@ impl InternalServer {
 			}
 			.instrument(tracing::error_span!("router", addr = address.to_string())),
 		);
-		InternalServer {
+		Ok(InternalServer {
 			address,
 			router,
 			instance,
-		}
+		})
 	}
 }

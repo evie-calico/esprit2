@@ -32,7 +32,8 @@ impl<'texture> ServerHandle<'texture> {
 
 		let resources = resource::Manager::open(options::resource_directory()).into_error()?;
 
-		let mut soul_jar = gui::widget::SoulJar::new(textures).unwrap();
+		let mut soul_jar =
+			gui::widget::SoulJar::new(textures).into_trace("while initializing soul jar")?;
 		// This disperses the souls enough to cause them to fly in from the sides
 		// the same effect can be seen if a computer is put to sleep and then woken up.
 		soul_jar.tick(5.0);
@@ -44,17 +45,19 @@ impl<'texture> ServerHandle<'texture> {
 
 		lua.globals()
 			.set("Console", console::LuaHandle(console_impl::Dummy))
-			.unwrap();
+			.into_error()?;
 		lua.globals()
 			.set("Status", resources.statuses_handle())
-			.unwrap();
+			.into_error()?;
 		lua.globals()
 			.set("Heuristic", consider::HeuristicConstructor)
-			.unwrap();
-		lua.globals().set("Log", combat::LogConstructor).unwrap();
+			.into_error()?;
+		lua.globals()
+			.set("Log", combat::LogConstructor)
+			.into_error()?;
 		lua.globals()
 			.set("Input", input::RequestConstructor)
-			.unwrap();
+			.into_error()?;
 
 		let stream = PacketStream::new(stream);
 		stream
@@ -102,22 +105,22 @@ impl<'texture> ServerHandle<'texture> {
 		event: sdl2::event::Event,
 		scripts: &resource::Scripts<'lua>,
 		options: &Options,
-	) -> input::Mode<'lua> {
+	) -> Result<input::Mode<'lua>, rancor::BoxedError> {
 		let sdl2::event::Event::KeyDown {
 			keycode: Some(keycode),
 			..
 		} = event
 		else {
-			return input_mode;
+			return Ok(input_mode);
 		};
 		let Some(world) = &self.world else {
-			return input_mode;
+			return Ok(input_mode);
 		};
 
 		if !world.next_character().borrow().player_controlled {
-			return input_mode;
+			return Ok(input_mode);
 		}
-		match input::controllable_character(
+		let result = match input::controllable_character(
 			keycode,
 			world,
 			&self.console,
@@ -132,7 +135,7 @@ impl<'texture> ServerHandle<'texture> {
 					mode
 				}
 				Some(input::Response::Act(action)) => {
-					self.perform_action(scripts, action).await.unwrap();
+					self.perform_action(scripts, action).await?;
 					mode
 				}
 
@@ -167,22 +170,41 @@ impl<'texture> ServerHandle<'texture> {
 				error!("world input processing returned an error: {msg}");
 				input::Mode::Normal
 			}
-		}
+		};
+		Ok(result)
 	}
 
-	pub(crate) async fn tick(&mut self, delta: f64, input_mode: &mut input::Mode<'_>) {
-		while let Ok(packet) = self.stream.recv.channel.as_mut().unwrap().try_recv() {
-			let packet = access(&packet).unwrap();
+	pub(crate) async fn tick(
+		&mut self,
+		delta: f64,
+		input_mode: &mut input::Mode<'_>,
+	) -> Result<(), rancor::BoxedError> {
+		#[derive(Debug, thiserror::Error)]
+		#[error("server packet reciever closed")]
+		struct RecvClosed;
+
+		while let Ok(packet) = self
+			.stream
+			.recv
+			.channel
+			.as_mut()
+			.ok_or(RecvClosed)
+			.into_error()?
+			.try_recv()
+		{
+			let packet = rkyv::access(&packet)?;
 			match packet {
 				protocol::ArchivedServerPacket::Ping => {
 					// TODO: Respond to pings
 				}
-				protocol::ArchivedServerPacket::World { world } => match deserialize(world) {
-					Ok(world) => self.world = Some(world),
-					Err(msg) => error!("failed to deserialize world: {msg}"),
-				},
+				protocol::ArchivedServerPacket::World { world } => {
+					self.world =
+						Some(rkyv::deserialize(world).trace("while deserializing world packet")?);
+				}
 				protocol::ArchivedServerPacket::Message(message) => {
-					self.console.history.push(deserialize(message).unwrap());
+					self.console.history.push(
+						rkyv::deserialize(message).trace("while deserializing message packet")?,
+					);
 				}
 			}
 		}
@@ -197,8 +219,10 @@ impl<'texture> ServerHandle<'texture> {
 		if let input::Mode::Cursor(input::Cursor { state, .. }) = input_mode {
 			state.float.increment(delta * 0.75);
 		}
+		Ok(())
 	}
 
+	#[allow(clippy::unwrap_used, reason = "SDL")]
 	pub(crate) fn draw<'lua>(
 		&self,
 		input_mode: &input::Mode<'lua>,
