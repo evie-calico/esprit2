@@ -300,7 +300,7 @@ pub(crate) async fn main() {
 struct InternalServer {
 	address: SocketAddr,
 	router: task::JoinHandle<()>,
-	instance: thread::JoinHandle<()>,
+	instance: thread::JoinHandle<esprit2::Result<()>>,
 }
 
 impl InternalServer {

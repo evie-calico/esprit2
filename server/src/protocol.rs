@@ -13,6 +13,7 @@
 
 use esprit2::prelude::*;
 use percent_encoding::percent_decode_str;
+use rkyv::rancor::ResultExt;
 use rkyv::{rancor, util::AlignedVec};
 use std::{io, num::ParseIntError, str::Utf8Error};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -127,21 +128,24 @@ impl PacketStream {
 		}
 	}
 
-	pub async fn send<P>(&self, packet: &P)
+	pub async fn send<P>(&self, packet: &P) -> Result<(), rancor::BoxedError>
 	where
 		P: for<'a> rkyv::Serialize<
 			rkyv::api::high::HighSerializer<
 				AlignedVec,
 				rkyv::ser::allocator::ArenaHandle<'a>,
-				rancor::Error,
+				rancor::BoxedError,
 			>,
 		>,
 	{
-		self.forward(to_bytes(packet).unwrap()).await;
+		match rkyv::to_bytes(packet) {
+			Ok(packet) => self.forward(packet).await,
+			Err(e) => Err(e),
+		}
 	}
 
-	pub async fn forward(&self, packet: AlignedVec) {
-		let _ = self.send.channel.send(packet).await;
+	pub async fn forward(&self, packet: AlignedVec) -> Result<(), rancor::BoxedError> {
+		self.send.forward(packet).await.into_error()
 	}
 }
 
@@ -227,10 +231,13 @@ impl PacketSender {
 			>,
 		>,
 	{
-		use rancor::ResultExt;
 		match rkyv::to_bytes(packet) {
-			Ok(packet) => self.channel.send(packet).await.into_error(),
+			Ok(packet) => self.forward(packet).await,
 			Err(e) => Err(e),
 		}
+	}
+
+	pub async fn forward(&self, packet: AlignedVec) -> Result<(), rancor::BoxedError> {
+		self.channel.send(packet).await.into_error()
 	}
 }

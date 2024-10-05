@@ -12,10 +12,10 @@
 
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try, iter_array_chunks)]
 
-pub mod protocol;
-
 use esprit2::prelude::*;
 use protocol::{ClientAuthentication, PacketStream, ServerPacket};
+use rkyv::rancor::Source;
+use rkyv::rancor::{self, ResultExt};
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
 use std::io;
@@ -26,17 +26,21 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::{select, task};
 
+pub mod protocol;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+	#[error(transparent)]
+	Engine(#[from] esprit2::Error),
 	#[error(transparent)]
 	Io(#[from] io::Error),
 
 	#[error("failed to serialize packet: {0}")]
-	Ser(rkyv::rancor::Error),
+	Ser(rkyv::rancor::BoxedError),
 	#[error("failed to read packet: {0}")]
-	Access(rkyv::rancor::Error),
+	Access(rkyv::rancor::BoxedError),
 	#[error("failed to deserialize packet: {0}")]
-	De(rkyv::rancor::Error),
+	De(rkyv::rancor::BoxedError),
 }
 
 #[derive(Debug)]
@@ -51,7 +55,11 @@ pub struct Client {
 
 impl Client {
 	pub fn new(stream: TcpStream) -> Self {
-		let address = stream.peer_addr().unwrap().to_string().into_boxed_str();
+		let address = stream
+			.peer_addr()
+			.expect("missing peer address")
+			.to_string()
+			.into_boxed_str();
 		Self {
 			address,
 			stream: PacketStream::new(stream),
@@ -68,7 +76,7 @@ pub(crate) struct Server {
 }
 
 impl Server {
-	pub(crate) fn new(resource_directory: PathBuf) -> Self {
+	pub(crate) fn new(resource_directory: PathBuf) -> esprit2::Result<Self> {
 		// Game initialization.
 		let resources = match resource::Manager::open(&resource_directory) {
 			Ok(resources) => resources,
@@ -94,19 +102,17 @@ impl Server {
 				error!("failed to initialize world manager: {msg}");
 				exit(1);
 			});
-		world
-			.generate_floor(
-				"default seed",
-				&vault::Set {
-					vaults: vec!["example".into()],
-					density: 4,
-					hall_ratio: 1,
-				},
-				&resources,
-			)
-			.unwrap();
+		world.generate_floor(
+			"default seed",
+			&vault::Set {
+				vaults: vec!["example".into()],
+				density: 4,
+				hall_ratio: 1,
+			},
+			&resources,
+		)?;
 
-		Self { resources, world }
+		Ok(Self { resources, world })
 	}
 }
 
@@ -126,7 +132,7 @@ type ClientIdentifier = u64;
 #[derive(Debug)]
 struct ClientParty {
 	next_id: u64,
-	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<()>)>,
+	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<Result<(), rancor::BoxedError>>)>,
 	packet_sender: mpsc::Sender<(ClientIdentifier, AlignedVec)>,
 	packet_reciever: mpsc::Receiver<(ClientIdentifier, AlignedVec)>,
 }
@@ -144,16 +150,35 @@ impl Default for ClientParty {
 }
 
 impl ClientParty {
+	/// Steals the client's packet reciever and coalesces it into a shared channel.
+	///
+	/// # Panics
+	///
+	/// Panics if the client's packet reciever has already been stolen.
 	fn join(&mut self, mut client: Client) {
-		let mut reciever = client.stream.recv.channel.take().unwrap();
+		let mut reciever = client
+			.stream
+			.recv
+			.channel
+			.take()
+			.expect("packet reciever must be present");
 		let sender = self.packet_sender.clone();
 		let id = self.next_id;
 		let task = task::spawn(async move {
+			#[derive(Debug, thiserror::Error)]
+			#[error("packet reciever channel disconnected")]
+			struct RecieverError;
 			loop {
 				sender
-					.send((id, reciever.recv().await.unwrap()))
+					.send((
+						id,
+						reciever
+							.recv()
+							.await
+							.ok_or_else(|| rancor::BoxedError::new(RecieverError))?,
+					))
 					.await
-					.unwrap();
+					.into_error()?;
 			}
 		});
 		self.clients.insert(id, (client, task));
@@ -167,93 +192,106 @@ impl ClientParty {
 	}
 }
 
-pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
+/// # Errors
+///
+/// Returns an error if the instance cannot be initialized.
+pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Result<()> {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
 	lua.globals()
-		.get::<&str, mlua::Table>("package")
-		.unwrap()
-		.set("path", res.join("scripts/?.lua").to_string_lossy())
-		.unwrap();
+		.get::<&str, mlua::Table>("package")?
+		.set("path", res.join("scripts/?.lua").to_string_lossy())?;
 
-	let scripts = resource::Scripts::open(res.join("scripts"), &lua).unwrap();
+	let scripts = resource::Scripts::open(res.join("scripts"), &lua)?;
 
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
 	let console_handle = Console { sender };
-	let mut server = Server::new(res);
+	let mut server = Server::new(res)?;
 	let mut clients = ClientParty::default();
 
 	lua.globals()
-		.set("Console", console::LuaHandle(console_handle.clone()))
-		.unwrap();
+		.set("Console", console::LuaHandle(console_handle.clone()))?;
 	lua.globals()
-		.set("Status", server.resources.statuses_handle())
-		.unwrap();
+		.set("Status", server.resources.statuses_handle())?;
 	lua.globals()
-		.set("Heuristic", consider::HeuristicConstructor)
-		.unwrap();
-	lua.globals().set("Log", combat::LogConstructor).unwrap();
+		.set("Heuristic", consider::HeuristicConstructor)?;
+	lua.globals().set("Log", combat::LogConstructor)?;
 
 	tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
-		.build()
-		.unwrap()
+		.build()?
 		.block_on(async move {
-			loop {
+			// This function is unusually lenient of errors in order to avoid unexpected shutdowns.
+			'server: loop {
 				select! {
 					Some(client) = router.recv() => {
-						client.stream.send(&protocol::ServerPacket::Ping).await;
 						clients.join(client);
 					}
 					Some(i) = console_reciever.recv() => {
 						for client in clients.iter_mut() {
-							client
+							if let Err(msg) = client
 								.stream
 								.send(&protocol::ServerPacket::Message(&i))
-								.await;
+								.await
+							{
+								error!("failed to send console message to client: {msg}");
+							}
 						}
 					}
 					Some((id, packet)) = clients.packet_reciever.recv() => {
-						if let Err(msg) = client_tick(
-							&mut clients.clients.get_mut(&id).unwrap().0,
-							packet,
-							&console_handle,
-							&scripts,
-							&mut server,
-						)
-						.await {
-							error!("client action failed: {msg}");
+						if let Some((client, _)) = clients.clients.get_mut(&id) {
+							if let Err(msg) = client_tick(
+								client,
+								packet,
+								&console_handle,
+								&scripts,
+								&mut server,
+							)
+							.await {
+								error!("client action failed: {msg}");
+							}
+						} else {
+							warn!(id, "discarding former client's packet");
 						}
 					}
 					_ = tokio::time::sleep(Duration::from_millis(1)) => {
 					}
 				}
 
-				while server
-					.world
-					.tick(&server.resources, &scripts, &console_handle)
-					.unwrap()
-				{}
+				loop {
+					match server
+						.world
+						.tick(&server.resources, &scripts, &console_handle)
+					{
+						Ok(true) => (),
+						Ok(false) => break,
+						Err(msg) => {
+							error!("server world tick failed: {msg}");
+							break 'server;
+						}
+					}
+				}
 
 				let mut world_packet = None;
 				for client in clients.iter_mut() {
 					if client.requested_world {
-						debug!("");
 						client.requested_world = false;
-						client
-							.stream
-							.forward(
-								world_packet
-									.get_or_insert_with(|| {
-										to_bytes(&ServerPacket::World {
-											world: &server.world,
-										})
-										.unwrap()
-									})
-									.clone(),
-							)
-							.await;
+						let packet = if let Some(packet) = &mut world_packet {
+							packet
+						} else {
+							match to_bytes(&ServerPacket::World {
+								world: &server.world,
+							}) {
+								Ok(packet) => world_packet.insert(packet),
+								Err(msg) => {
+									error!("failed to serialize world: {msg}");
+									break 'server;
+								}
+							}
+						};
+						// This error is useless; `client.stream.recv.task` would fail first and provides more info.
+						let _ = client.stream.forward(packet.clone()).await;
 					}
 				}
 
@@ -264,6 +302,7 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
 				}
 			}
 		});
+	Ok(())
 }
 
 async fn client_tick(
@@ -283,14 +322,18 @@ async fn client_tick(
 	}
 	let _span = span.entered();
 
-	let packet = access(&packet).map_err(Error::Access)?;
+	let packet = rkyv::access(&packet).map_err(Error::Access)?;
 	match packet {
 		protocol::ArchivedClientPacket::Ping => {
-			client.stream.send(&protocol::ServerPacket::Ping).await;
+			client
+				.stream
+				.send(&protocol::ServerPacket::Ping)
+				.await
+				.map_err(Error::Ser)?;
 			client.ping = Instant::now();
 		}
 		protocol::ArchivedClientPacket::Action { action } => {
-			let action: character::Action = deserialize(action).map_err(Error::De)?;
+			let action: character::Action = rkyv::deserialize(action).map_err(Error::De)?;
 			let console = console_handle;
 			let scripts: &resource::Scripts = scripts;
 			let next_character = server.world.next_character();
@@ -299,8 +342,7 @@ async fn client_tick(
 			if next_character.borrow().player_controlled {
 				server
 					.world
-					.perform_action(console, &server.resources, scripts, action)
-					.unwrap();
+					.perform_action(console, &server.resources, scripts, action)?;
 			} else {
 				warn!("client attempted to move piece it did not own");
 				client
@@ -308,11 +350,12 @@ async fn client_tick(
 					.send(&protocol::ServerPacket::World {
 						world: &server.world,
 					})
-					.await;
+					.await
+					.map_err(Error::Ser)?;
 			}
 		}
 		protocol::ArchivedClientPacket::Authenticate(auth) => {
-			let client_authentication = deserialize(auth).map_err(Error::De)?;
+			let client_authentication = rkyv::deserialize(auth).map_err(Error::De)?;
 			info!(username = client_authentication.username, "authenticated");
 			client.authentication = Some(client_authentication);
 		}

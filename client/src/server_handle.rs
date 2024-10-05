@@ -80,18 +80,20 @@ impl<'texture> ServerHandle<'texture> {
 		&mut self,
 		scripts: &resource::Scripts<'_>,
 		action: character::Action,
-	) -> esprit2::Result<()> {
+	) -> Result<(), rancor::BoxedError> {
 		let world = self.world.as_mut().expect("world must be present");
-		world.perform_action(
-			console_impl::Dummy,
-			&self.resources,
-			scripts,
-			action.clone(),
-		)?;
+		world
+			.perform_action(
+				console_impl::Dummy,
+				&self.resources,
+				scripts,
+				action.clone(),
+			)
+			.into_trace("failed to perform action")?;
 		self.stream
 			.send(&protocol::ClientPacket::Action { action })
-			.await;
-		Ok(())
+			.await
+			.into_trace("failed to serialize action packet")
 	}
 
 	pub(crate) async fn event<'lua>(
