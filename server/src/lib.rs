@@ -25,7 +25,6 @@ use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio::{select, task};
-use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -47,7 +46,6 @@ pub struct Client {
 
 	pub ping: Instant,
 	pub authentication: Option<ClientAuthentication>,
-	pub owned_pieces: Vec<Uuid>,
 	pub requested_world: bool,
 }
 
@@ -59,22 +57,18 @@ impl Client {
 			stream: PacketStream::new(stream),
 			ping: Instant::now(),
 			authentication: None,
-			owned_pieces: Vec::new(),
 			requested_world: true,
 		}
 	}
 }
 
-/// Server state
-///
-/// These fields are public for now but it might make sense to better encapsulate the server in the future.
-pub struct Server {
-	pub resources: resource::Manager,
-	pub world: world::Manager,
+pub(crate) struct Server {
+	pub(crate) resources: resource::Manager,
+	pub(crate) world: world::Manager,
 }
 
 impl Server {
-	pub fn new(resource_directory: PathBuf) -> Self {
+	pub(crate) fn new(resource_directory: PathBuf) -> Self {
 		// Game initialization.
 		let resources = match resource::Manager::open(&resource_directory) {
 			Ok(resources) => resources,
@@ -113,47 +107,6 @@ impl Server {
 			.unwrap();
 
 		Self { resources, world }
-	}
-}
-
-/// Recieve operations
-impl Server {
-	pub fn recv_ping(&self, client: &mut Client) {
-		let ms = client.ping.elapsed().as_millis();
-		if ms > 50 {
-			info!(client = "client", ms, "recieved late ping")
-		}
-		client.ping = Instant::now();
-	}
-
-	pub fn recv_action(
-		&mut self,
-		console: impl console::Handle,
-		scripts: &resource::Scripts,
-		action: character::Action,
-	) -> esprit2::Result<()> {
-		if self.world.next_character().borrow().player_controlled {
-			self.world
-				.perform_action(&console, &self.resources, scripts, action)?;
-		}
-		Ok(())
-	}
-}
-
-/// Send operations.
-impl Server {
-	/// Check if the server is ready to ping this client.
-	///
-	/// # Returns
-	/// `Some(())` if a ping packet should be sent.
-	pub fn send_ping(&mut self, client: &mut Client) -> Option<()> {
-		client.ping = Instant::now();
-		Some(())
-	}
-
-	/// Returns an archived version of the world state, as an array of bytes.
-	pub fn send_world(&self) -> Option<&world::Manager> {
-		Some(&self.world)
 	}
 }
 
