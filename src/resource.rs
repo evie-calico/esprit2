@@ -8,14 +8,12 @@ use std::rc::Rc;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
 	#[error("resource {0} not found")]
-	NotFound(Id),
+	NotFound(Box<str>),
 	#[error("keys (file names) must be representable in UTF8")]
 	InvalidKey,
 }
 
-type Id = Box<str>;
-
-pub trait ResourceId<Manager> {
+pub trait Id<Manager> {
 	type Resource;
 	fn get<'resources>(&self, resources: &'resources Manager)
 		-> Result<&'resources Self::Resource>;
@@ -51,7 +49,7 @@ macro_rules! impl_resource {
 			}
 		}
 
-		impl$(<$($lifetime),*>)? ResourceId<$Manager> for $Name {
+		impl$(<$($lifetime),*>)? Id<$Manager> for $Name {
 			type Resource = $Resource;
 			fn get<'resources>(
 				&$self,
@@ -98,7 +96,7 @@ impl_resource! {
 	}
 }
 
-pub struct Resource<T>(HashMap<Id, T>);
+pub struct Resource<T>(HashMap<Box<str>, T>);
 
 impl<T> Resource<T> {
 	pub fn new() -> Self {
@@ -249,7 +247,7 @@ impl Manager {
 		Handle(self.statuses.clone())
 	}
 
-	pub fn get<T: ResourceId<Self>>(&self, id: &T) -> Result<&T::Resource> {
+	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&T::Resource> {
 		id.get(self)
 	}
 }

@@ -113,9 +113,8 @@ impl Vault {
 		Ok(Self {
 			tiles,
 			width,
-
-			edges,
 			characters,
+			edges,
 		})
 	}
 }
