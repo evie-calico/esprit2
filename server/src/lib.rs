@@ -14,6 +14,7 @@
 
 use esprit2::prelude::*;
 use protocol::{ClientAuthentication, PacketStream, ServerPacket};
+use rkyv::rancor;
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
 use std::io;
@@ -278,7 +279,7 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Re
 						let packet = if let Some(packet) = &mut world_packet {
 							packet
 						} else {
-							match to_bytes(&ServerPacket::World {
+							match rkyv::to_bytes::<rancor::BoxedError>(&ServerPacket::World {
 								world: &server.world,
 							}) {
 								Ok(packet) => world_packet.insert(packet),

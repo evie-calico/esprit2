@@ -8,14 +8,6 @@
 	int_roundings
 )]
 
-use rkyv::{
-	api::high::{HighDeserializer, HighSerializer, HighValidator},
-	bytecheck::CheckBytes,
-	rancor,
-	ser::allocator::ArenaHandle,
-	util::AlignedVec,
-};
-
 pub mod astar;
 pub mod attack;
 pub mod character;
@@ -164,26 +156,6 @@ impl OrdDir {
 			_ => None,
 		}
 	}
-}
-
-pub fn to_bytes<T>(value: &T) -> Result<AlignedVec, rancor::Error>
-where
-	T: for<'a> rkyv::Serialize<HighSerializer<AlignedVec, ArenaHandle<'a>, rancor::Error>>,
-{
-	rkyv::to_bytes::<rancor::Error>(value)
-}
-
-pub fn deserialize<T>(
-	value: &impl rkyv::Deserialize<T, HighDeserializer<rancor::Error>>,
-) -> Result<T, rancor::Error> {
-	rkyv::deserialize(value)
-}
-
-pub fn access<T>(bytes: &[u8]) -> Result<&T, rancor::Error>
-where
-	T: rkyv::Portable + for<'a> CheckBytes<HighValidator<'a, rancor::Error>>,
-{
-	rkyv::access(bytes)
 }
 
 pub mod prelude {
