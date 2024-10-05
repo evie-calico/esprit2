@@ -169,21 +169,17 @@ impl<'texture> ServerHandle<'texture> {
 
 	pub async fn tick(&mut self, delta: f64, input_mode: &mut input::Mode<'_>) {
 		while let Ok(packet) = self.stream.recv.channel.as_mut().unwrap().try_recv() {
-			let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).unwrap();
+			let packet = access(&packet).unwrap();
 			match packet {
 				protocol::ArchivedServerPacket::Ping => {
-					// self.stream.send(&protocol::ClientPacket::Ping).await;
+					// TODO: Respond to pings
 				}
-				protocol::ArchivedServerPacket::World { world } => {
-					match rkyv::deserialize::<world::Manager, rkyv::rancor::Error>(world) {
-						Ok(world) => self.world = Some(world),
-						Err(msg) => error!("failed to deserialize world: {msg}"),
-					}
-				}
+				protocol::ArchivedServerPacket::World { world } => match deserialize(world) {
+					Ok(world) => self.world = Some(world),
+					Err(msg) => error!("failed to deserialize world: {msg}"),
+				},
 				protocol::ArchivedServerPacket::Message(message) => {
-					self.console
-						.history
-						.push(rkyv::deserialize::<_, rkyv::rancor::Error>(message).unwrap());
+					self.console.history.push(deserialize(message).unwrap());
 				}
 			}
 		}

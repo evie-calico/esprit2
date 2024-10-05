@@ -293,11 +293,9 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) {
 							.forward(
 								world_packet
 									.get_or_insert_with(|| {
-										rkyv::to_bytes::<rkyv::rancor::Error>(
-											&ServerPacket::World {
-												world: &server.world,
-											},
-										)
+										to_bytes(&ServerPacket::World {
+											world: &server.world,
+										})
 										.unwrap()
 									})
 									.clone(),
@@ -332,15 +330,14 @@ async fn client_tick(
 	}
 	let _span = span.entered();
 
-	let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).map_err(Error::Access)?;
+	let packet = access(&packet).map_err(Error::Access)?;
 	match packet {
 		protocol::ArchivedClientPacket::Ping => {
 			client.stream.send(&protocol::ServerPacket::Ping).await;
 			client.ping = Instant::now();
 		}
 		protocol::ArchivedClientPacket::Action { action } => {
-			let action: character::Action =
-				rkyv::deserialize::<_, rkyv::rancor::Error>(action).map_err(Error::De)?;
+			let action: character::Action = deserialize(action).map_err(Error::De)?;
 			let console = console_handle;
 			let scripts: &resource::Scripts = scripts;
 			let next_character = server.world.next_character();
@@ -362,8 +359,7 @@ async fn client_tick(
 			}
 		}
 		protocol::ArchivedClientPacket::Authenticate(auth) => {
-			let client_authentication =
-				rkyv::deserialize::<_, rkyv::rancor::Error>(auth).map_err(Error::De)?;
+			let client_authentication = deserialize(auth).map_err(Error::De)?;
 			info!(username = client_authentication.username, "authenticated");
 			client.authentication = Some(client_authentication);
 		}

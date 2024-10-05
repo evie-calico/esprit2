@@ -13,16 +13,12 @@
 
 use esprit2::prelude::*;
 use percent_encoding::percent_decode_str;
-use rkyv::util::AlignedVec;
+use rkyv::{rancor, util::AlignedVec};
 use std::{io, num::ParseIntError, str::Utf8Error};
-use tokio::{
-	net::{
-		tcp::{OwnedReadHalf, OwnedWriteHalf},
-		TcpStream, ToSocketAddrs,
-	},
-	sync::mpsc,
-	task,
-};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::sync::mpsc;
+use tokio::task;
 use url::Url;
 
 /// Default port for esprit servers to listen on.
@@ -137,12 +133,11 @@ impl PacketStream {
 			rkyv::api::high::HighSerializer<
 				AlignedVec,
 				rkyv::ser::allocator::ArenaHandle<'a>,
-				rkyv::rancor::Error,
+				rancor::Error,
 			>,
 		>,
 	{
-		self.forward(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
-			.await;
+		self.forward(to_bytes(packet).unwrap()).await;
 	}
 
 	pub async fn forward(&self, packet: AlignedVec) {
@@ -222,19 +217,17 @@ impl PacketSender {
 		Self { channel, task }
 	}
 
-	pub async fn send<P>(&self, packet: &P)
+	pub async fn send<P>(&self, packet: &P) -> Result<(), rancor::Error>
 	where
 		P: for<'a> rkyv::Serialize<
 			rkyv::api::high::HighSerializer<
 				AlignedVec,
 				rkyv::ser::allocator::ArenaHandle<'a>,
-				rkyv::rancor::Error,
+				rancor::Error,
 			>,
 		>,
 	{
-		let _ = self
-			.channel
-			.send(rkyv::to_bytes::<rkyv::rancor::Error>(packet).unwrap())
-			.await;
+		use rancor::ResultExt;
+		self.channel.send(to_bytes(packet)?).await.into_error()
 	}
 }
