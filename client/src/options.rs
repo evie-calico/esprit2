@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::{fs, io};
 
-pub fn user_directory() -> &'static PathBuf {
+pub(crate) fn user_directory() -> &'static PathBuf {
 	static USER_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
 	USER_DIRECTORY.get_or_init(find_user_directory)
 }
 
-pub fn resource_directory() -> &'static PathBuf {
+pub(crate) fn resource_directory() -> &'static PathBuf {
 	static RESOURCE_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
 	RESOURCE_DIRECTORY.get_or_init(find_resource_directory)
 }
@@ -31,14 +31,14 @@ fn find_resource_directory() -> PathBuf {
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Options {
-	pub board: Board,
-	pub ui: UserInterface,
-	pub controls: Controls,
+pub(crate) struct Options {
+	pub(crate) board: Board,
+	pub(crate) ui: UserInterface,
+	pub(crate) controls: Controls,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum OpenOptionsError {
+pub(crate) enum OpenOptionsError {
 	#[error("{0}")]
 	Io(#[from] io::Error),
 	#[error("{0}")]
@@ -51,15 +51,15 @@ impl Options {
 	/// # Errors
 	///
 	/// Fails if the file could not be opened or parsed.
-	pub fn open(path: impl AsRef<Path>) -> Result<Self, OpenOptionsError> {
+	pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self, OpenOptionsError> {
 		Ok(toml::from_str(&fs::read_to_string(path)?)?)
 	}
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Board {
-	pub scale: u32,
+pub(crate) struct Board {
+	pub(crate) scale: u32,
 }
 
 impl Default for Board {
@@ -70,12 +70,12 @@ impl Default for Board {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct UserInterface {
-	pub colors: Colors,
-	pub typography: typography::Options,
+pub(crate) struct UserInterface {
+	pub(crate) colors: Colors,
+	pub(crate) typography: typography::Options,
 
-	pub pamphlet_width: u32,
-	pub console_height: u32,
+	pub(crate) pamphlet_width: u32,
+	pub(crate) console_height: u32,
 }
 
 impl Default for UserInterface {
@@ -92,15 +92,15 @@ impl Default for UserInterface {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct ConsoleColors {
-	pub normal: Color,
-	pub system: Color,
-	pub unimportant: Color,
-	pub defeat: Color,
-	pub danger: Color,
-	pub important: Color,
-	pub special: Color,
-	pub combat: Color,
+pub(crate) struct ConsoleColors {
+	pub(crate) normal: Color,
+	pub(crate) system: Color,
+	pub(crate) unimportant: Color,
+	pub(crate) defeat: Color,
+	pub(crate) danger: Color,
+	pub(crate) important: Color,
+	pub(crate) special: Color,
+	pub(crate) combat: Color,
 }
 
 impl Default for ConsoleColors {
@@ -121,11 +121,11 @@ impl Default for ConsoleColors {
 /// User interfact colors
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Colors {
-	pub normal_mode: Color,
-	pub select_mode: Color,
-	pub prompt_mode: Color,
-	pub console: ConsoleColors,
+pub(crate) struct Colors {
+	pub(crate) normal_mode: Color,
+	pub(crate) select_mode: Color,
+	pub(crate) prompt_mode: Color,
+	pub(crate) console: ConsoleColors,
 }
 
 impl Default for Colors {
@@ -140,7 +140,7 @@ impl Default for Colors {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Key(Keycode);
+pub(crate) struct Key(Keycode);
 
 impl serde::Serialize for Key {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -189,10 +189,10 @@ impl<'de> serde::Deserialize<'de> for Key {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Triggers(Vec<Key>);
+pub(crate) struct Triggers(Vec<Key>);
 
 impl Triggers {
-	pub fn contains(&self, keycode: Keycode) -> bool {
+	pub(crate) fn contains(&self, keycode: Keycode) -> bool {
 		self.0.iter().any(|x| x.0 == keycode)
 	}
 }
@@ -220,29 +220,29 @@ impl std::ops::Deref for Triggers {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Controls {
-	pub left: Triggers,
-	pub right: Triggers,
-	pub up: Triggers,
-	pub down: Triggers,
-	pub up_left: Triggers,
-	pub up_right: Triggers,
-	pub down_left: Triggers,
-	pub down_right: Triggers,
+pub(crate) struct Controls {
+	pub(crate) left: Triggers,
+	pub(crate) right: Triggers,
+	pub(crate) up: Triggers,
+	pub(crate) down: Triggers,
+	pub(crate) up_left: Triggers,
+	pub(crate) up_right: Triggers,
+	pub(crate) down_left: Triggers,
+	pub(crate) down_right: Triggers,
 
-	pub talk: Triggers,
-	pub autocombat: Triggers,
-	pub select: Triggers,
-	pub attack: Triggers,
-	pub cast: Triggers,
-	pub underfoot: Triggers,
+	pub(crate) talk: Triggers,
+	pub(crate) autocombat: Triggers,
+	pub(crate) select: Triggers,
+	pub(crate) attack: Triggers,
+	pub(crate) cast: Triggers,
+	pub(crate) underfoot: Triggers,
 
-	pub yes: Triggers,
-	pub no: Triggers,
-	pub confirm: Triggers,
-	pub escape: Triggers,
-	pub fullscreen: Triggers,
-	pub debug: Triggers,
+	pub(crate) yes: Triggers,
+	pub(crate) no: Triggers,
+	pub(crate) confirm: Triggers,
+	pub(crate) escape: Triggers,
+	pub(crate) fullscreen: Triggers,
+	pub(crate) debug: Triggers,
 }
 
 impl Default for Controls {

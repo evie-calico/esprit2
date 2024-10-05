@@ -9,23 +9,24 @@ use sdl2::ttf::Font;
 use sdl2::video::Window;
 use std::ops::Range;
 
-pub mod widget;
+pub(crate) mod widget;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
-pub struct Context<'canvas, 'ttf_module, 'rwops> {
-	pub canvas: &'canvas mut Canvas<Window>,
-	pub typography: &'ttf_module Typography<'ttf_module, 'rwops>,
-	pub rect: Rect,
+pub(crate) struct Context<'canvas, 'ttf_module, 'rwops> {
+	pub(crate) canvas: &'canvas mut Canvas<Window>,
+	pub(crate) typography: &'ttf_module Typography<'ttf_module, 'rwops>,
+	pub(crate) rect: Rect,
 	/// These values control the position of the cursor.
-	pub x: i32,
-	pub y: i32,
+	pub(crate) x: i32,
+	pub(crate) y: i32,
 	/// Determines which direction the cursor moves in.
 	orientation: Orientation,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Justification {
+#[allow(dead_code)]
+pub(crate) enum Justification {
 	Left,
 	Right,
 }
@@ -36,7 +37,7 @@ enum Orientation {
 }
 
 impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
-	pub fn new(
+	pub(crate) fn new(
 		canvas: &'canvas mut Canvas<Window>,
 		typography: &'ttf_module Typography<'ttf_module, 'rwops>,
 		rect: Rect,
@@ -51,7 +52,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn view(&mut self, x: i32, y: i32, width: u32, height: u32) -> Context {
+	pub(crate) fn view(&mut self, x: i32, y: i32, width: u32, height: u32) -> Context {
 		Context::new(
 			self.canvas,
 			self.typography,
@@ -59,13 +60,13 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		)
 	}
 
-	pub fn relocate(&mut self, rect: Rect) {
+	pub(crate) fn relocate(&mut self, rect: Rect) {
 		self.rect = rect;
 		self.x = rect.x;
 		self.y = rect.y;
 	}
 
-	pub fn advance(&mut self, width: u32, height: u32) {
+	pub(crate) fn advance(&mut self, width: u32, height: u32) {
 		let (width, height) = (width as i32, height as i32);
 		match self.orientation {
 			Orientation::Horizontal { height: o_height } => {
@@ -79,11 +80,11 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn horizontal(&mut self) {
+	pub(crate) fn horizontal(&mut self) {
 		self.orientation = Orientation::Horizontal { height: 0 };
 	}
 
-	pub fn vertical(&mut self) {
+	pub(crate) fn vertical(&mut self) {
 		if let Orientation::Horizontal { height } = self.orientation {
 			self.orientation = Orientation::Vertical;
 			self.x = self.rect.x;
@@ -91,7 +92,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn hsplit(&mut self, views: &mut [Option<impl FnMut(&mut Context)>]) {
+	pub(crate) fn hsplit(&mut self, views: &mut [Option<impl FnMut(&mut Context)>]) {
 		// We need to keep track of the tallest child so that we can advance our own pointer by the end of this.
 		let mut lowest_child = 0;
 		let view_count = views.len();
@@ -117,7 +118,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(0, (lowest_child - self.y) as u32);
 	}
 
-	pub fn menu<'texture>(
+	pub(crate) fn menu<'texture>(
 		&mut self,
 		index: Option<(usize, &Texture<'texture>)>,
 		entries: impl IntoIterator<Item = &str>,
@@ -136,7 +137,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
+	pub(crate) fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
 		let font = &self.typography.normal;
 		let color = self.typography.color;
 		let texture_creator = self.canvas.texture_creator();
@@ -194,7 +195,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn progress_bar(
+	pub(crate) fn progress_bar(
 		&mut self,
 		progress: f32,
 		fill: Color,
@@ -223,28 +224,19 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(self.rect.width(), height);
 	}
 
-	pub fn label(&mut self, s: &str) {
+	pub(crate) fn label(&mut self, s: &str) {
 		self.label_color(s, self.typography.color)
 	}
 
-	pub fn label_justified(&mut self, s: &str, justification: Justification) {
-		self.label_custom(
-			s,
-			self.typography.color,
-			&self.typography.normal,
-			justification,
-		);
-	}
-
-	pub fn label_color(&mut self, s: &str, color: Color) {
+	pub(crate) fn label_color(&mut self, s: &str, color: Color) {
 		self.label_custom(s, color, &self.typography.normal, Justification::Left);
 	}
 
-	pub fn label_styled(&mut self, s: &str, color: Color, font: &Font) {
+	pub(crate) fn label_styled(&mut self, s: &str, color: Color, font: &Font) {
 		self.label_custom(s, color, font, Justification::Left);
 	}
 
-	pub fn label_custom(
+	pub(crate) fn label_custom(
 		&mut self,
 		s: &str,
 		color: Color,
@@ -283,7 +275,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(width, height);
 	}
 
-	pub fn opposing_labels(&mut self, s1: &str, s2: &str, color: Color, font: &Font) {
+	pub(crate) fn opposing_labels(&mut self, s1: &str, s2: &str, color: Color, font: &Font) {
 		let texture_creator = self.canvas.texture_creator();
 		let font_texture = font
 			.render(s1)
@@ -319,7 +311,12 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(self.rect.width(), height);
 	}
 
-	pub fn expression<Colors: VariableColors>(&mut self, expression: &Expression, font: &Font) {
+	#[expect(unused)]
+	pub(crate) fn expression<Colors: VariableColors>(
+		&mut self,
+		expression: &Expression,
+		font: &Font,
+	) {
 		fn enter_op(
 			op: &expression::Operation,
 			expression: &Expression,
@@ -382,7 +379,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub fn htexture(&mut self, texture: &Texture, width: u32) {
+	pub(crate) fn htexture(&mut self, texture: &Texture, width: u32) {
 		let query = texture.query();
 		let height = width / query.width * query.height;
 		self.canvas
@@ -395,7 +392,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(width, height)
 	}
 
-	pub fn console(&mut self, console: &Console, colors: &crate::options::ConsoleColors) {
+	pub(crate) fn console(&mut self, console: &Console, colors: &crate::options::ConsoleColors) {
 		let canvas = &mut self.canvas;
 		let rect = Rect::new(
 			self.x,
@@ -522,7 +519,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 	}
 }
 
-pub trait VariableColors {
+pub(crate) trait VariableColors {
 	fn get(s: &str) -> Option<Color>;
 }
 

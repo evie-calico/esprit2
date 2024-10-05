@@ -8,12 +8,12 @@ use sdl2::render::Texture;
 use std::cell::RefCell;
 
 #[derive(Clone, Default, Debug)]
-pub struct PartyReferenceDrawState {
+pub(crate) struct PartyReferenceDrawState {
 	pub(crate) cloud: draw::CloudState,
 	pub(crate) cloud_trail: draw::CloudTrail,
 }
 
-pub struct SoulJar<'texture> {
+pub(crate) struct SoulJar<'texture> {
 	souls: Vec<Soul>,
 	light_texture: RefCell<Texture<'texture>>,
 }
@@ -30,14 +30,14 @@ impl<'texture> SoulJar<'texture> {
 		})
 	}
 
-	pub fn tick(&mut self, delta: f32) {
+	pub(crate) fn tick(&mut self, delta: f32) {
 		for i in &mut self.souls {
 			i.tick(delta);
 		}
 	}
 }
 
-pub fn menu(
+pub(crate) fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
 	input_mode: &input::Mode,
@@ -199,8 +199,8 @@ pub(crate) fn attack_menu(
 	}
 }
 
-pub struct Pamphlet {
-	pub party_member_clouds: Vec<PartyReferenceDrawState>,
+pub(crate) struct Pamphlet {
+	pub(crate) party_member_clouds: Vec<PartyReferenceDrawState>,
 }
 
 impl Pamphlet {

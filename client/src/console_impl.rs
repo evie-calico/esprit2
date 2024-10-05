@@ -2,14 +2,14 @@ use esprit2::prelude::*;
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
-pub struct Dummy;
+pub(crate) struct Dummy;
 
 impl console::Handle for Dummy {
 	fn send_message(&self, _message: console::Message) {}
 }
 
 #[derive(Debug, Clone)]
-pub struct Handle {
+pub(crate) struct Handle {
 	sender: mpsc::Sender<console::Message>,
 }
 
@@ -20,10 +20,10 @@ impl console::Handle for Handle {
 }
 
 #[derive(Debug)]
-pub struct Console {
-	pub handle: Handle,
+pub(crate) struct Console {
+	pub(crate) handle: Handle,
 	message_reciever: mpsc::Receiver<console::Message>,
-	pub history: Vec<console::Message>,
+	pub(crate) history: Vec<console::Message>,
 	in_progress: VecDeque<usize>,
 }
 
@@ -46,7 +46,7 @@ impl console::Handle for Console {
 }
 
 impl Console {
-	pub fn update(&mut self, delta: f64) {
+	pub(crate) fn update(&mut self, delta: f64) {
 		for message in self.message_reciever.try_iter() {
 			let is_dialogue = matches!(message.printer, console::MessagePrinter::Dialogue { .. });
 			self.history.push(message);

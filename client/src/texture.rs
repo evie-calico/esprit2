@@ -24,14 +24,14 @@ struct TextureInfo<'texture> {
 	had_error: Cell<bool>,
 }
 
-pub struct Manager<'texture> {
+pub(crate) struct Manager<'texture> {
 	texture_creator: &'texture TextureCreator<WindowContext>,
 	textures: Resource<TextureInfo<'texture>>,
 	missing_texture: Texture<'texture>,
 }
 
 impl<'texture> Manager<'texture> {
-	pub fn new(
+	pub(crate) fn new(
 		path: impl AsRef<Path>,
 		texture_creator: &'texture TextureCreator<WindowContext>,
 	) -> Result<Self> {
@@ -53,7 +53,7 @@ impl<'texture> Manager<'texture> {
 
 	/// Return the given texture.
 	/// If the texture cannot be found, returns the missing texture placeholder.
-	pub fn get(&self, key: &str) -> &Texture {
+	pub(crate) fn get(&self, key: &str) -> &Texture {
 		let Ok(texture_info) = self.textures.get(key) else {
 			return &self.missing_texture;
 		};
@@ -85,7 +85,7 @@ impl<'texture> Manager<'texture> {
 	/// # Errors
 	///
 	/// Returns an error if the texture could not be found, loaded, or parsed.
-	pub fn open(&self, key: &str) -> Result<Texture> {
+	pub(crate) fn open(&self, key: &str) -> Result<Texture> {
 		let texture_info = self.textures.get(key)?;
 
 		let image = texture_info

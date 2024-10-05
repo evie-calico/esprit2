@@ -23,24 +23,24 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tracing::Instrument;
 
-pub mod console_impl;
-pub mod draw;
-pub mod gui;
-pub mod input;
-pub mod menu;
-pub mod options;
-pub mod select;
-pub mod texture;
-pub mod typography;
+pub(crate) mod console_impl;
+pub(crate) mod draw;
+pub(crate) mod gui;
+pub(crate) mod input;
+pub(crate) mod menu;
+pub(crate) mod options;
+pub(crate) mod select;
+pub(crate) mod texture;
+pub(crate) mod typography;
 
-pub mod prelude {
-	pub use super::*;
+pub(crate) mod prelude {
+	pub(crate) use super::*;
 }
 
-pub use console_impl::Console;
-pub use options::Options;
-pub use server_handle::ServerHandle;
-pub use typography::Typography;
+pub(crate) use console_impl::Console;
+pub(crate) use options::Options;
+pub(crate) use server_handle::ServerHandle;
+pub(crate) use typography::Typography;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -56,7 +56,7 @@ fn update_delta(
 }
 
 #[derive(Debug, Clone)]
-pub enum RootMenuResponse {
+pub(crate) enum RootMenuResponse {
 	OpenSingleplayer { username: String },
 	OpenMultiplayer { username: String, url: String },
 }
@@ -71,7 +71,7 @@ struct Cli {
 
 #[allow(clippy::unwrap_used, reason = "SDL")]
 #[tokio::main]
-pub async fn main() {
+pub(crate) async fn main() {
 	let cli = Cli::parse();
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();

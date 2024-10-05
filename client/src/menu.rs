@@ -2,19 +2,19 @@ use crate::input::Signal;
 use crate::prelude::*;
 use sdl2::event::Event;
 
-pub trait Menu<T> {
+pub(crate) trait Menu<T> {
 	fn event(&mut self, event: &Event, options: &Options) -> Signal<T>;
 	fn draw(&self, gui: &mut gui::Context, textures: &texture::Manager);
 }
 
-pub mod login {
+pub(crate) mod login {
 	use super::Menu;
 	use crate::input::{LineInput, Radio, RadioBacker, Signal};
 	use crate::prelude::*;
 	use crate::RootMenuResponse;
 
 	#[derive(Default)]
-	pub enum RootMenu {
+	pub(crate) enum RootMenu {
 		#[default]
 		Singleplayer,
 		Multiplayer,
@@ -46,14 +46,14 @@ pub mod login {
 	}
 
 	#[derive(Default)]
-	pub struct State {
-		pub username: LineInput,
-		pub root_menu: Radio<RootMenu>,
-		pub url: LineInput,
+	pub(crate) struct State {
+		pub(crate) username: LineInput,
+		pub(crate) root_menu: Radio<RootMenu>,
+		pub(crate) url: LineInput,
 	}
 
 	impl State {
-		pub fn new(username: Option<&str>, url: Option<&str>) -> Self {
+		pub(crate) fn new(username: Option<&str>, url: Option<&str>) -> Self {
 			Self {
 				username: LineInput {
 					line: username.unwrap_or("").to_string(),

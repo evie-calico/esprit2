@@ -217,17 +217,20 @@ impl PacketSender {
 		Self { channel, task }
 	}
 
-	pub async fn send<P>(&self, packet: &P) -> Result<(), rancor::Error>
+	pub async fn send<P>(&self, packet: &P) -> Result<(), rancor::BoxedError>
 	where
 		P: for<'a> rkyv::Serialize<
 			rkyv::api::high::HighSerializer<
 				AlignedVec,
 				rkyv::ser::allocator::ArenaHandle<'a>,
-				rancor::Error,
+				rancor::BoxedError,
 			>,
 		>,
 	{
 		use rancor::ResultExt;
-		self.channel.send(to_bytes(packet)?).await.into_error()
+		match rkyv::to_bytes(packet) {
+			Ok(packet) => self.channel.send(packet).await.into_error(),
+			Err(e) => Err(e),
+		}
 	}
 }

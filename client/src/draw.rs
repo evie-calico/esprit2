@@ -327,7 +327,7 @@ impl CloudTrail {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct CloudyWave {
+pub(crate) struct CloudyWave {
 	timer: f64,
 }
 

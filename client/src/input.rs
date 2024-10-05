@@ -5,16 +5,16 @@ use mlua::LuaSerdeExt;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
-pub enum Signal<T> {
+pub(crate) enum Signal<T> {
 	None,
 	Cancel,
 	Yield(T),
 }
 
 #[derive(Debug, Default)]
-pub struct LineInput {
-	pub line: String,
-	pub submitted: bool,
+pub(crate) struct LineInput {
+	pub(crate) line: String,
+	pub(crate) submitted: bool,
 }
 
 impl std::ops::Deref for LineInput {
@@ -31,7 +31,7 @@ impl LineInput {
 	/// # Panics
 	///
 	/// Panics when recieving an empty set of leaves.
-	pub fn dispatch<T>(
+	pub(crate) fn dispatch<T>(
 		&mut self,
 		event: &Event,
 		options: &Options,
@@ -70,7 +70,7 @@ impl LineInput {
 	}
 }
 
-pub trait RadioBacker {
+pub(crate) trait RadioBacker {
 	fn inc(&mut self) -> bool;
 	fn dec(&mut self) -> bool;
 	fn index(&self) -> usize;
@@ -78,14 +78,14 @@ pub trait RadioBacker {
 
 /// A dialogue describing a list of things and whether or not they have been selected.
 #[derive(Debug, Default)]
-pub struct Radio<Backer: RadioBacker> {
+pub(crate) struct Radio<Backer: RadioBacker> {
 	/// Tracks the currently "hovered" option.
-	pub backer: Backer,
+	pub(crate) backer: Backer,
 	/// Whether or not the radio is currently "submitted".
 	///
 	/// An unsubmitted radio consumes events,
 	/// using them to translate the cursor.
-	pub submitted: bool,
+	pub(crate) submitted: bool,
 }
 
 impl<Backer: RadioBacker> Radio<Backer> {
@@ -94,7 +94,7 @@ impl<Backer: RadioBacker> Radio<Backer> {
 	/// # Panics
 	///
 	/// Panics when recieving an empty set of leaves.
-	pub fn dispatch<T>(
+	pub(crate) fn dispatch<T>(
 		&mut self,
 		event: &Event,
 		options: &Options,
@@ -243,7 +243,7 @@ impl<'lua> PartialAction<'lua> {
 	}
 }
 
-pub struct Cursor<'lua> {
+pub(crate) struct Cursor<'lua> {
 	pub(crate) origin: (i32, i32),
 	pub(crate) position: (i32, i32),
 	pub(crate) range: u32,
@@ -252,17 +252,17 @@ pub struct Cursor<'lua> {
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub struct Prompt<'lua> {
+pub(crate) struct Prompt<'lua> {
 	pub(crate) message: String,
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub struct DirectionPrompt<'lua> {
+pub(crate) struct DirectionPrompt<'lua> {
 	pub(crate) message: String,
 	pub(crate) callback: PartialAction<'lua>,
 }
 
-pub enum Mode<'lua> {
+pub(crate) enum Mode<'lua> {
 	Normal,
 	// Select modes
 	Select,
