@@ -13,7 +13,10 @@
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try, iter_array_chunks)]
 
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, PacketReceiver, PacketSender, ServerPacket};
+use protocol::{
+	ArchivedClientAuthentication, ClientAuthentication, ClientIdentifier, PacketReceiver,
+	PacketSender, ServerPacket,
+};
 use rkyv::rancor;
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
@@ -76,6 +79,22 @@ impl Client {
 			stream,
 		)
 	}
+
+	pub async fn ping(&mut self) -> Result<(), Error> {
+		self.sender
+			.send(&protocol::ServerPacket::Ping)
+			.await
+			.map_err(Error::Ser)?;
+		self.ping = Instant::now();
+		Ok(())
+	}
+
+	pub async fn authenticate(&mut self, auth: &ArchivedClientAuthentication) -> Result<(), Error> {
+		let auth = rkyv::deserialize(auth).map_err(Error::De)?;
+		info!(username = auth.username, "authenticated");
+		self.authentication = Some(auth);
+		Ok(())
+	}
 }
 
 pub(crate) struct Server {
@@ -135,10 +154,8 @@ impl console::Handle for Console {
 	}
 }
 
-type ClientIdentifier = u64;
-
 #[derive(Debug)]
-struct ClientParty {
+pub struct ClientParty {
 	next_id: ClientIdentifier,
 	clients: HashMap<ClientIdentifier, Client>,
 	receiver: StreamMap<ClientIdentifier, ReceiverStream<AlignedVec>>,
@@ -155,13 +172,28 @@ impl Default for ClientParty {
 }
 
 impl ClientParty {
-	fn join(&mut self, client: Client, receiver: ReceiverStream<AlignedVec>) {
+	pub fn join(&mut self, client: Client, receiver: ReceiverStream<AlignedVec>) {
 		let id = self.next_id;
 		self.clients.insert(id, client);
 		self.receiver.insert(id, receiver);
 		// I really don't think this will ever be reached,
 		// but if it is the thread should just panic.
 		self.next_id = self.next_id.checked_add(1).expect("out of client ids");
+	}
+
+	pub async fn next(&mut self) -> Option<(ClientIdentifier, &mut Client, AlignedVec)> {
+		let (id, packet) = self.receiver.next().await?;
+		let client = self
+			.get_mut(&id)
+			.expect("clients and receivers must have the same keys");
+		Some((id, client, packet))
+	}
+
+	pub fn take(&mut self, id: ClientIdentifier) -> (Client, ReceiverStream<AlignedVec>) {
+		(
+			self.clients.remove(&id).expect("id must be valid"),
+			self.receiver.remove(&id).expect("id must be valid"),
+		)
 	}
 }
 
@@ -228,8 +260,7 @@ pub fn instance(
 							}
 						}
 					}
-					Some((id, packet)) = clients.receiver.next() => {
-						let client = clients.get_mut(&id).expect("clients and receivers must have the same keys");
+					Some((_id, client, packet)) = clients.next() => {
 						if let Err(msg) = client_tick(
 							client,
 							packet,
@@ -310,14 +341,7 @@ async fn client_tick(
 
 	let packet = rkyv::access(&packet).map_err(Error::Access)?;
 	match packet {
-		protocol::ArchivedClientPacket::Ping => {
-			client
-				.sender
-				.send(&protocol::ServerPacket::Ping)
-				.await
-				.map_err(Error::Ser)?;
-			client.ping = Instant::now();
-		}
+		protocol::ArchivedClientPacket::Ping => client.ping().await?,
 		protocol::ArchivedClientPacket::Action { action } => {
 			let action: character::Action = rkyv::deserialize(action).map_err(Error::De)?;
 			let console = console_handle;
@@ -345,8 +369,9 @@ async fn client_tick(
 			info!(username = client_authentication.username, "authenticated");
 			client.authentication = Some(client_authentication);
 		}
-		// Client is already routed!
-		protocol::ArchivedClientPacket::Route(_route) => {}
+		// Client is already routed, but a singular server instance without a router may be sent superfluous routing packets.
+		// Ignore them and act as usual and clients should connect just fine.
+		protocol::ArchivedClientPacket::Instantiate | protocol::ArchivedClientPacket::Route(_) => {}
 	}
 	Ok(())
 }

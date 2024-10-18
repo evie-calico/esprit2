@@ -201,17 +201,13 @@ pub(crate) async fn main() {
 								// TODO: handle and display connection errors.
 								let new_server = InternalServer::new().await.unwrap();
 								let stream = TcpStream::connect(new_server.address).await.unwrap();
-								let client_routing = ClientRouting {
-									instance_id: 0,
-									instance_password: None,
-								};
 								internal_server = Some(new_server);
 								server = Some((
 									input::Mode::Normal,
 									ServerHandle::new(
 										stream,
 										ClientAuthentication { username },
-										client_routing,
+										None,
 										&lua,
 										&textures,
 									)

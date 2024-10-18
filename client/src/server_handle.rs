@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, ClientPacket, PacketReceiver, PacketSender};
+use protocol::{
+	ClientAuthentication, ClientIdentifier, ClientPacket, PacketReceiver, PacketSender,
+};
 use rkyv::rancor::{self, ResultExt};
 use rkyv::util::AlignedVec;
 use sdl2::rect::Rect;
@@ -10,6 +12,7 @@ pub(crate) struct ServerHandle<'texture> {
 	sender: PacketSender,
 	_internal_receiver: PacketReceiver,
 	receiver: mpsc::Receiver<AlignedVec>,
+	identifier: Option<ClientIdentifier>,
 
 	pub(crate) world: Option<world::Manager>,
 	pub(crate) resources: resource::Manager,
@@ -24,7 +27,7 @@ impl<'texture> ServerHandle<'texture> {
 	pub(crate) async fn new<'lua>(
 		stream: TcpStream,
 		authentication: ClientAuthentication,
-		routing: ClientRouting,
+		routing: Option<ClientRouting>,
 		lua: &'lua mlua::Lua,
 		textures: &'texture texture::Manager<'_>,
 	) -> Result<Self, rancor::BoxedError> {
@@ -67,13 +70,18 @@ impl<'texture> ServerHandle<'texture> {
 		sender
 			.send(&ClientPacket::Authenticate(authentication))
 			.await?;
-		sender.send(&ClientPacket::Route(routing)).await?;
+		if let Some(routing) = routing {
+			sender.send(&ClientPacket::Route(routing)).await?;
+		} else {
+			sender.send(&ClientPacket::Instantiate).await?;
+		}
 		let (_internal_receiver, receiver) = PacketReceiver::new(receiver);
 
 		Ok(Self {
 			sender,
 			_internal_receiver,
 			receiver,
+			identifier: None,
 
 			world: None,
 			resources,
@@ -190,6 +198,9 @@ impl<'texture> ServerHandle<'texture> {
 			match packet {
 				protocol::ArchivedServerPacket::Ping => {
 					// TODO: Respond to pings
+				}
+				protocol::ArchivedServerPacket::Register(identifier) => {
+					self.identifier = Some(identifier.to_native());
 				}
 				protocol::ArchivedServerPacket::World { world } => {
 					self.world =

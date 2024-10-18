@@ -15,12 +15,15 @@ use esprit2::prelude::*;
 use percent_encoding::percent_decode_str;
 use rkyv::rancor::ResultExt;
 use rkyv::{rancor, util::AlignedVec};
+use std::num::IntErrorKind;
 use std::{io, num::ParseIntError, str::Utf8Error};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::ToSocketAddrs;
 use tokio::sync::mpsc;
 use tokio::task;
 use url::Url;
+
+pub type ClientIdentifier = u64;
 
 /// Default port for esprit servers to listen on.
 ///
@@ -48,7 +51,7 @@ pub struct ClientAuthentication {
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct ClientRouting {
-	pub instance_id: usize,
+	pub instance_id: u32,
 	pub instance_password: Option<Box<str>>,
 }
 
@@ -67,21 +70,38 @@ pub enum ClientRoutingError {
 }
 
 impl ClientRouting {
-	pub fn new(url: &str) -> Result<(Self, impl ToSocketAddrs), ClientRoutingError> {
+	pub fn new(url: &str) -> Result<(Option<Self>, impl ToSocketAddrs), ClientRoutingError> {
 		use ClientRoutingError as E;
 		let url = Url::parse(url)?;
-		let mut segments = url.path_segments().ok_or(E::MissingInstance)?;
-		let instance_id = segments.next().ok_or(E::MissingInstance)?.parse()?;
-		let instance_password = segments
-			.next()
-			.map(|x| percent_decode_str(x).decode_utf8())
-			.transpose()?
-			.map(|x| x.into());
+		let s = url
+			.path_segments()
+			.and_then(|mut segments| {
+				let instance_id = match segments.next()?.parse::<u32>() {
+					Ok(i) => i,
+					Err(e) => {
+						return match e.kind() {
+							IntErrorKind::Empty => None,
+							_ => Some(Err(E::MalformedInstance(e))),
+						}
+					}
+				};
+				let instance_password = match segments
+					.next()
+					.map(|x| percent_decode_str(x).decode_utf8())
+					.transpose()
+				{
+					Ok(i) => i,
+					Err(e) => return Some(Err(E::MalformedPassword(e))),
+				}
+				.map(|x| x.into());
+				Some(Ok(Self {
+					instance_id,
+					instance_password,
+				}))
+			})
+			.transpose()?;
 		Ok((
-			Self {
-				instance_id,
-				instance_password,
-			},
+			s,
 			(
 				String::from(
 					percent_decode_str(url.host_str().ok_or(E::MissingHost)?).decode_utf8()?,
@@ -99,6 +119,7 @@ pub enum ClientPacket {
 	// Root packets
 	Authenticate(ClientAuthentication),
 	Route(ClientRouting),
+	Instantiate,
 	// Instance packets
 	Action { action: character::Action },
 }
@@ -106,6 +127,7 @@ pub enum ClientPacket {
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum ServerPacket<'a> {
 	Ping,
+	Register(ClientIdentifier),
 	World {
 		#[rkyv(with = rkyv::with::Inline)]
 		world: &'a world::Manager,
