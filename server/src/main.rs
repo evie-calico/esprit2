@@ -15,6 +15,7 @@ use std::process::exit;
 use std::thread::{self, JoinHandle};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(clap::Parser)]
 struct Cli {
@@ -46,8 +47,14 @@ async fn main() {
 		exit(1);
 	});
 
-	let _span =
-		tracing::error_span!("router", addr = listener.local_addr().unwrap().to_string()).entered();
+	let _span = tracing::error_span!(
+		"router",
+		addr = listener
+			.local_addr()
+			.expect("missing local address")
+			.to_string()
+	)
+	.entered();
 
 	let mut instances = Box::new_uninit_slice(cli.instances);
 	let instances = MaybeUninit::fill_with(&mut instances, || None);
@@ -69,14 +76,17 @@ async fn main() {
 							.name(format!("instance {i}"))
 							.spawn({
 								let res = cli.resource_directory.clone();
-								move || {
-									esprit2_server::instance(reciever, res);
-								}
+								move || esprit2_server::instance(reciever, res)
 							})
-							.unwrap(),
+							.expect("failed to spawn instance thread"),
 					);
 					info!(peer = address.to_string(), "connected");
-					router.send(Client::new(stream)).await.unwrap();
+					let (client, receiver) = Client::new(stream);
+					if let Err(_client) = router.send((client, ReceiverStream::new(receiver))).await
+					{
+						error!("instance router closed");
+						// TODO: Rescue client
+					}
 				} else {
 					todo!()
 				}

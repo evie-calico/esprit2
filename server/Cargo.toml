@@ -21,3 +21,5 @@ uuid = { version = "1.10.0", features = ["v4"] }
 url = "2.5.2"
 percent-encoding = "2.3.1"
 tokio = { version = "1.40.0", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-stream = "0.1.16"
+futures = "0.3.31"

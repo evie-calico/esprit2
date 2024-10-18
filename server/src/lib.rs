@@ -13,7 +13,7 @@
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try, iter_array_chunks)]
 
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, PacketStream, ServerPacket};
+use protocol::{ClientAuthentication, PacketReceiver, PacketSender, ServerPacket};
 use rkyv::rancor;
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
@@ -22,8 +22,10 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
+use tokio::select;
 use tokio::sync::mpsc;
-use tokio::{select, task};
+use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::{StreamExt, StreamMap};
 
 pub mod protocol;
 
@@ -45,7 +47,8 @@ pub enum Error {
 #[derive(Debug)]
 pub struct Client {
 	pub address: Box<str>,
-	pub stream: PacketStream,
+	sender: PacketSender,
+	_receiver: PacketReceiver,
 
 	pub ping: Instant,
 	pub authentication: Option<ClientAuthentication>,
@@ -53,19 +56,25 @@ pub struct Client {
 }
 
 impl Client {
-	pub fn new(stream: TcpStream) -> Self {
+	pub fn new(stream: TcpStream) -> (Self, mpsc::Receiver<AlignedVec>) {
 		let address = stream
 			.peer_addr()
 			.expect("missing peer address")
 			.to_string()
 			.into_boxed_str();
-		Self {
-			address,
-			stream: PacketStream::new(stream),
-			ping: Instant::now(),
-			authentication: None,
-			requested_world: true,
-		}
+		let (receiver, sender) = stream.into_split();
+		let (receiver, stream) = PacketReceiver::new(receiver);
+		(
+			Self {
+				address,
+				sender: PacketSender::new(sender),
+				_receiver: receiver,
+				ping: Instant::now(),
+				authentication: None,
+				requested_world: true,
+			},
+			stream,
+		)
 	}
 }
 
@@ -128,73 +137,54 @@ impl console::Handle for Console {
 
 type ClientIdentifier = u64;
 
-#[derive(Debug, thiserror::Error)]
-enum ClientPartyError {
-	#[error("packet reciever channel closed")]
-	RecieverChannel,
-	#[error("packet sender channel closed")]
-	SenderChannel,
-}
-
 #[derive(Debug)]
 struct ClientParty {
-	next_id: u64,
-	clients: HashMap<ClientIdentifier, (Client, task::JoinHandle<Result<(), ClientPartyError>>)>,
-	packet_sender: mpsc::Sender<(ClientIdentifier, AlignedVec)>,
-	packet_reciever: mpsc::Receiver<(ClientIdentifier, AlignedVec)>,
+	next_id: ClientIdentifier,
+	clients: HashMap<ClientIdentifier, Client>,
+	receiver: StreamMap<ClientIdentifier, ReceiverStream<AlignedVec>>,
 }
 
 impl Default for ClientParty {
 	fn default() -> Self {
-		let (packet_sender, packet_reciever) = mpsc::channel(64);
 		Self {
-			next_id: 0,
+			next_id: ClientIdentifier::default(),
 			clients: HashMap::new(),
-			packet_sender,
-			packet_reciever,
+			receiver: StreamMap::new(),
 		}
 	}
 }
 
 impl ClientParty {
-	/// Steals the client's packet reciever and coalesces it into a shared channel.
-	///
-	/// # Panics
-	///
-	/// Panics if the client's packet reciever has already been stolen.
-	fn join(&mut self, mut client: Client) {
-		let mut reciever = client
-			.stream
-			.recv
-			.channel
-			.take()
-			.expect("packet reciever must be present");
-		let sender = self.packet_sender.clone();
+	fn join(&mut self, client: Client, receiver: ReceiverStream<AlignedVec>) {
 		let id = self.next_id;
-		let task = task::spawn(async move {
-			use ClientPartyError as E;
-			loop {
-				sender
-					.send((id, reciever.recv().await.ok_or(E::RecieverChannel)?))
-					.await
-					.map_err(|_| E::SenderChannel)?;
-			}
-		});
-		self.clients.insert(id, (client, task));
+		self.clients.insert(id, client);
+		self.receiver.insert(id, receiver);
 		// I really don't think this will ever be reached,
 		// but if it is the thread should just panic.
 		self.next_id = self.next_id.checked_add(1).expect("out of client ids");
 	}
+}
 
-	fn iter_mut(&mut self) -> impl Iterator<Item = &mut Client> {
-		self.clients.values_mut().map(|(client, _task)| client)
+impl std::ops::Deref for ClientParty {
+	type Target = HashMap<ClientIdentifier, Client>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.clients
+	}
+}
+impl std::ops::DerefMut for ClientParty {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.clients
 	}
 }
 
 /// # Errors
 ///
 /// Returns an error if the instance cannot be initialized.
-pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Result<()> {
+pub fn instance(
+	mut router: mpsc::Receiver<(Client, ReceiverStream<AlignedVec>)>,
+	res: PathBuf,
+) -> esprit2::Result<()> {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
@@ -224,13 +214,13 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Re
 			// This function is unusually lenient of errors in order to avoid unexpected shutdowns.
 			'server: loop {
 				select! {
-					Some(client) = router.recv() => {
-						clients.join(client);
+					Some((client, receiver)) = router.recv() => {
+						clients.join(client, receiver);
 					}
 					Some(i) = console_reciever.recv() => {
-						for client in clients.iter_mut() {
+						for client in clients.values_mut() {
 							if let Err(msg) = client
-								.stream
+								.sender
 								.send(&protocol::ServerPacket::Message(&i))
 								.await
 							{
@@ -238,20 +228,17 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Re
 							}
 						}
 					}
-					Some((id, packet)) = clients.packet_reciever.recv() => {
-						if let Some((client, _)) = clients.clients.get_mut(&id) {
-							if let Err(msg) = client_tick(
-								client,
-								packet,
-								&console_handle,
-								&scripts,
-								&mut server,
-							)
-							.await {
-								error!("client action failed: {msg}");
-							}
-						} else {
-							warn!(id, "discarding former client's packet");
+					Some((id, packet)) = clients.receiver.next() => {
+						let client = clients.get_mut(&id).expect("clients and receivers must have the same keys");
+						if let Err(msg) = client_tick(
+							client,
+							packet,
+							&console_handle,
+							&scripts,
+							&mut server,
+						)
+						.await {
+							error!("client action failed: {msg}");
 						}
 					}
 					_ = tokio::time::sleep(Duration::from_millis(1)) => {
@@ -273,7 +260,7 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Re
 				}
 
 				let mut world_packet = None;
-				for client in clients.iter_mut() {
+				for client in clients.values_mut() {
 					if client.requested_world {
 						client.requested_world = false;
 						let packet = if let Some(packet) = &mut world_packet {
@@ -290,7 +277,7 @@ pub fn instance(mut router: mpsc::Receiver<Client>, res: PathBuf) -> esprit2::Re
 							}
 						};
 						// This error is useless; `client.stream.recv.task` would fail first and provides more info.
-						let _ = client.stream.forward(packet.clone()).await;
+						let _ = client.sender.forward(packet.clone()).await;
 					}
 				}
 
@@ -325,7 +312,7 @@ async fn client_tick(
 	match packet {
 		protocol::ArchivedClientPacket::Ping => {
 			client
-				.stream
+				.sender
 				.send(&protocol::ServerPacket::Ping)
 				.await
 				.map_err(Error::Ser)?;
@@ -345,7 +332,7 @@ async fn client_tick(
 			} else {
 				warn!("client attempted to move piece it did not own");
 				client
-					.stream
+					.sender
 					.send(&protocol::ServerPacket::World {
 						world: &server.world,
 					})

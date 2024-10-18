@@ -17,7 +17,7 @@ use rkyv::rancor::ResultExt;
 use rkyv::{rancor, util::AlignedVec};
 use std::{io, num::ParseIntError, str::Utf8Error};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::ToSocketAddrs;
 use tokio::sync::mpsc;
 use tokio::task;
 use url::Url;
@@ -114,49 +114,12 @@ pub enum ServerPacket<'a> {
 }
 
 #[derive(Debug)]
-pub struct PacketStream {
-	pub recv: PacketReceiver,
-	pub send: PacketSender,
-}
-
-impl PacketStream {
-	pub fn new(stream: TcpStream) -> Self {
-		let (read, write) = stream.into_split();
-		Self {
-			recv: PacketReceiver::new(read),
-			send: PacketSender::new(write),
-		}
-	}
-
-	pub async fn send<P>(&self, packet: &P) -> Result<(), rancor::BoxedError>
-	where
-		P: for<'a> rkyv::Serialize<
-			rkyv::api::high::HighSerializer<
-				AlignedVec,
-				rkyv::ser::allocator::ArenaHandle<'a>,
-				rancor::BoxedError,
-			>,
-		>,
-	{
-		match rkyv::to_bytes(packet) {
-			Ok(packet) => self.forward(packet).await,
-			Err(e) => Err(e),
-		}
-	}
-
-	pub async fn forward(&self, packet: AlignedVec) -> Result<(), rancor::BoxedError> {
-		self.send.forward(packet).await.into_error()
-	}
-}
-
-#[derive(Debug)]
 pub struct PacketReceiver {
-	pub channel: Option<mpsc::Receiver<AlignedVec>>,
 	pub task: task::JoinHandle<io::Result<()>>,
 }
 
 impl PacketReceiver {
-	pub fn new(read: OwnedReadHalf) -> Self {
+	pub fn new(read: OwnedReadHalf) -> (Self, mpsc::Receiver<AlignedVec>) {
 		let (send, channel) = mpsc::channel::<AlignedVec>(8);
 		let task = task::spawn(async move {
 			loop {
@@ -189,10 +152,7 @@ impl PacketReceiver {
 			}
 			Ok(())
 		});
-		Self {
-			channel: Some(channel),
-			task,
-		}
+		(Self { task }, channel)
 	}
 }
 

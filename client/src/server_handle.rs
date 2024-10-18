@@ -1,12 +1,15 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
-use protocol::{ClientAuthentication, ClientPacket, PacketStream};
+use protocol::{ClientAuthentication, ClientPacket, PacketReceiver, PacketSender};
 use rkyv::rancor::{self, ResultExt};
+use rkyv::util::AlignedVec;
 use sdl2::rect::Rect;
 use tokio::net::TcpStream;
 
 pub(crate) struct ServerHandle<'texture> {
-	stream: PacketStream,
+	sender: PacketSender,
+	_internal_receiver: PacketReceiver,
+	receiver: mpsc::Receiver<AlignedVec>,
 
 	pub(crate) world: Option<world::Manager>,
 	pub(crate) resources: resource::Manager,
@@ -59,15 +62,18 @@ impl<'texture> ServerHandle<'texture> {
 			.set("Input", input::RequestConstructor)
 			.into_error()?;
 
-		let stream = PacketStream::new(stream);
-		stream
-			.send
+		let (receiver, sender) = stream.into_split();
+		let sender = PacketSender::new(sender);
+		sender
 			.send(&ClientPacket::Authenticate(authentication))
 			.await?;
-		stream.send.send(&ClientPacket::Route(routing)).await?;
+		sender.send(&ClientPacket::Route(routing)).await?;
+		let (_internal_receiver, receiver) = PacketReceiver::new(receiver);
 
 		Ok(Self {
-			stream,
+			sender,
+			_internal_receiver,
+			receiver,
 
 			world: None,
 			resources,
@@ -93,7 +99,7 @@ impl<'texture> ServerHandle<'texture> {
 				action.clone(),
 			)
 			.into_trace("failed to perform action")?;
-		self.stream
+		self.sender
 			.send(&protocol::ClientPacket::Action { action })
 			.await
 			.into_trace("failed to serialize action packet")
@@ -179,19 +185,7 @@ impl<'texture> ServerHandle<'texture> {
 		delta: f64,
 		input_mode: &mut input::Mode<'_>,
 	) -> Result<(), rancor::BoxedError> {
-		#[derive(Debug, thiserror::Error)]
-		#[error("server packet reciever closed")]
-		struct RecvClosed;
-
-		while let Ok(packet) = self
-			.stream
-			.recv
-			.channel
-			.as_mut()
-			.ok_or(RecvClosed)
-			.into_error()?
-			.try_recv()
-		{
+		while let Ok(packet) = self.receiver.try_recv() {
 			let packet = rkyv::access(&packet)?;
 			match packet {
 				protocol::ArchivedServerPacket::Ping => {

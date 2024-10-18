@@ -22,6 +22,7 @@ use std::{fs, io, thread};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::task;
+use tokio_stream::wrappers::ReceiverStream;
 use tracing::Instrument;
 
 pub(crate) mod console_impl;
@@ -325,7 +326,12 @@ impl InternalServer {
 						// No routing necessary, just forward all streams to the instance.
 						Ok((stream, peer_addr)) => {
 							info!(peer = peer_addr.to_string(), "connected");
-							if router.send(Client::new(stream)).await.is_err() {
+							let (client, receiver) = Client::new(stream);
+							if router
+								.send((client, ReceiverStream::new(receiver)))
+								.await
+								.is_err()
+							{
 								warn!("recieved connection after instance reciever channel closed");
 								break;
 							}
