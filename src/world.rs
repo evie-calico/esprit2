@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use consider::TaggedHeuristics;
 use mlua::LuaSerdeExt;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::collections::VecDeque;
@@ -400,7 +399,7 @@ impl Manager {
 			.call::<Option<usize>>(
 				scripts
 					.runtime
-					.create_sequence_from(considerations.iter().map(TaggedHeuristics::new))?,
+					.create_sequence_from(considerations.iter().cloned())?,
 			)?
 			.map(|index| considerations.remove(index - 1).action)
 			.unwrap_or(character::Action::Wait(TURN)))

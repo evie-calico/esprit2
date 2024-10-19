@@ -3,6 +3,8 @@
 //! This is mainly for enemy logic, but may have some use for player UI,
 //! such as showing a sorted list of potential spell targets rather than a cursor.
 
+use mlua::IntoLuaMulti;
+
 use crate::prelude::*;
 
 /// Rough approximations of an action's result.
@@ -30,6 +32,11 @@ pub enum Heuristic {
 		x: i32,
 		y: i32,
 	},
+}
+
+fn saturating_cast(x: mlua::Integer) -> u32 {
+	x.max(u32::MIN as mlua::Integer)
+		.min(u32::MAX as mlua::Integer) as u32
 }
 
 fn wrong_variant() -> mlua::Error {
@@ -72,66 +79,50 @@ pub struct HeuristicConstructor;
 
 impl mlua::UserData for HeuristicConstructor {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
-		methods.add_function(
-			"damage",
-			|_, (target, amount): (character::Ref, mlua::Integer)| {
-				Ok(Heuristic::Damage {
-					target,
-					amount: amount.try_into().unwrap_or_default(),
-				})
-			},
-		);
-		methods.add_function("debuff", |_, (target, amount): (character::Ref, u32)| {
-			Ok(Heuristic::Debuff { target, amount })
+		methods.add_function("damage", |_, (target, amount)| {
+			Ok(Heuristic::Damage {
+				target,
+				amount: saturating_cast(amount),
+			})
 		});
+		methods.add_function("debuff", |_, (target, amount)| {
+			Ok(Heuristic::Debuff {
+				target,
+				amount: saturating_cast(amount),
+			})
+		});
+		methods.add_function("move", |_, (x, y)| Ok(Heuristic::Move { x, y }));
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, mlua::FromLua)]
 pub struct Consider {
 	pub action: character::Action,
 	pub heuristics: Vec<Heuristic>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ActionType {
-	Wait,
-	Move,
-	Attack,
-	Cast,
-}
-
-#[derive(Clone, Debug, mlua::FromLua)]
-pub struct TaggedHeuristics {
-	action_type: ActionType,
-	heuristics: Vec<Heuristic>,
-}
-
-impl TaggedHeuristics {
-	pub fn new(consider: &Consider) -> Self {
-		Self {
-			action_type: match consider.action {
-				character::Action::Wait(_) => ActionType::Wait,
-				character::Action::Move(_, _) => ActionType::Move,
-				character::Action::Attack(_, _) => ActionType::Attack,
-				character::Action::Cast(_, _) => ActionType::Cast,
-			},
-			heuristics: consider.heuristics.clone(),
-		}
-	}
-}
-
-impl mlua::UserData for TaggedHeuristics {
-	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
-		fields.add_field_method_get("heuristics", |_, this| Ok(this.heuristics.clone()));
-	}
-
+impl mlua::UserData for Consider {
 	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_function("ipairs", |_, this: mlua::AnyUserData| {
+			Ok((
+				this.get_metatable()?.get::<mlua::Function>("__next")?,
+				this,
+				mlua::Nil,
+			))
+		});
+		methods.add_meta_method("__next", |lua, this, index: mlua::Value| {
+			let index = index.as_usize().unwrap_or(0);
+			if let Some(heuristic) = this.heuristics.get(index) {
+				lua.pack_multi((index + 1, heuristic.clone()))
+			} else {
+				mlua::Nil.into_lua_multi(lua)
+			}
+		});
 		methods.add_method("attack", |_, this, ()| {
-			Ok(this.action_type == ActionType::Attack)
+			Ok(matches!(this.action, character::Action::Attack(..)))
 		});
 		methods.add_method("spell", |_, this, ()| {
-			Ok(this.action_type == ActionType::Cast)
+			Ok(matches!(this.action, character::Action::Cast(..)))
 		});
 	}
 }

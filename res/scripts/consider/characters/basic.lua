@@ -28,7 +28,7 @@ end
 local function sum_heuristics(consider, weight)
 	if weight == nil then weight = 1 end
 	local score = 0
-	for _, heuristic in ipairs(consider.heuristics) do
+	for _, heuristic in consider:ipairs() do
 		if heuristic:damage() then
 			score = score + damage_score(heuristic) * weight
 		elseif heuristic:debuff() then
