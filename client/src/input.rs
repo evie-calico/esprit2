@@ -320,9 +320,12 @@ pub(crate) fn controllable_character<'lua>(
 								mode,
 								Some(Response::Act(character::Action::Attack(
 									default_attack,
-									character::ActionArgs(std::collections::HashMap::from([(
-										"target".into(),
-										character::ActionArg::Position { x, y },
+									Value::Table(Box::new([(
+										Value::String("target".into()),
+										Value::Table(Box::new([
+											(Value::String("x".into()), Value::Integer(x.into())),
+											(Value::String("y".into()), Value::Integer(y.into())),
+										])),
 									)])),
 								))),
 							));

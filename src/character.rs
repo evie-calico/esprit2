@@ -344,35 +344,6 @@ impl Piece {
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
-#[serde(untagged)]
-pub enum ActionArg {
-	Boolean(bool),
-	Integer(mlua::Integer),
-	Position { x: i32, y: i32 },
-	String(String),
-}
-
-// I'd rather this be a list of tuples but I don't wanna write lua conversion code right now.
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
-pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
-
 /// Anything a character piece can "do".
 ///
 /// This is the only way that character logic or player input should communicate with pieces.
@@ -382,8 +353,8 @@ pub struct ActionArgs(pub HashMap<Box<str>, ActionArg>);
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(resource::Attack, ActionArgs),
-	Cast(resource::Spell, ActionArgs),
+	Attack(resource::Attack, Value),
+	Cast(resource::Spell, Value),
 }
 
 #[derive(

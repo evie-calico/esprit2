@@ -22,6 +22,7 @@ pub mod resource;
 pub mod soul;
 pub mod spell;
 pub mod status;
+pub mod value;
 pub mod vault;
 pub mod world;
 
@@ -50,6 +51,7 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+pub use value::Value;
 /// Arbitrary Unit of Time.
 pub type Aut = u32;
 /// The length of a "turn".

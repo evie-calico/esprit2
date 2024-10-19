@@ -501,7 +501,7 @@ impl Manager {
 		spell: &Spell,
 		user: character::Ref,
 		scripts: &resource::Scripts,
-		arguments: character::ActionArgs,
+		argument: Value,
 		console: impl console::Handle,
 	) -> Result<Option<u32>, Error> {
 		let castable = spell.castable_by(&user.borrow());
@@ -511,14 +511,13 @@ impl Manager {
 				let parameters = spell.parameter_table(scripts, &*user.borrow())?;
 				let thread = scripts
 					.sandbox(&spell.on_cast)?
-					.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
 					.insert("Parameters", parameters)?
 					.insert("User", user)?
 					// Maybe these should be members of the spell?
 					.insert("Level", spell.level)?
 					.insert("Affinity", affinity)?
 					.thread()?;
-				self.poll::<Option<Aut>>(scripts.runtime, thread, ())?
+				self.poll::<Option<Aut>>(scripts.runtime, thread, argument)?
 			}
 			spell::Castable::NotEnoughSP => {
 				let message = format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
@@ -540,7 +539,7 @@ impl Manager {
 		scripts: &resource::Scripts,
 		attack: &Attack,
 		user: character::Ref,
-		arguments: character::ActionArgs,
+		argument: Value,
 	) -> Result<Option<Aut>> {
 		// Calculate damage
 		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow())?;
@@ -548,11 +547,10 @@ impl Manager {
 		let thread = scripts
 			.sandbox(&attack.on_use)?
 			.insert("User", user)?
-			.insert("Arguments", scripts.runtime.to_value(&arguments)?)?
 			.insert("UseTime", attack.use_time)?
 			.insert("Magnitude", magnitude)?
 			.thread()?;
-		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, ())?)
+		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, argument)?)
 	}
 
 	pub fn move_piece(
