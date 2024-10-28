@@ -349,12 +349,27 @@ impl Piece {
 /// This is the only way that character logic or player input should communicate with pieces.
 /// The information here should be enough to perform the action, but in the event it isn't
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
-#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, mlua::FromLua)]
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
 	Attack(resource::Attack, Value),
 	Cast(resource::Spell, Value),
+}
+
+impl mlua::UserData for Action {}
+
+pub struct ActionConstructor;
+
+impl mlua::UserData for ActionConstructor {
+	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+		methods.add_function("wait", |_, time| Ok(Action::Wait(time)));
+		methods.add_function("move", |_, (x, y)| Ok(Action::Move(x, y)));
+		methods.add_function("attack", |_, (attack, args)| {
+			Ok(Action::Attack(attack, args))
+		});
+		methods.add_function("cast", |_, (spell, args)| Ok(Action::Cast(spell, args)));
+	}
 }
 
 #[derive(

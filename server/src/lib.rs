@@ -237,6 +237,11 @@ pub fn instance(
 		.set("Status", server.resources.statuses_handle())?;
 	lua.globals()
 		.set("Heuristic", consider::HeuristicConstructor)?;
+	lua.globals().set("Action", character::ActionConstructor)?;
+	lua.globals().set(
+		"Consider",
+		lua.create_function(|_lua, (action, heuristics)| Ok(Consider { action, heuristics }))?,
+	)?;
 	lua.globals().set("Log", combat::LogConstructor)?;
 
 	tokio::runtime::Builder::new_multi_thread()

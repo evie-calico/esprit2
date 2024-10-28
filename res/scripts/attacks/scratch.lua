@@ -2,7 +2,9 @@
 local combat = require "combat"
 local world = require "world"
 
-local target = world.character_at(Arguments.target.x, Arguments.target.y)
+local args = ...
+
+local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end
 
 -- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission

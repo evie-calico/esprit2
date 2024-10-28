@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use mlua::FromLua;
-use mlua::LuaSerdeExt;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
@@ -221,7 +220,7 @@ impl<'lua> PartialAction<'lua> {
 				} else {
 					Ok(Response::Act(character::Action::Attack(
 						attack,
-						lua.from_value(value)?,
+						Value::from_lua(value, lua)?,
 					)))
 				}
 			}
@@ -235,7 +234,7 @@ impl<'lua> PartialAction<'lua> {
 				} else {
 					Ok(Response::Act(character::Action::Cast(
 						spell,
-						lua.from_value(value)?,
+						Value::from_lua(value, lua)?,
 					)))
 				}
 			}

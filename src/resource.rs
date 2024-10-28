@@ -33,7 +33,6 @@ macro_rules! impl_resource {
 			Clone, Debug, Eq, PartialEq,
 			serde::Serialize, serde::Deserialize,
 			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
-			mlua::FromLua,
 		)]
 		pub struct $Name(Box<str>);
 
@@ -46,6 +45,12 @@ macro_rules! impl_resource {
 		impl<T: Into<Box<str>>> From<T> for $Name {
 			fn from(s: T) -> Self {
 				Self(s.into())
+			}
+		}
+
+		impl AsRef<str> for $Name {
+			fn as_ref(&self) -> &str {
+				&*self.0
 			}
 		}
 
@@ -66,7 +71,20 @@ macro_rules! impl_resource {
 			}
 		}
 
-		impl ::mlua::UserData for $Name {}
+		impl<'lua> mlua::IntoLua<'lua> for $Name {
+			fn into_lua(self, lua: &'lua mlua::Lua) -> mlua::Result<mlua::Value<'lua>> {
+				Ok(mlua::Value::String(lua.create_string(self.as_ref())?))
+			}
+		}
+
+		impl<'lua> mlua::FromLua<'lua> for $Name {
+			fn from_lua(value: mlua::Value<'lua>, _lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+				Ok(value
+					.as_str()
+					.ok_or_else(|| mlua::Error::runtime("expected string"))?
+					.into())
+			}
+		}
 	};
 }
 
@@ -90,11 +108,21 @@ impl_resource! {
 	impl Vault as vault::Vault where (self, resources: resource::Manager) {
 		resources.vaults.get(&self.0)
 	}
-
-	impl<'lua> Script as mlua::Function<'lua> where (self, resources: resource::Scripts<'lua>) {
-		resources.scripts.get(&self.0)
-	}
 }
+
+#[derive(
+	Clone,
+	Debug,
+	Eq,
+	PartialEq,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+	mlua::FromLua,
+)]
+pub struct Script(Box<str>);
 
 pub struct Resource<T>(HashMap<Box<str>, T>);
 
@@ -152,57 +180,52 @@ impl mlua::UserData for Manager {}
 pub struct Scripts<'lua> {
 	pub runtime: &'lua mlua::Lua,
 	sandbox_metatable: mlua::Table<'lua>,
-	scripts: Resource<mlua::Function<'lua>>,
 }
 
-pub fn register<T>(directory: &Path, loader: &dyn Fn(&Path) -> Result<T>) -> Result<Resource<T>> {
+pub fn register<T>(
+	directory: &Path,
+	mut loader: impl FnMut(&Path) -> Result<T>,
+) -> Result<Resource<T>> {
 	let mut container = Resource::new();
-	recurse(&mut container, directory, directory, loader)?;
+	recurse(directory, |path, reference| {
+		loader(path).map(|x| {
+			container.0.insert(reference.into(), x);
+		})
+	})?;
 	Ok(container)
 }
 
-fn recurse<T>(
-	container: &mut Resource<T>,
-	base_directory: &Path,
-	directory: &Path,
-	loader: &dyn Fn(&Path) -> Result<T>,
-) -> Result<()> {
-	match fs::read_dir(directory) {
-		Ok(read_dir) => {
-			for entry in read_dir {
-				let entry = entry?;
-				let path = entry.path();
-				if entry.metadata()?.is_dir() {
-					recurse(container, base_directory, &path, loader)?;
-				} else {
-					let reference = path
-						.strip_prefix(base_directory)
-						.map(PathBuf::from)
-						.unwrap_or_default()
-						.parent()
-						.unwrap_or(Path::new(""))
-						.join(
-							path.file_prefix()
-								.expect("path should never be a directory"),
-						);
-					let reference = reference.to_str().ok_or(Error::InvalidKey)?;
-
-					match loader(&path) {
-						Ok(resource) => {
-							container.0.insert(reference.into(), resource);
-						}
-						Err(msg) => {
-							error!("Failed to load {reference} ({}): {msg}", path.display());
-						}
-					}
-				}
+fn recurse(directory: &Path, mut loader: impl FnMut(&Path, &str) -> Result<()>) -> Result<()> {
+	fn recurse(
+		base_directory: &Path,
+		directory: &Path,
+		loader: &mut impl FnMut(&Path, &str) -> Result<()>,
+	) -> Result<()> {
+		let read_dir = fs::read_dir(directory)?;
+		for entry in read_dir {
+			let entry = entry?;
+			let path = entry.path();
+			if entry.metadata()?.is_dir() {
+				recurse(base_directory, &path, loader)?;
+			} else {
+				let reference = path
+					.strip_prefix(base_directory)
+					.map(PathBuf::from)
+					.unwrap_or_default()
+					.parent()
+					.unwrap_or(Path::new(""))
+					.join(
+						path.file_prefix()
+							.expect("path should never be a directory"),
+					);
+				let reference = reference.to_str().ok_or(Error::InvalidKey)?;
+				loader(&path, reference)?;
 			}
 		}
-		Err(msg) => {
-			error!("Failed to read {}: {msg}", directory.display());
-		}
+		Ok(())
 	}
-	Ok(())
+
+	recurse(directory, directory, &mut loader)
 }
 
 impl Manager {
@@ -215,24 +238,24 @@ impl Manager {
 	pub fn open(path: impl AsRef<Path>) -> Result<Manager> {
 		let path = path.as_ref();
 
-		let sheets = register(&path.join("sheets"), &|path| {
+		let sheets = register(&path.join("sheets"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let statuses = register(&path.join("statuses"), &|path| {
+		let statuses = register(&path.join("statuses"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?
 		.into();
 
-		let attacks = register(&path.join("attacks"), &|path| {
+		let attacks = register(&path.join("attacks"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let spells = register(&path.join("spells"), &|path| {
+		let spells = register(&path.join("spells"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let vaults = register(&path.join("vaults"), &|path| vault::Vault::open(path))?;
+		let vaults = register(&path.join("vaults"), |path| vault::Vault::open(path))?;
 
 		Ok(Self {
 			attacks,
@@ -252,13 +275,13 @@ impl Manager {
 	}
 }
 
-pub struct SandboxBuilder<'lua, 'scripts> {
+pub struct SandboxBuilder<'lua> {
 	runtime: &'lua mlua::Lua,
-	function: &'scripts mlua::Function<'lua>,
+	function: mlua::Function<'lua>,
 	environment: mlua::Table<'lua>,
 }
 
-impl<'lua, 'scripts> SandboxBuilder<'lua, 'scripts> {
+impl<'lua> SandboxBuilder<'lua> {
 	pub fn insert(
 		self,
 		key: impl mlua::IntoLua<'lua>,
@@ -294,26 +317,32 @@ impl<'lua, 'scripts> SandboxBuilder<'lua, 'scripts> {
 
 impl<'lua> Scripts<'lua> {
 	pub fn open(path: impl AsRef<Path>, lua: &'lua mlua::Lua) -> Result<Scripts<'lua>> {
+		let scripts = lua.create_table()?;
+		recurse(path.as_ref(), |path, reference| {
+			scripts.set(
+				reference,
+				lua.load(&fs::read_to_string(path)?)
+					.set_name(reference)
+					.into_function()?,
+			)?;
+			Ok(())
+		})?;
+		lua.globals().set("Scripts", scripts)?;
 		Ok(Self {
 			runtime: lua,
 			sandbox_metatable: lua.create_table_from([("__index", lua.globals())])?,
-			scripts: register(path.as_ref(), &|path| {
-				Ok(lua
-					.load(&fs::read_to_string(path)?)
-					.set_name(path.to_string_lossy())
-					.into_function()?)
-			})?,
 		})
 	}
 
-	pub fn function(&self, key: &Script) -> Result<&mlua::Function<'lua>> {
-		key.get(self)
+	pub fn function(&self, key: &Script) -> Result<mlua::Function<'lua>> {
+		Ok(self
+			.runtime
+			.globals()
+			.get::<_, mlua::Table>("Scripts")?
+			.get(&*key.0)?)
 	}
 
-	pub fn sandbox<'scripts>(
-		&'scripts self,
-		key: &Script,
-	) -> Result<SandboxBuilder<'lua, 'scripts>> {
+	pub fn sandbox(&self, key: &Script) -> Result<SandboxBuilder<'lua>> {
 		let environment = self.runtime.create_table()?;
 		// This is cloning a reference, which is a lot cheaper than creating a new table.
 		environment.set_metatable(Some(self.sandbox_metatable.clone()));

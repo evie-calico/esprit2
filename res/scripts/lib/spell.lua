@@ -1,6 +1,5 @@
 ---@meta
 
-Arguments = {}
 Parameters = {}
 ---@class Piece
 User = nil

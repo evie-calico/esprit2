@@ -35,7 +35,7 @@ impl<'texture> Manager<'texture> {
 		path: impl AsRef<Path>,
 		texture_creator: &'texture TextureCreator<WindowContext>,
 	) -> Result<Self> {
-		let textures = resource::register(path.as_ref(), &|path| {
+		let textures = resource::register(path.as_ref(), |path| {
 			Ok(TextureInfo {
 				path: path.to_path_buf(),
 				..Default::default()

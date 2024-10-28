@@ -336,7 +336,7 @@ impl Manager {
 		for attack_id in next_character.borrow().sheet.attacks.iter() {
 			let attack = resources.get(attack_id)?;
 			if let Some(on_consider) = &attack.on_consider {
-				let attack_heuristics: mlua::Table = scripts
+				let results: mlua::Table = scripts
 					.sandbox(on_consider)?
 					.insert("UseTime", attack.use_time)?
 					.insert(
@@ -344,15 +344,9 @@ impl Manager {
 						u32::evalv(&attack.magnitude, &*next_character.borrow())?,
 					)?
 					.insert("User", next_character.clone())?
-					.world(self, ())?;
-				for heuristics in attack_heuristics.sequence_values::<mlua::Table>() {
-					let heuristics = heuristics?;
-					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
-					let heuristics = heuristics.get("heuristics")?;
-					considerations.push(Consider {
-						action: character::Action::Attack(attack_id.clone(), arguments),
-						heuristics,
-					})
+					.world(self, attack_id.as_ref())?;
+				for consideration in results.sequence_values::<Consider>() {
+					considerations.push(consideration?)
 				}
 			}
 		}
@@ -364,22 +358,16 @@ impl Manager {
 				&spell.on_consider,
 			) {
 				let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
-				let spell_heuristics: mlua::Table = scripts
+				let results: mlua::Table = scripts
 					.sandbox(on_consider)?
 					.insert("Parameters", parameters)?
 					.insert("User", next_character.clone())?
 					// Maybe these should be members of the spell?
 					.insert("Level", spell.level)?
 					.insert("Affinity", spell.affinity(&next_character.borrow()))?
-					.world(self, ())?;
-				for heuristics in spell_heuristics.sequence_values::<mlua::Table>() {
-					let heuristics = heuristics?;
-					let arguments = scripts.runtime.from_value(heuristics.get("arguments")?)?;
-					let heuristics = heuristics.get("heuristics")?;
-					considerations.push(Consider {
-						action: character::Action::Cast(spell_id.clone(), arguments),
-						heuristics,
-					})
+					.world(self, spell_id.as_ref())?;
+				for consideration in results.sequence_values::<Consider>() {
+					considerations.push(consideration?)
 				}
 			}
 		}

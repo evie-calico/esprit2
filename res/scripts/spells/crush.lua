@@ -2,6 +2,8 @@
 local combat = require "combat";
 local world = require "world";
 
+local args = ...
+
 -- It would be nice to all some filters for *requesting* a list of characters,
 -- (sort of like yielding a Cursor ActionRequest) with some sort of query language
 -- to filter entries on the rust side.
@@ -29,20 +31,20 @@ local failure_messages = {
 Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), Log.Success);
 
 for _, character in ipairs(characters) do
-	if math.abs(character.x - Arguments.target.x) <= Parameters.radius and math.abs(character.y - Arguments.target.y) <= Parameters.radius then
+	if math.abs(character.x - args.target.x) <= Parameters.radius and math.abs(character.y - args.target.y) <= Parameters.radius then
 		-- we'll start with a basic rightward movement.
 		for distance_traveled = 0, Affinity:magnitude(Parameters.displacement) do
 			local projected_x = character.x
 			local projected_y = character.y
-			if Arguments.direction == "Left" then
+			if args.direction == "Left" then
 				projected_x = projected_x - 1
-			elseif Arguments.direction == "Right" then
+			elseif args.direction == "Right" then
 				projected_x =
 					projected_x + 1
 			end
-			if Arguments.direction == "Up" then
+			if args.direction == "Up" then
 				projected_y = projected_y - 1
-			elseif Arguments.direction == "Down" then
+			elseif args.direction == "Down" then
 				projected_y =
 					projected_y + 1
 			end
