@@ -91,7 +91,7 @@ macro_rules! impl_console {
 		pub struct LuaHandle<T: Handle>(pub T);
 
 		impl<T: Handle> mlua::UserData for LuaHandle<T> {
-			fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+			fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 				$(handle_colored_print! { $impl_colors, methods } )*
 				methods.add_method("combat_log", |_, this, (text, log): (String, combat::Log)| {
 					this.0.combat_log(text, log);

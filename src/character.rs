@@ -67,9 +67,7 @@ pub fn inflict(
 	this: &Ref,
 	(key, magnitude): (String, Option<u32>),
 ) -> mlua::Result<()> {
-	let statuses = lua
-		.globals()
-		.get::<&str, resource::Handle<Status>>("Status")?;
+	let statuses = lua.globals().get::<resource::Handle<Status>>("Status")?;
 	let status = statuses
 		.0
 		.get(&key)
@@ -174,7 +172,7 @@ impl std::ops::Deref for Ref {
 }
 
 impl mlua::UserData for Ref {
-	fn add_fields<'lua, F: mlua::prelude::LuaUserDataFields<'lua, Self>>(fields: &mut F) {
+	fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
 		macro_rules! get {
 			($field:ident) => {
 				fields.add_field_method_get(stringify!($field), |_, this| Ok(this.borrow().$field.clone()));
@@ -203,7 +201,7 @@ impl mlua::UserData for Ref {
 		set!(hp, sp, x, y);
 	}
 
-	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
 		methods.add_method("replace_nouns", |_, this, s: String| {
 			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
 		});
@@ -362,7 +360,7 @@ impl mlua::UserData for Action {}
 pub struct ActionConstructor;
 
 impl mlua::UserData for ActionConstructor {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_function("wait", |_, time| Ok(Action::Wait(time)));
 		methods.add_function("move", |_, (x, y)| Ok(Action::Move(x, y)));
 		methods.add_function("attack", |_, (attack, args)| {

@@ -221,7 +221,7 @@ pub fn instance(
 	let lua = mlua::Lua::new();
 
 	lua.globals()
-		.get::<&str, mlua::Table>("package")?
+		.get::<mlua::Table>("package")?
 		.set("path", res.join("scripts/?.lua").to_string_lossy())?;
 
 	let scripts = resource::Scripts::open(res.join("scripts"), &lua)?;

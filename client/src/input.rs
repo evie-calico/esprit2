@@ -184,7 +184,7 @@ impl mlua::UserData for Request {}
 pub(crate) struct RequestConstructor;
 
 impl mlua::UserData for RequestConstructor {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_function("Cursor", |_, (x, y, range, radius)| {
 			Ok(Request::Cursor {
 				x,
@@ -198,17 +198,13 @@ impl mlua::UserData for RequestConstructor {
 	}
 }
 
-pub(crate) enum PartialAction<'lua> {
-	Attack(resource::Attack, character::Ref, mlua::Thread<'lua>),
-	Spell(resource::Spell, character::Ref, mlua::Thread<'lua>),
+pub(crate) enum PartialAction {
+	Attack(resource::Attack, character::Ref, mlua::Thread),
+	Spell(resource::Spell, character::Ref, mlua::Thread),
 }
 
-impl<'lua> PartialAction<'lua> {
-	fn resolve(
-		self,
-		lua: &'lua mlua::Lua,
-		arg: impl mlua::IntoLuaMulti<'lua>,
-	) -> esprit2::Result<Response<'lua>> {
+impl PartialAction {
+	fn resolve(self, lua: &mlua::Lua, arg: impl mlua::IntoLuaMulti) -> esprit2::Result<Response> {
 		match self {
 			PartialAction::Attack(attack, next_character, thread) => {
 				let value = thread.resume(arg)?;
@@ -242,52 +238,52 @@ impl<'lua> PartialAction<'lua> {
 	}
 }
 
-pub(crate) struct Cursor<'lua> {
+pub(crate) struct Cursor {
 	pub(crate) origin: (i32, i32),
 	pub(crate) position: (i32, i32),
 	pub(crate) range: u32,
 	pub(crate) radius: Option<u32>,
 	pub(crate) state: CursorState,
-	pub(crate) callback: PartialAction<'lua>,
+	pub(crate) callback: PartialAction,
 }
 
-pub(crate) struct Prompt<'lua> {
+pub(crate) struct Prompt {
 	pub(crate) message: String,
-	pub(crate) callback: PartialAction<'lua>,
+	pub(crate) callback: PartialAction,
 }
 
-pub(crate) struct DirectionPrompt<'lua> {
+pub(crate) struct DirectionPrompt {
 	pub(crate) message: String,
-	pub(crate) callback: PartialAction<'lua>,
+	pub(crate) callback: PartialAction,
 }
 
-pub(crate) enum Mode<'lua> {
+pub(crate) enum Mode {
 	Normal,
 	// Select modes
 	Select,
 	Attack,
 	Cast,
 	// Prompt modes
-	Cursor(Cursor<'lua>),
-	Prompt(Prompt<'lua>),
-	DirectionPrompt(DirectionPrompt<'lua>),
+	Cursor(Cursor),
+	Prompt(Prompt),
+	DirectionPrompt(DirectionPrompt),
 }
 
-pub(crate) enum Response<'lua> {
+pub(crate) enum Response {
 	Select(select::Point),
 	Act(character::Action),
-	Partial(PartialAction<'lua>, Request),
+	Partial(PartialAction, Request),
 }
 
-pub(crate) fn controllable_character<'lua>(
+pub(crate) fn controllable_character(
 	keycode: sdl2::keyboard::Keycode,
 	world: &world::Manager,
 	console: impl console::Handle,
 	resources: &resource::Manager,
-	scripts: &resource::Scripts<'lua>,
-	mode: Mode<'lua>,
+	scripts: &resource::Scripts,
+	mode: Mode,
 	options: &Options,
-) -> Result<(Mode<'lua>, Option<Response<'lua>>)> {
+) -> Result<(Mode, Option<Response>)> {
 	match mode {
 		Mode::Normal => {
 			let directions = [
@@ -542,12 +538,12 @@ pub(crate) fn controllable_character<'lua>(
 	}
 }
 
-fn gather_attack_inputs<'lua>(
+fn gather_attack_inputs(
 	resources: &resource::Manager,
-	scripts: &resource::Scripts<'lua>,
+	scripts: &resource::Scripts,
 	attack_id: resource::Attack,
 	next_character: character::Ref,
-) -> Result<Response<'lua>, Error> {
+) -> Result<Response, Error> {
 	let attack = resources.get(&attack_id)?;
 	let thread = scripts
 		.sandbox(&attack.on_input)?
@@ -562,12 +558,12 @@ fn gather_attack_inputs<'lua>(
 	PartialAction::Attack(attack_id, next_character, thread).resolve(scripts.runtime, ())
 }
 
-fn gather_spell_inputs<'lua>(
+fn gather_spell_inputs(
 	resources: &resource::Manager,
-	scripts: &resource::Scripts<'lua>,
+	scripts: &resource::Scripts,
 	spell_id: resource::Spell,
 	next_character: character::Ref,
-) -> Result<Response<'lua>, Error> {
+) -> Result<Response, Error> {
 	let spell = resources.get(&spell_id)?;
 	let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
 	let thread = scripts

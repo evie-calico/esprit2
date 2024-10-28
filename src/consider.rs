@@ -44,7 +44,7 @@ fn wrong_variant() -> mlua::Error {
 }
 
 impl mlua::UserData for Heuristic {
-	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
 		fields.add_field_method_get("x", |_, this| match this {
 			Heuristic::Move { x, .. } => Ok(*x),
 			Heuristic::Damage { .. } | Heuristic::Debuff { .. } => Err(wrong_variant()),
@@ -65,7 +65,7 @@ impl mlua::UserData for Heuristic {
 		});
 	}
 
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_method("damage", |_, this, ()| {
 			Ok(matches!(this, Heuristic::Damage { .. }))
 		});
@@ -78,7 +78,7 @@ impl mlua::UserData for Heuristic {
 pub struct HeuristicConstructor;
 
 impl mlua::UserData for HeuristicConstructor {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_function("damage", |_, (target, amount)| {
 			Ok(Heuristic::Damage {
 				target,
@@ -102,10 +102,10 @@ pub struct Consider {
 }
 
 impl mlua::UserData for Consider {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_function("ipairs", |_, this: mlua::AnyUserData| {
 			Ok((
-				this.get_metatable()?.get::<mlua::Function>("__next")?,
+				this.metatable()?.get::<mlua::Function>("__next")?,
 				this,
 				mlua::Nil,
 			))

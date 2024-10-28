@@ -89,7 +89,7 @@ impl Affinity {
 }
 
 impl mlua::UserData for Affinity {
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_method("magnitude", |_, this, magnitude: u32| {
 			Ok(this.magnitude(magnitude))
 		});
@@ -214,11 +214,11 @@ impl Spell {
 		}
 	}
 
-	pub fn parameter_table<'lua>(
+	pub fn parameter_table(
 		&self,
-		scripts: &resource::Scripts<'lua>,
+		scripts: &resource::Scripts,
 		eval_vars: &impl expression::Variables,
-	) -> mlua::Result<mlua::Table<'lua>> {
+	) -> mlua::Result<mlua::Table> {
 		scripts
 			.runtime
 			.create_table_from(self.parameters.iter().filter_map(|(k, v)| {

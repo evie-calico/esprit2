@@ -29,14 +29,14 @@ pub enum Value {
 	OrderedTable(#[rkyv(omit_bounds)] Box<[Value]>),
 }
 
-impl<'lua> mlua::FromLua<'lua> for Value {
-	fn from_lua(value: mlua::Value<'lua>, _lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+impl mlua::FromLua for Value {
+	fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
 		match value {
 			mlua::Value::Nil => Ok(Value::Nil),
 			mlua::Value::Boolean(i) => Ok(Value::Boolean(i)),
 			mlua::Value::Integer(i) => Ok(Value::Integer(i)),
 			mlua::Value::Number(i) => Ok(Value::Number(i)),
-			mlua::Value::String(i) => Ok(Value::String(i.to_str()?.into())),
+			mlua::Value::String(i) => Ok(Value::String(i.to_str()?.as_ref().into())),
 			mlua::Value::Table(i) => {
 				let mut integer_only = true;
 				i.for_each(|k: mlua::Value, _v: mlua::Value| {
@@ -65,8 +65,8 @@ impl<'lua> mlua::FromLua<'lua> for Value {
 	}
 }
 
-impl<'lua> mlua::IntoLua<'lua> for Value {
-	fn into_lua(self, lua: &'lua mlua::Lua) -> mlua::Result<mlua::Value<'lua>> {
+impl mlua::IntoLua for Value {
+	fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
 		Ok(match self {
 			Value::Nil => mlua::Value::Nil,
 			Value::Boolean(i) => mlua::Value::Boolean(i),

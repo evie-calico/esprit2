@@ -6,7 +6,7 @@ default-members = ["client"]
 
 [workspace.dependencies]
 rkyv = "0.8.8"
-mlua = { version = "0.9.8", features = ["luajit", "macros", "serialize"] }
+mlua = { version = "0.10.0", features = ["luajit", "macros", "serialize", "error-send"] }
 
 [workspace.lints]
 clippy.module_name_repetitions = "warn"
@@ -24,7 +24,7 @@ workspace = true
 
 [dependencies]
 # Lua scripting
-alua = { version = "0.1.3", features = ["userdata"] }
+alua = { version = "0.2.0", features = ["userdata"] }
 mlua.workspace = true
 
 # Parser generator for expression.rs

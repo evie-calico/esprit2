@@ -583,11 +583,11 @@ impl Manager {
 		}
 	}
 
-	pub fn poll<'lua, T: mlua::FromLua<'lua>>(
+	pub fn poll<T: mlua::FromLua>(
 		&self,
-		lua: &'lua mlua::Lua,
-		thread: mlua::Thread<'lua>,
-		args: impl mlua::IntoLuaMulti<'lua>,
+		lua: &mlua::Lua,
+		thread: mlua::Thread,
+		args: impl mlua::IntoLuaMulti,
 	) -> mlua::Result<T> {
 		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 		pub enum CharacterQuery {

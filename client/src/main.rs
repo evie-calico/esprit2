@@ -127,7 +127,7 @@ pub(crate) async fn main() {
 	let lua = mlua::Lua::new();
 
 	lua.globals()
-		.get::<&str, mlua::Table>("package")
+		.get::<mlua::Table>("package")
 		.unwrap()
 		.set(
 			"path",

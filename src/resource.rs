@@ -71,17 +71,18 @@ macro_rules! impl_resource {
 			}
 		}
 
-		impl<'lua> mlua::IntoLua<'lua> for $Name {
-			fn into_lua(self, lua: &'lua mlua::Lua) -> mlua::Result<mlua::Value<'lua>> {
+		impl mlua::IntoLua for $Name {
+			fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
 				Ok(mlua::Value::String(lua.create_string(self.as_ref())?))
 			}
 		}
 
-		impl<'lua> mlua::FromLua<'lua> for $Name {
-			fn from_lua(value: mlua::Value<'lua>, _lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+		impl mlua::FromLua for $Name {
+			fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
 				Ok(value
 					.as_str()
 					.ok_or_else(|| mlua::Error::runtime("expected string"))?
+					.as_ref()
 					.into())
 			}
 		}
@@ -148,7 +149,7 @@ impl<T> Default for Resource<T> {
 pub struct Handle<T>(pub Rc<Resource<T>>);
 
 impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
-	fn add_methods<'lua, M: mlua::prelude::LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
 		methods.add_method("get", |_lua, this, key: String| {
 			this.0
 				.get(key.as_str())
@@ -177,9 +178,10 @@ pub struct Manager {
 
 impl mlua::UserData for Manager {}
 
+// TODO: Remove this.
 pub struct Scripts<'lua> {
 	pub runtime: &'lua mlua::Lua,
-	sandbox_metatable: mlua::Table<'lua>,
+	sandbox_metatable: mlua::Table,
 }
 
 pub fn register<T>(
@@ -277,37 +279,30 @@ impl Manager {
 
 pub struct SandboxBuilder<'lua> {
 	runtime: &'lua mlua::Lua,
-	function: mlua::Function<'lua>,
-	environment: mlua::Table<'lua>,
+	function: mlua::Function,
+	environment: mlua::Table,
 }
 
 impl<'lua> SandboxBuilder<'lua> {
-	pub fn insert(
-		self,
-		key: impl mlua::IntoLua<'lua>,
-		value: impl mlua::IntoLua<'lua>,
-	) -> Result<Self> {
+	pub fn insert(self, key: impl mlua::IntoLua, value: impl mlua::IntoLua) -> Result<Self> {
 		self.environment.set(key, value)?;
 		Ok(self)
 	}
 
-	pub fn thread(self) -> mlua::Result<mlua::Thread<'lua>> {
+	pub fn thread(self) -> mlua::Result<mlua::Thread> {
 		self.function.set_environment(self.environment)?;
 		self.runtime.create_thread(self.function.clone())
 	}
 
-	pub fn call<R: FromLuaMulti<'lua>>(
-		self,
-		args: impl mlua::IntoLuaMulti<'lua>,
-	) -> mlua::Result<R> {
+	pub fn call<R: FromLuaMulti>(self, args: impl mlua::IntoLuaMulti) -> mlua::Result<R> {
 		self.function.set_environment(self.environment)?;
-		self.function.call::<_, R>(args)
+		self.function.call::<R>(args)
 	}
 
-	pub fn world<R: FromLua<'lua>>(
+	pub fn world<R: FromLua>(
 		self,
 		world: &world::Manager,
-		args: impl mlua::IntoLuaMulti<'lua>,
+		args: impl mlua::IntoLuaMulti,
 	) -> Result<R> {
 		self.function.set_environment(self.environment)?;
 		let thread = self.runtime.create_thread(self.function.clone())?;
@@ -334,11 +329,11 @@ impl<'lua> Scripts<'lua> {
 		})
 	}
 
-	pub fn function(&self, key: &Script) -> Result<mlua::Function<'lua>> {
+	pub fn function(&self, key: &Script) -> Result<mlua::Function> {
 		Ok(self
 			.runtime
 			.globals()
-			.get::<_, mlua::Table>("Scripts")?
+			.get::<mlua::Table>("Scripts")?
 			.get(&*key.0)?)
 	}
 

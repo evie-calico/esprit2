@@ -47,7 +47,7 @@ impl Log {
 pub struct LogConstructor;
 
 impl mlua::UserData for LogConstructor {
-	fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
 		macro_rules! units {
 			($unit:ident) => {
 				fields.add_field(stringify!($unit), Log::$unit);
@@ -58,7 +58,7 @@ impl mlua::UserData for LogConstructor {
 		units!(Glance);
 	}
 
-	fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
 		methods.add_function("Hit", |_, damage| Ok(Log::Hit { damage }));
 	}
 }

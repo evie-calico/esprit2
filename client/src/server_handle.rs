@@ -126,11 +126,11 @@ impl<'texture> ServerHandle<'texture> {
 
 	pub(crate) async fn event<'lua>(
 		&mut self,
-		input_mode: input::Mode<'lua>,
+		input_mode: input::Mode,
 		event: sdl2::event::Event,
 		scripts: &resource::Scripts<'lua>,
 		options: &Options,
-	) -> Result<input::Mode<'lua>, rancor::BoxedError> {
+	) -> Result<input::Mode, rancor::BoxedError> {
 		let sdl2::event::Event::KeyDown {
 			keycode: Some(keycode),
 			..
@@ -202,7 +202,7 @@ impl<'texture> ServerHandle<'texture> {
 	pub(crate) async fn tick(
 		&mut self,
 		delta: f64,
-		input_mode: &mut input::Mode<'_>,
+		input_mode: &mut input::Mode,
 	) -> Result<(), rancor::BoxedError> {
 		while let Ok(packet) = self.receiver.try_recv() {
 			let packet = rkyv::access(&packet)?;
@@ -239,9 +239,9 @@ impl<'texture> ServerHandle<'texture> {
 	}
 
 	#[allow(clippy::unwrap_used, reason = "SDL")]
-	pub(crate) fn draw<'lua>(
+	pub(crate) fn draw(
 		&self,
-		input_mode: &input::Mode<'lua>,
+		input_mode: &input::Mode,
 		ctx: &mut gui::Context,
 		textures: &'texture texture::Manager,
 		options: &Options,
