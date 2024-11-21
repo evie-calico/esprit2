@@ -375,7 +375,7 @@ pub(crate) fn controllable_character(
 				let action = world.consider_action(
 					scripts,
 					world.next_character().clone(),
-					considerations,
+					&considerations,
 				)?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
 			} else {

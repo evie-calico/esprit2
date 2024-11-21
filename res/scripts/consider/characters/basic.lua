@@ -1,4 +1,8 @@
+local scripts = require "scripts"
+
 local considerations = ...
+
+scripts("consider/movement")(User, considerations)
 
 local risk_averse = false
 
@@ -54,4 +58,4 @@ for _, x in ipairs(scores) do
 	end
 end
 
-if highest ~= nil then return highest.index else return nil end
+if highest ~= nil then return considerations[highest.index] else return nil end

@@ -302,7 +302,7 @@ impl Manager {
 		let character = self.next_character();
 		if !character.borrow().player_controlled {
 			let considerations = self.consider_turn(resources, scripts)?;
-			let action = self.consider_action(scripts, character.clone(), considerations)?;
+			let action = self.consider_action(scripts, character.clone(), &considerations)?;
 			self.perform_action(&console, resources, scripts, action)?;
 			Ok(true)
 		} else {
@@ -319,20 +319,6 @@ impl Manager {
 
 		let mut considerations = Vec::new();
 
-		for character in self
-			.characters
-			.iter()
-			.filter(|x| x.borrow().alliance != next_character.borrow().alliance)
-		{
-			let character = character.borrow();
-			let x = character.x;
-			let y = character.y;
-			considerations.push(Consider {
-				action: character::Action::Move(x, y),
-				heuristics: vec![consider::Heuristic::Move { x, y }],
-			})
-		}
-
 		for attack_id in next_character.borrow().sheet.attacks.iter() {
 			let attack = resources.get(attack_id)?;
 			if let Some(on_consider) = &attack.on_consider {
@@ -345,7 +331,7 @@ impl Manager {
 					)?
 					.insert("User", next_character.clone())?
 					.world(self, attack_id.as_ref())?;
-				for consideration in results.sequence_values::<Consider>() {
+				for consideration in results.sequence_values() {
 					considerations.push(consideration?)
 				}
 			}
@@ -366,7 +352,7 @@ impl Manager {
 					.insert("Level", spell.level)?
 					.insert("Affinity", spell.affinity(&next_character.borrow()))?
 					.world(self, spell_id.as_ref())?;
-				for consideration in results.sequence_values::<Consider>() {
+				for consideration in results.sequence_values() {
 					considerations.push(consideration?)
 				}
 			}
@@ -379,17 +365,18 @@ impl Manager {
 		&self,
 		scripts: &resource::Scripts,
 		character: character::Ref,
-		mut considerations: Vec<Consider>,
+		considerations: &[Consider],
 	) -> Result<character::Action> {
 		Ok(scripts
 			.sandbox(&character.borrow().sheet.on_consider)?
 			.insert("User", character.clone())?
-			.call::<Option<usize>>(
+			.world::<Option<Consider>>(
+				self,
 				scripts
 					.runtime
 					.create_sequence_from(considerations.iter().cloned())?,
 			)?
-			.map(|index| considerations.remove(index - 1).action)
+			.map(|x| x.action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 

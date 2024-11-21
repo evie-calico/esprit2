@@ -469,7 +469,7 @@ mod sheet {
 		pub spells: Vec<resource::Spell>,
 
 		/// Script to decide on an action from a list of considerations
-		pub on_consider: resource::Script,
+		pub on_consider: Box<str>,
 	}
 }
 

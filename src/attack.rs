@@ -15,8 +15,8 @@ pub struct Attack {
 	pub name: String,
 	pub description: String,
 	pub magnitude: Expression,
-	pub on_input: resource::Script,
-	pub on_use: resource::Script,
-	pub on_consider: Option<resource::Script>,
+	pub on_input: Box<str>,
+	pub on_use: Box<str>,
+	pub on_consider: Option<Box<str>>,
 	pub use_time: Aut,
 }

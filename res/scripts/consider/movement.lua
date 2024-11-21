@@ -1,17 +1,15 @@
-return {
-	append = function(considerations)
-		local directions = {
-			{ x = 1,  y = 0 },
-			{ x = 0,  y = 1 },
-			{ x = -1, y = 0 },
-			{ x = 0,  y = -1 },
-			{ x = 1,  y = 1 },
-			{ x = -1, y = 1 },
-			{ x = 1,  y = -1 },
-			{ x = -1, y = -1 },
-		}
-		for _, v in ipairs(directions) do
+local world = require "world"
 
-		end
+local user, considerations = ...
+
+for _, v in ipairs(world.characters()) do
+	if user.alliance ~= v.alliance then
+		table.insert(
+			considerations,
+			Consider(
+				Action.move(v.x, v.y),
+				{ Heuristic.move(v.x, v.y) }
+			)
+		)
 	end
-}
+end

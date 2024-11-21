@@ -111,20 +111,6 @@ impl_resource! {
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	Eq,
-	PartialEq,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-	mlua::FromLua,
-)]
-pub struct Script(Box<str>);
-
 pub struct Resource<T>(HashMap<Box<str>, T>);
 
 impl<T> Resource<T> {
@@ -329,15 +315,15 @@ impl<'lua> Scripts<'lua> {
 		})
 	}
 
-	pub fn function(&self, key: &Script) -> Result<mlua::Function> {
+	pub fn function(&self, key: &str) -> Result<mlua::Function> {
 		Ok(self
 			.runtime
 			.globals()
 			.get::<mlua::Table>("Scripts")?
-			.get(&*key.0)?)
+			.get(key)?)
 	}
 
-	pub fn sandbox(&self, key: &Script) -> Result<SandboxBuilder<'lua>> {
+	pub fn sandbox(&self, key: &str) -> Result<SandboxBuilder<'lua>> {
 		let environment = self.runtime.create_table()?;
 		// This is cloning a reference, which is a lot cheaper than creating a new table.
 		environment.set_metatable(Some(self.sandbox_metatable.clone()));
