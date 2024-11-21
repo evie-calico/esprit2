@@ -62,14 +62,18 @@ fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> 
 }
 
 /// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
-pub fn inflict(
+fn inflict(
 	lua: &mlua::Lua,
 	this: &Ref,
 	(key, magnitude): (String, Option<u32>),
 ) -> mlua::Result<()> {
-	let statuses = lua.globals().get::<resource::Handle<Status>>("Status")?;
-	let status = statuses
-		.0
+	let resources = lua
+		.globals()
+		.get::<mlua::Table>("package")?
+		.get::<mlua::Table>("loaded")?
+		.get::<resource::Handle>("resources")?;
+	let status = resources
+		.statuses
 		.get(&key)
 		.cloned()
 		.map_err(mlua::Error::external)?;
@@ -84,6 +88,7 @@ pub fn inflict(
 	Ok(())
 }
 
+use mlua::IntoLuaMulti;
 use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
 
 pub struct InlineRefCell;
@@ -192,7 +197,7 @@ impl mlua::UserData for Ref {
 				$( set! { $field } )+
 			}
 		}
-		fields.add_field_method_get("sheet", |_, this| Ok(this.borrow().sheet.clone()));
+		fields.add_field_method_get("level", |_, this| Ok(this.borrow().sheet.level));
 		fields.add_field_method_get("stats", |_, this| {
 			this.borrow().stats().map_err(mlua::Error::runtime)
 		});
@@ -202,6 +207,38 @@ impl mlua::UserData for Ref {
 	}
 
 	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
+		methods.add_function("attacks", |_, this: mlua::AnyUserData| {
+			Ok((
+				this.metatable()?.get::<mlua::Function>("__next_attack")?,
+				this,
+				mlua::Nil,
+			))
+		});
+		methods.add_meta_method("__next_attack", |lua, this, index: mlua::Value| {
+			let index = index.as_usize().unwrap_or(0);
+			if let Some(attack) = this.borrow().sheet.attacks.get(index) {
+				lua.pack_multi((index + 1, attack.clone()))
+			} else {
+				mlua::Nil.into_lua_multi(lua)
+			}
+		});
+
+		methods.add_function("spells", |_, this: mlua::AnyUserData| {
+			Ok((
+				this.metatable()?.get::<mlua::Function>("__next_spell")?,
+				this,
+				mlua::Nil,
+			))
+		});
+		methods.add_meta_method("__next_spell", |lua, this, index: mlua::Value| {
+			let index = index.as_usize().unwrap_or(0);
+			if let Some(spell) = this.borrow().sheet.spells.get(index) {
+				lua.pack_multi((index + 1, spell.clone()))
+			} else {
+				mlua::Nil.into_lua_multi(lua)
+			}
+		});
+
 		methods.add_method("replace_nouns", |_, this, s: String| {
 			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
 		});
@@ -390,90 +427,70 @@ pub enum Alliance {
 	Enemy,
 }
 
-mod sheet {
-	use super::*;
+fn growth_bonuses() -> Stats {
+	use rand::seq::SliceRandom;
+	const BONUS_COUNT: usize = 10;
 
-	fn stats(_lua: &mlua::Lua, this: &mut Sheet, _: ()) -> mlua::Result<Stats> {
-		Ok(this.stats())
-	}
+	let mut bonuses = Stats::default();
+	let mut stats = [
+		&mut bonuses.heart,
+		&mut bonuses.soul,
+		&mut bonuses.power,
+		&mut bonuses.defense,
+		&mut bonuses.magic,
+		&mut bonuses.resistance,
+	];
+	let mut rng = rand::thread_rng();
 
-	fn growth_bonuses() -> Stats {
-		use rand::seq::SliceRandom;
-		const BONUS_COUNT: usize = 10;
-
-		let mut bonuses = Stats::default();
-		let mut stats = [
-			&mut bonuses.heart,
-			&mut bonuses.soul,
-			&mut bonuses.power,
-			&mut bonuses.defense,
-			&mut bonuses.magic,
-			&mut bonuses.resistance,
-		];
-		let mut rng = rand::thread_rng();
-
-		for _ in 0..BONUS_COUNT {
-			let stat = stats
+	for _ in 0..BONUS_COUNT {
+		let stat = stats
+			.choose_mut(&mut rng)
+			.expect("stats should not be empty");
+		// Prefer skipping stats that are already 0
+		if **stat == 0 {
+			**stats
 				.choose_mut(&mut rng)
-				.expect("stats should not be empty");
-			// Prefer skipping stats that are already 0
-			if **stat == 0 {
-				**stats
-					.choose_mut(&mut rng)
-					.expect("stats should not be empty") += 1;
-			} else {
-				**stat += 1;
-			}
+				.expect("stats should not be empty") += 1;
+		} else {
+			**stat += 1;
 		}
-
-		bonuses
 	}
 
-	#[derive(
-		Clone,
-		Debug,
-		serde::Serialize,
-		serde::Deserialize,
-		alua::UserData,
-		rkyv::Archive,
-		rkyv::Serialize,
-		rkyv::Deserialize,
-	)]
-	#[alua(method = stats)]
-	pub struct Sheet {
-		pub icon: Box<str>,
-		/// Note that this includes the character's name.
-		#[alua(get)]
-		pub nouns: Nouns,
-
-		#[alua(get)]
-		pub level: u16,
-		#[alua(get)]
-		#[serde(default)] // There's no reason for most sheets to care about this.
-		pub experience: u32,
-
-		#[alua(get)]
-		pub bases: Stats,
-		#[alua(get)]
-		pub growths: Stats,
-		#[serde(default = "growth_bonuses")]
-		pub growth_bonuses: Stats,
-
-		pub skillset: spell::Skillset,
-		#[alua(get)]
-		pub speed: Aut,
-
-		#[alua(get)]
-		pub attacks: Vec<resource::Attack>,
-		#[alua(get)]
-		pub spells: Vec<resource::Spell>,
-
-		/// Script to decide on an action from a list of considerations
-		pub on_consider: Box<str>,
-	}
+	bonuses
 }
 
-pub use sheet::Sheet;
+#[derive(
+	Clone,
+	Debug,
+	serde::Serialize,
+	serde::Deserialize,
+	rkyv::Archive,
+	rkyv::Serialize,
+	rkyv::Deserialize,
+)]
+pub struct Sheet {
+	pub icon: Box<str>,
+	/// Note that this includes the character's name.
+	pub nouns: Nouns,
+
+	pub level: u16,
+	#[serde(default)] // There's no reason for most sheets to care about this.
+	pub experience: u32,
+
+	pub bases: Stats,
+	pub growths: Stats,
+	#[serde(default = "growth_bonuses")]
+	pub growth_bonuses: Stats,
+
+	pub skillset: spell::Skillset,
+	pub speed: Aut,
+
+	pub attacks: Vec<resource::Attack>,
+	pub spells: Vec<resource::Spell>,
+
+	/// Script to decide on an action from a list of considerations
+	pub on_consider: Box<str>,
+}
 
 impl Sheet {
 	pub fn stats(&self) -> Stats {
@@ -500,6 +517,17 @@ impl expression::Variables for Sheet {
 	}
 }
 
+fn as_table(lua: &mlua::Lua, this: &mut Stats, _: ()) -> mlua::Result<mlua::Table> {
+	lua.create_table_from([
+		("heart", this.heart),
+		("soul", this.soul),
+		("power", this.power),
+		("defense", this.defense),
+		("magic", this.magic),
+		("resistance", this.resistance),
+	])
+}
+
 #[derive(
 	Clone,
 	Copy,
@@ -512,6 +540,7 @@ impl expression::Variables for Sheet {
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
+#[alua(method = as_table)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]

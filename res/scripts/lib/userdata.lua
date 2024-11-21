@@ -3,7 +3,6 @@
 ---@class Piece
 ---@field alliance userdata
 ---@field stats table
----@field sheet table
 ---@field x integer
 ---@field y integer
 ---@field hp integer
@@ -15,5 +14,5 @@
 ---@field replace_nouns function
 
 ---@class Console
----@field combat_log function 
+---@field combat_log function
 ---@field print function

@@ -81,6 +81,13 @@ impl Variables for Integer {
 	}
 }
 
+impl Variables for mlua::Table {
+	fn get(&self, s: &str) -> Result<Integer, Error> {
+		self.get::<Integer>(s)
+			.map_err(|_| Error::MissingVariable(s.into()))
+	}
+}
+
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Expression {
 	pub source: String,
@@ -95,6 +102,14 @@ impl Default for Expression {
 			root: Operation::Integer(0),
 			leaves: Vec::new(),
 		}
+	}
+}
+
+impl mlua::UserData for Expression {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+		methods.add_meta_method("__call", |_, this, args: mlua::Table| {
+			mlua::Integer::evalv(this, &args).map_err(mlua::Error::external)
+		});
 	}
 }
 

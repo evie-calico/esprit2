@@ -1,8 +1,23 @@
 local scripts = require "scripts"
+local resources = require "resources"
 
-local considerations = ...
+local considerations = {}
 
 scripts("consider/movement")(User, considerations)
+
+for _, attack_id in User:attacks() do
+	local attack = resources:attack(attack_id)
+	if attack.on_consider ~= nil then
+		scripts(attack.on_consider)(User, attack_id, considerations)
+	end
+end
+
+for _, spell_id in User:spells() do
+	local spell = resources:spell(spell_id)
+	if spell.on_consider ~= nil then
+		scripts(spell.on_consider)(User, spell_id, considerations)
+	end
+end
 
 local risk_averse = false
 

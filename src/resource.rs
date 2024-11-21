@@ -98,11 +98,11 @@ impl_resource! {
 		resources.statuses.get(&self.0)
 	}
 
-	impl Attack as Rc<attack::Attack> where (self, resources: resource::Manager) {
+	impl Attack as attack::Attack where (self, resources: resource::Manager) {
 		resources.attacks.get(&self.0)
 	}
 
-	impl Spell as Rc<spell::Spell> where (self, resources: resource::Manager) {
+	impl Spell as spell::Spell where (self, resources: resource::Manager) {
 		resources.spells.get(&self.0)
 	}
 
@@ -111,7 +111,8 @@ impl_resource! {
 	}
 }
 
-pub struct Resource<T>(HashMap<Box<str>, T>);
+#[derive(Debug)]
+pub struct Resource<T: ?Sized>(HashMap<Box<str>, Rc<T>>);
 
 impl<T> Resource<T> {
 	pub fn new() -> Self {
@@ -119,9 +120,10 @@ impl<T> Resource<T> {
 	}
 
 	pub fn get(&self, key: &str) -> Result<&T> {
-		self.0
+		Ok(self
+			.0
 			.get(key)
-			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))
+			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))?)
 	}
 }
 
@@ -131,38 +133,63 @@ impl<T> Default for Resource<T> {
 	}
 }
 
-#[derive(Clone, mlua::FromLua)]
-pub struct Handle<T>(pub Rc<Resource<T>>);
-
-impl<T: Clone + mlua::UserData + 'static> mlua::UserData for Handle<T> {
-	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
-		methods.add_method("get", |_lua, this, key: String| {
-			this.0
-				.get(key.as_str())
-				.cloned()
-				.map_err(mlua::Error::external)
-		});
-	}
-}
-
 /// Manages all resource loading in a central, abstracted structure.
 ///
 /// The primary benefit of using this structure is that it abstracts
 /// the path and extension used to load any given asset.
 /// `resource::Manager` can also cache certain resources to avoid repeated disk reads,
 /// meaning outside code doesn't need to store permanent references to resources.
+#[derive(Debug)]
 pub struct Manager {
 	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	attacks: Resource<Rc<attack::Attack>>,
+	pub attacks: Resource<attack::Attack>,
 	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	spells: Resource<Rc<spell::Spell>>,
+	pub spells: Resource<spell::Spell>,
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
-	sheets: Resource<character::Sheet>,
-	statuses: Rc<Resource<status::Status>>,
-	vaults: Resource<vault::Vault>,
+	pub sheets: Resource<character::Sheet>,
+	pub statuses: Resource<status::Status>,
+	pub vaults: Resource<vault::Vault>,
 }
 
-impl mlua::UserData for Manager {}
+#[derive(Debug, Clone, FromLua)]
+pub struct Handle(Rc<Manager>);
+
+impl Handle {
+	pub fn new(resources: Rc<Manager>) -> Self {
+		Self(resources)
+	}
+}
+
+impl std::ops::Deref for Handle {
+	type Target = Manager;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl mlua::UserData for Handle {
+	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
+		methods.add_method("status", |_lua, this, key: Box<str>| {
+			this.statuses
+				.get(&key)
+				.cloned()
+				.map_err(mlua::Error::external)
+		});
+		methods.add_method("attack", |_lua, this, key: Box<str>| {
+			this.attacks
+				.get(&key)
+				.cloned()
+				.map_err(mlua::Error::external)
+		});
+		methods.add_method("spell", |_lua, this, key: Box<str>| {
+			this.spells
+				.get(&key)
+				.cloned()
+				.map_err(mlua::Error::external)
+		});
+	}
+}
 
 // TODO: Remove this.
 pub struct Scripts<'lua> {
@@ -177,7 +204,7 @@ pub fn register<T>(
 	let mut container = Resource::new();
 	recurse(directory, |path, reference| {
 		loader(path).map(|x| {
-			container.0.insert(reference.into(), x);
+			container.0.insert(reference.into(), x.into());
 		})
 	})?;
 	Ok(container)
@@ -232,8 +259,7 @@ impl Manager {
 
 		let statuses = register(&path.join("statuses"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
-		})?
-		.into();
+		})?;
 
 		let attacks = register(&path.join("attacks"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
@@ -252,10 +278,6 @@ impl Manager {
 			statuses,
 			vaults,
 		})
-	}
-
-	pub fn statuses_handle(&self) -> Handle<status::Status> {
-		Handle(self.statuses.clone())
 	}
 
 	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&T::Resource> {

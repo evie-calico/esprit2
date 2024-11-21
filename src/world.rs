@@ -301,8 +301,7 @@ impl Manager {
 	) -> Result<bool> {
 		let character = self.next_character();
 		if !character.borrow().player_controlled {
-			let considerations = self.consider_turn(resources, scripts)?;
-			let action = self.consider_action(scripts, character.clone(), &considerations)?;
+			let action = self.consider_action(scripts, character.clone())?;
 			self.perform_action(&console, resources, scripts, action)?;
 			Ok(true)
 		} else {
@@ -310,72 +309,15 @@ impl Manager {
 		}
 	}
 
-	pub fn consider_turn(
-		&self,
-		resources: &resource::Manager,
-		scripts: &resource::Scripts,
-	) -> Result<Vec<Consider>> {
-		let next_character = self.next_character();
-
-		let mut considerations = Vec::new();
-
-		for attack_id in next_character.borrow().sheet.attacks.iter() {
-			let attack = resources.get(attack_id)?;
-			if let Some(on_consider) = &attack.on_consider {
-				let results: mlua::Table = scripts
-					.sandbox(on_consider)?
-					.insert("UseTime", attack.use_time)?
-					.insert(
-						"Magnitude",
-						u32::evalv(&attack.magnitude, &*next_character.borrow())?,
-					)?
-					.insert("User", next_character.clone())?
-					.world(self, attack_id.as_ref())?;
-				for consideration in results.sequence_values() {
-					considerations.push(consideration?)
-				}
-			}
-		}
-
-		for spell_id in next_character.borrow().sheet.spells.iter() {
-			let spell = resources.get(spell_id)?;
-			if let (spell::Castable::Yes, Some(on_consider)) = (
-				spell.castable_by(&next_character.borrow()),
-				&spell.on_consider,
-			) {
-				let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
-				let results: mlua::Table = scripts
-					.sandbox(on_consider)?
-					.insert("Parameters", parameters)?
-					.insert("User", next_character.clone())?
-					// Maybe these should be members of the spell?
-					.insert("Level", spell.level)?
-					.insert("Affinity", spell.affinity(&next_character.borrow()))?
-					.world(self, spell_id.as_ref())?;
-				for consideration in results.sequence_values() {
-					considerations.push(consideration?)
-				}
-			}
-		}
-
-		Ok(considerations)
-	}
-
 	pub fn consider_action(
 		&self,
 		scripts: &resource::Scripts,
 		character: character::Ref,
-		considerations: &[Consider],
 	) -> Result<character::Action> {
 		Ok(scripts
 			.sandbox(&character.borrow().sheet.on_consider)?
 			.insert("User", character.clone())?
-			.world::<Option<Consider>>(
-				self,
-				scripts
-					.runtime
-					.create_sequence_from(considerations.iter().cloned())?,
-			)?
+			.world::<Option<Consider>>(self, ())?
 			.map(|x| x.action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}

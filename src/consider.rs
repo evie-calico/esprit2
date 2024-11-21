@@ -3,9 +3,8 @@
 //! This is mainly for enemy logic, but may have some use for player UI,
 //! such as showing a sorted list of potential spell targets rather than a cursor.
 
-use mlua::IntoLuaMulti;
-
 use crate::prelude::*;
+use mlua::IntoLuaMulti;
 
 /// Rough approximations of an action's result.
 /// Used to estimate the outcome of a certain action.

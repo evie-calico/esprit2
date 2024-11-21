@@ -160,6 +160,30 @@ pub struct Spell {
 	pub on_input: Box<str>,
 }
 
+impl mlua::UserData for Spell {
+	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
+	}
+
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+		methods.add_meta_method("__index", |lua, this, key: String| {
+			match this.parameters.get(key.as_str()) {
+				Some(Parameter::Integer(i)) => Ok(mlua::Value::Integer(*i as mlua::Integer)),
+				Some(Parameter::Expression(e)) => {
+					Ok(mlua::Value::UserData(lua.create_userdata(e.clone())?))
+				}
+				None => Ok(mlua::Nil),
+			}
+		});
+		methods.add_method(
+			"affinity",
+			|_, this, (character, magnitude): (character::Ref, u32)| {
+				Ok(this.affinity(&character.borrow()).magnitude(magnitude))
+			},
+		)
+	}
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Castable {
 	Yes,

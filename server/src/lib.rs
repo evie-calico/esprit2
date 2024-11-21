@@ -98,7 +98,7 @@ impl Client {
 }
 
 pub(crate) struct Server {
-	pub(crate) resources: resource::Manager,
+	pub(crate) resources: resource::Handle,
 	pub(crate) world: world::Manager,
 }
 
@@ -106,9 +106,10 @@ impl Server {
 	pub(crate) fn new(resource_directory: PathBuf) -> esprit2::Result<Self> {
 		// Game initialization.
 		let resources = match resource::Manager::open(&resource_directory) {
-			Ok(resources) => resources,
+			Ok(resources) => resource::Handle::new(resources.into()),
 			Err(msg) => {
 				error!("failed to open resource directory: {msg}");
+				// TODO: I think these are out-of-date and should be moved to the caller.
 				exit(1);
 			}
 		};
@@ -231,10 +232,13 @@ pub fn instance(
 	let mut server = Server::new(res)?;
 	let mut clients = ClientParty::default();
 
+	let handle = server.resources.clone();
+	lua.load_from_function::<resource::Handle>(
+		"resources",
+		lua.create_function(move |_, ()| Ok(handle.clone()))?,
+	)?;
 	lua.globals()
 		.set("Console", console::LuaHandle(console_handle.clone()))?;
-	lua.globals()
-		.set("Status", server.resources.statuses_handle())?;
 	lua.globals()
 		.set("Heuristic", consider::HeuristicConstructor)?;
 	lua.globals().set("Action", character::ActionConstructor)?;

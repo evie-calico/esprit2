@@ -371,12 +371,7 @@ pub(crate) fn controllable_character(
 			}
 
 			if options.controls.autocombat.contains(keycode) {
-				let considerations = world.consider_turn(resources, scripts)?;
-				let action = world.consider_action(
-					scripts,
-					world.next_character().clone(),
-					&considerations,
-				)?;
+				let action = world.consider_action(scripts, world.next_character().clone())?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
 			} else {
 				Ok((Mode::Normal, None))

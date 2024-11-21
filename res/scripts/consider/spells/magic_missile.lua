@@ -1,27 +1,27 @@
 ---@module "lib.consider.spell"
 local combat = require "combat"
+local resources = require "resources"
 local world = require "world"
 
-local considerations = {}
+local user, spell_id, considerations = ...
+local spell = resources:spell(spell_id)
 
-for _, character in ipairs(world.characters_within(User.x, User.y, Parameters.range)) do
-	if not combat.alliance_check(User, character) then
+for _, character in ipairs(world.characters_within(user.x, user.y, spell.range)) do
+	if not combat.alliance_check(user, character) then
 		table.insert(
 			considerations,
 			Consider(
 				Action.cast(
-					...,
+					spell_id,
 					{ target = { x = character.x, y = character.y } }
 				),
 				{
 					Heuristic.damage(
 						character,
-						Affinity:magnitude(Parameters.magnitude) - character.stats.resistance
+						spell:affinity(user, spell.magnitude(user.stats:as_table())) - character.stats.resistance
 					),
 				}
 			)
 		)
 	end
 end
-
-return considerations
