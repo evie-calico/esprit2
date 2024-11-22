@@ -330,7 +330,10 @@ impl<'lua> Scripts<'lua> {
 			)?;
 			Ok(())
 		})?;
-		lua.globals().set("Scripts", scripts)?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.scripts",
+			lua.create_function(move |_, ()| Ok(scripts.clone()))?,
+		)?;
 		Ok(Self {
 			runtime: lua,
 			sandbox_metatable: lua.create_table_from([("__index", lua.globals())])?,
@@ -340,9 +343,10 @@ impl<'lua> Scripts<'lua> {
 	pub fn function(&self, key: &str) -> Result<mlua::Function> {
 		Ok(self
 			.runtime
-			.globals()
-			.get::<mlua::Table>("Scripts")?
-			.get(key)?)
+			.load(mlua::chunk! {
+				return require "esprit.scripts" [$key]
+			})
+			.eval()?)
 	}
 
 	pub fn sandbox(&self, key: &str) -> Result<SandboxBuilder<'lua>> {

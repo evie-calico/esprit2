@@ -1,5 +1,4 @@
----@module "lib.spell"
-local input = require "input"
+local input = require "esprit.input"
 
 local names = {
 	"Positive",

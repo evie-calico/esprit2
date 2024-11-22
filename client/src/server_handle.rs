@@ -53,36 +53,32 @@ impl<'texture> ServerHandle<'texture> {
 		let chase_point = None;
 
 		let handle = resources.clone();
-		lua.load_from_function::<resource::Handle>(
-			"resources",
-			lua.create_function(move |_, ()| Ok(handle.clone()))
-				.into_error()?,
+		esprit2::lua::init(lua, handle, console_impl::Dummy).into_error()?;
+		// input requests need to yield so this library is written in lua.
+		let request_constructor = input::RequestConstructor;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.input",
+			lua.load(mlua::chunk! {
+				local request_constructor = $request_constructor
+				return {
+					cursor = function(x, y, range, radius)
+						x, y = coroutine.yield(request_constructor.Cursor(x, y, range, radius))
+						return { x = x, y = y }
+					end,
+
+					prompt = function(message)
+						return coroutine.yield(request_constructor.Prompt(message))
+					end,
+
+					direction = function(message)
+						return coroutine.yield(request_constructor.Direction(message))
+					end,
+				}
+			})
+			.into_function()
+			.into_error()?,
 		)
 		.into_error()?;
-		lua.globals()
-			.set("Console", console::LuaHandle(console_impl::Dummy))
-			.into_error()?;
-		lua.globals()
-			.set("Heuristic", consider::HeuristicConstructor)
-			.into_error()?;
-		lua.globals()
-			.set("Action", character::ActionConstructor)
-			.into_error()?;
-		lua.globals()
-			.set(
-				"Consider",
-				lua.create_function(|_lua, (action, heuristics)| {
-					Ok(Consider { action, heuristics })
-				})
-				.into_error()?,
-			)
-			.into_error()?;
-		lua.globals()
-			.set("Log", combat::LogConstructor)
-			.into_error()?;
-		lua.globals()
-			.set("Input", input::RequestConstructor)
-			.into_error()?;
 
 		let (receiver, sender) = stream.into_split();
 		let sender = PacketSender::new(sender);

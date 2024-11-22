@@ -67,11 +67,7 @@ fn inflict(
 	this: &Ref,
 	(key, magnitude): (String, Option<u32>),
 ) -> mlua::Result<()> {
-	let resources = lua
-		.globals()
-		.get::<mlua::Table>("package")?
-		.get::<mlua::Table>("loaded")?
-		.get::<resource::Handle>("resources")?;
+	let resources: resource::Handle = lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
 	let status = resources
 		.statuses
 		.get(&key)
@@ -239,6 +235,9 @@ impl mlua::UserData for Ref {
 			}
 		});
 
+		methods.add_method("is_allied", |_, this, other: Ref| {
+			Ok(this.borrow().alliance == other.borrow().alliance)
+		});
 		methods.add_method("replace_nouns", |_, this, s: String| {
 			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
 		});

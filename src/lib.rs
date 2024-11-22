@@ -17,6 +17,7 @@ pub mod console;
 pub mod expression;
 pub mod floor;
 pub mod item;
+pub mod lua;
 pub mod nouns;
 pub mod resource;
 pub mod soul;

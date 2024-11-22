@@ -1,4 +1,8 @@
-local world = require "world"
+local world = require "esprit.world"
+
+local action = require "esprit.types.action"
+local consider = require "esprit.types.consider"
+local heuristic = require "esprit.types.heuristic"
 
 local user, considerations = ...
 
@@ -6,9 +10,9 @@ for _, v in ipairs(world.characters()) do
 	if user.alliance ~= v.alliance then
 		table.insert(
 			considerations,
-			Consider(
-				Action.move(v.x, v.y),
-				{ Heuristic.move(v.x, v.y) }
+			consider(
+				action.move(v.x, v.y),
+				{ heuristic.move(v.x, v.y) }
 			)
 		)
 	end

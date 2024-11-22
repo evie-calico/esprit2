@@ -1,4 +1,4 @@
-local input = require "input"
+local input = require "esprit.input"
 
 return {
 	target = input.cursor(User.x, User.y, Parameters.range, Parameters.radius),

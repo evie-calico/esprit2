@@ -1,27 +1,29 @@
----@module "lib.consider.attack"
-local combat = require "combat";
-local resources = require "resources";
-local world = require "world";
+local world = require "esprit.world"
+local resources = require "esprit.resources"
+
+local action = require "esprit.types.action"
+local consider = require "esprit.types.consider"
+local heuristic = require "esprit.types.heuristic"
 
 local user, attack_id, considerations = ...
 local attack = resources:attack(attack_id)
 
 for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
-	if not combat.alliance_check(user, character) then
+	if not user:is_allied(character) then
 		table.insert(
 			considerations,
-			Consider(
-				Action.attack(
+			consider(
+				action.attack(
 					attack_id,
 					{ target = { x = character.x, y = character.y } }
 				),
 				{
-					Heuristic.damage(
+					heuristic.damage(
 						character,
 						attack:magnitude(user) - character.stats.defense
 					),
 					-- Estimate the drawback of close combat
-					Heuristic.debuff(user, 2)
+					heuristic.debuff(user, 2)
 				}
 			)
 		)

@@ -1,6 +1,7 @@
----@module "lib.spell"
-local combat = require "combat";
-local world = require "world";
+local combat = require "esprit.combat"
+local world = require "esprit.world"
+local console = require "esprit.console"
+local log = require "esprit.types.log"
 
 local args = ...
 
@@ -10,7 +11,7 @@ if target == nil then return end
 -- TODO: see scratch
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-local damage, pierce_failed = combat.apply_damage_with_pierce(
+local damage, pierce_failed = combat.apply_pierce(
 	Parameters.pierce_threshold,
 	Affinity:magnitude(Parameters.magnitude) - target.stats.resistance
 )
@@ -51,15 +52,15 @@ end
 -- Avoid showing unskilled messages too often;
 -- poorly made missiles are also likely to miss or be resisted.
 if pierce_failed then
-	Console:combat_log(pick(glancing_messages), Log.Glance)
+	console:combat_log(pick(glancing_messages), log.Glance)
 elseif damage == 0 then
 	if Affinity:weak() and math.random(0, 1) == 1 then
-		Console:combat_log(pick(unskilled_messages), Log.Miss)
+		console:combat_log(pick(unskilled_messages), log.Miss)
 	else
-		Console:combat_log(pick(failure_messages), Log.Miss)
+		console:combat_log(pick(failure_messages), log.Miss)
 	end
 else
-	Console:combat_log(pick(damage_messages), Log.Hit(damage))
+	console:combat_log(pick(damage_messages), log.Hit(damage))
 end
 
 return Parameters.cast_time

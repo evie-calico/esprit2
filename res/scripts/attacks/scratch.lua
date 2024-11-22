@@ -1,6 +1,7 @@
----@module "lib.attack"
-local combat = require "combat"
-local world = require "world"
+local combat = require "esprit.combat"
+local world = require "esprit.world"
+local console = require "esprit.console"
+local log = require "esprit.types.log"
 
 local args = ...
 
@@ -10,7 +11,7 @@ if target == nil then return end
 -- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-local damage, pierce_failed = combat.apply_damage_with_pierce(1, Magnitude - target.stats.defense)
+local damage, pierce_failed = combat.apply_pierce(1, Magnitude - target.stats.defense)
 
 target.hp = target.hp - damage
 if damage > 0 or pierce_failed then
@@ -42,11 +43,11 @@ local function pick(table)
 end
 
 if pierce_failed then
-	Console:combat_log(pick(glance_messages), Log.Glance)
+	console:combat_log(pick(glance_messages), log.Glance)
 elseif damage == 0 then
-	Console:combat_log(pick(failure_messages), Log.Miss)
+	console:combat_log(pick(failure_messages), log.Miss)
 else
-	Console:combat_log(pick(damage_messages), Log.Hit(damage))
+	console:combat_log(pick(damage_messages), log.Hit(damage))
 end
 
 return UseTime

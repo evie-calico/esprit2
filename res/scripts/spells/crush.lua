@@ -1,6 +1,7 @@
----@module "lib.spell"
-local combat = require "combat";
-local world = require "world";
+local combat = require "esprit.combat"
+local world = require "esprit.world"
+local console = require "esprit.console"
+local log = require "esprit.types.log"
 
 local args = ...
 
@@ -28,7 +29,7 @@ local failure_messages = {
 	"{Address} slides down the wall, hitting the ground unscatched",
 }
 
-Console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), Log.Success);
+console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
 
 for _, character in ipairs(characters) do
 	if math.abs(character.x - args.target.x) <= Parameters.radius and math.abs(character.y - args.target.y) <= Parameters.radius then
@@ -55,7 +56,7 @@ for _, character in ipairs(characters) do
 				character.x = projected_x
 				character.y = projected_y
 			else
-				local damage, pierce_failed = combat.apply_damage_with_pierce(
+				local damage, pierce_failed = combat.apply_pierce(
 					Parameters.pierce_threshold,
 					Affinity:magnitude(Parameters.magnitude) + distance_traveled * 2 - character.stats.resistance
 				)
@@ -63,14 +64,14 @@ for _, character in ipairs(characters) do
 				-- TODO Make messages vary based on distance travelled.
 				if damage > 0 then
 					character.hp = character.hp - damage
-					Console:combat_log(
+					console:combat_log(
 						character:replace_nouns(damage_messages[math.random(#damage_messages)]),
-						Log.Hit(damage)
+						log.Hit(damage)
 					)
 				else
-					Console:combat_log(
+					console:combat_log(
 						character:replace_nouns(failure_messages[math.random(#failure_messages)]),
-						pierce_failed and Log.Glance or Log.Miss
+						pierce_failed and log.Glance or log.Miss
 					)
 				end
 
@@ -80,7 +81,7 @@ for _, character in ipairs(characters) do
 		end
 
 		-- This print has to happen here because it should only be shown if the character never hit a wall.
-		Console:print(character:replace_nouns(neutral_messages[math.random(#neutral_messages)]))
+		console:print(character:replace_nouns(neutral_messages[math.random(#neutral_messages)]))
 
 		::printed::
 	end

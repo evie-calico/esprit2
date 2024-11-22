@@ -2,6 +2,7 @@ use esprit2::prelude::*;
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
+#[derive(Debug, Clone)]
 pub(crate) struct Dummy;
 
 impl console::Handle for Dummy {

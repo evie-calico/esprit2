@@ -1,8 +1,11 @@
 {
-    "workspace.library": [
-        "res/scripts/lib/globals.lua",
-        "res/scripts/lib/userdata.lua"
-    ],
+    "runtime": {
+        "version": "LuaJIT",
+        "path": [
+            "res/scripts/meta/?.lua"
+        ],
+        "pathStrict": true
+    },
     "format.defaultConfig": {
         "indent_style": "tab",
     }

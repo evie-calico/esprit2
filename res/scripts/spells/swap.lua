@@ -1,6 +1,7 @@
----@module "lib.spell"
-local combat = require "combat"
-local world = require "world"
+local combat = require "esprit.combat"
+local world = require "esprit.world"
+local log = require "esprit.types.log"
+local console = require "esprit.console"
 
 local args = ...
 
@@ -9,12 +10,12 @@ if target == nil then return end
 
 User.sp = User.sp - Level
 
-if not combat.alliance_check(User, target)
+if not User:is_allied(target)
 	and Affinity:magnitude(Parameters.magnitude) - target.stats.resistance <= 0
 then
-	Console:combat_log(
+	console:combat_log(
 		combat.format(User, target, "{target_Address} resisted {self_address}'s swap."),
-		Log.Miss
+		log.Miss
 	)
 else
 	local cx, cy = User.x, User.y
@@ -23,9 +24,9 @@ else
 	target.x = cx
 	target.y = cy
 
-	Console:combat_log(
+	console:combat_log(
 		combat.format(User, target, "{self_Address} swapped positions with {target_address}."),
-		Log.Success
+		log.Success
 	)
 end
 

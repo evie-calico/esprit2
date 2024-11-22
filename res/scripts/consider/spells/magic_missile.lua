@@ -1,22 +1,23 @@
----@module "lib.consider.spell"
-local combat = require "combat"
-local resources = require "resources"
-local world = require "world"
+local world = require "esprit.world"
+local resources = require "esprit.resources"
+local action = require "esprit.types.action"
+local consider = require "esprit.types.consider"
+local heuristic = require "esprit.types.heuristic"
 
 local user, spell_id, considerations = ...
 local spell = resources:spell(spell_id)
 
 for _, character in ipairs(world.characters_within(user.x, user.y, spell.range)) do
-	if not combat.alliance_check(user, character) then
+	if not user:is_allied(character) then
 		table.insert(
 			considerations,
-			Consider(
-				Action.cast(
+			consider(
+				action.cast(
 					spell_id,
 					{ target = { x = character.x, y = character.y } }
 				),
 				{
-					Heuristic.damage(
+					heuristic.damage(
 						character,
 						spell:affinity(user, spell.magnitude(user.stats:as_table())) - character.stats.resistance
 					),

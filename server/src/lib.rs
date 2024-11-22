@@ -218,13 +218,7 @@ pub fn instance(
 	mut router: mpsc::Receiver<(Client, ReceiverStream<AlignedVec>)>,
 	res: PathBuf,
 ) -> esprit2::Result<()> {
-	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
-
-	lua.globals()
-		.get::<mlua::Table>("package")?
-		.set("path", res.join("scripts/?.lua").to_string_lossy())?;
-
 	let scripts = resource::Scripts::open(res.join("scripts"), &lua)?;
 
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
@@ -232,21 +226,7 @@ pub fn instance(
 	let mut server = Server::new(res)?;
 	let mut clients = ClientParty::default();
 
-	let handle = server.resources.clone();
-	lua.load_from_function::<resource::Handle>(
-		"resources",
-		lua.create_function(move |_, ()| Ok(handle.clone()))?,
-	)?;
-	lua.globals()
-		.set("Console", console::LuaHandle(console_handle.clone()))?;
-	lua.globals()
-		.set("Heuristic", consider::HeuristicConstructor)?;
-	lua.globals().set("Action", character::ActionConstructor)?;
-	lua.globals().set(
-		"Consider",
-		lua.create_function(|_lua, (action, heuristics)| Ok(Consider { action, heuristics }))?,
-	)?;
-	lua.globals().set("Log", combat::LogConstructor)?;
+	esprit2::lua::init(&lua, server.resources.clone(), console_handle.clone())?;
 
 	tokio::runtime::Builder::new_multi_thread()
 		.enable_all()

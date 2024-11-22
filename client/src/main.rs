@@ -126,18 +126,6 @@ pub(crate) async fn main() {
 	// Create a Lua runtime.
 	let lua = mlua::Lua::new();
 
-	lua.globals()
-		.get::<mlua::Table>("package")
-		.unwrap()
-		.set(
-			"path",
-			options::resource_directory()
-				.join("scripts/?.lua")
-				.to_str()
-				.unwrap(),
-		)
-		.unwrap();
-
 	let scripts =
 		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
 			Ok(scripts) => scripts,
