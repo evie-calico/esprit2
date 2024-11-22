@@ -1,5 +1,5 @@
-local world = require "esprit.world"
 local console = require "esprit.console"
+local world = require "esprit.world"
 
 local args = ...
 

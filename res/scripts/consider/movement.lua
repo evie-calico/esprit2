@@ -1,5 +1,4 @@
 local world = require "esprit.world"
-
 local action = require "esprit.types.action"
 local consider = require "esprit.types.consider"
 local heuristic = require "esprit.types.heuristic"

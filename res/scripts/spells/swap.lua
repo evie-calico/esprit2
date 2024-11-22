@@ -1,7 +1,7 @@
 local combat = require "esprit.combat"
+local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
-local console = require "esprit.console"
 
 local args = ...
 
