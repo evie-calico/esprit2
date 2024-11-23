@@ -56,3 +56,5 @@
 ---@field weak fun(self): boolean
 ---@field average fun(self): boolean
 ---@field strong fun(self): boolean
+
+---@class (exact) Status: userdata

@@ -8,7 +8,7 @@ local heuristic = require "esprit.types.heuristic"
 local user, spell_id, considerations = ...
 local spell = resources:spell(spell_id)
 
-for _, character in ipairs(world.characters_within(user.x, user.y, spell.range)) do
+for _, character in ipairs(world.characters_within(user.x, user.y, spell.range --[[@as integer]])) do
 	if not user:is_allied(character) then
 		table.insert(
 			considerations,

@@ -19,7 +19,7 @@ for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
 				{
 					heuristic.damage(
 						character,
-						attack:magnitude(user) - character.stats.defense
+						attack.magnitude(user) - character.stats.defense
 					),
 					-- Estimate the drawback of close combat
 					heuristic.debuff(user, 2)
