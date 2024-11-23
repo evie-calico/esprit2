@@ -13,7 +13,7 @@ if target == nil then return end
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 -- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats:as_table()) - target.stats.defense)
+local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats) - target.stats.defense)
 
 -- Biting requires you to get closer to the enemy, lowering your physical defense.
 user:inflict("close_combat")

@@ -26,18 +26,8 @@
 ---@field defense integer
 ---@field magic integer
 ---@field resistance integer
----@field as_table fun(): StatsTable
 
---- This is a non-exact version of Stats represented by a Lua table.
----@class StatsTable: table<string, integer>
----@field heart integer
----@field soul integer
----@field power integer
----@field defense integer
----@field magic integer
----@field resistance integer
-
----@alias Expression fun(args: table<string, integer>): integer
+---@alias Expression fun(args: userdata|table<string, integer>): integer
 
 ---@class (exact) Attack: userdata
 ---@field magnitude Expression

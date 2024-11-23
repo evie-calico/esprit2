@@ -503,17 +503,6 @@ impl expression::Variables for Sheet {
 	}
 }
 
-fn as_table(lua: &mlua::Lua, this: &mut Stats, _: ()) -> mlua::Result<mlua::Table> {
-	lua.create_table_from([
-		("heart", this.heart),
-		("soul", this.soul),
-		("power", this.power),
-		("defense", this.defense),
-		("magic", this.magic),
-		("resistance", this.resistance),
-	])
-}
-
 #[derive(
 	Clone,
 	Copy,
@@ -527,7 +516,6 @@ fn as_table(lua: &mlua::Lua, this: &mut Stats, _: ()) -> mlua::Result<mlua::Tabl
 	rkyv::Serialize,
 	rkyv::Deserialize,
 )]
-#[alua(method = as_table)]
 pub struct Stats {
 	/// Health, or HP; Heart Points
 	#[serde(default)]

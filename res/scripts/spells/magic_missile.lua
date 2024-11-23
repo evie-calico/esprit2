@@ -14,7 +14,7 @@ if target == nil then return end
 
 local damage, pierce_failed = combat.apply_pierce(
 	spell.pierce_threshold --[[@as integer]],
-	spell:affinity(user):magnitude(spell.magnitude(user.stats:as_table())) - target.stats.resistance
+	spell:affinity(user):magnitude(spell.magnitude(user.stats)) - target.stats.resistance
 )
 
 target.hp = target.hp - damage

@@ -12,7 +12,7 @@ if target == nil then return end
 -- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-local damage, pierce_failed = combat.apply_pierce(1, attack.magnitude(user.stats:as_table()) - target.stats.defense)
+local damage, pierce_failed = combat.apply_pierce(1, attack.magnitude(user.stats) - target.stats.defense)
 
 target.hp = target.hp - damage
 if damage > 0 or pierce_failed then

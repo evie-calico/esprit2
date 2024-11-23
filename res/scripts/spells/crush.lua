@@ -59,7 +59,7 @@ for _, character in ipairs(characters) do
 			else
 				local damage, pierce_failed = combat.apply_pierce(
 					spell.pierce_threshold --[[@as integer]],
-					spell:affinity(user):magnitude(spell.magnitude(user.stats:as_table())) + distance_traveled * 2 -
+					spell:affinity(user):magnitude(spell.magnitude(user.stats)) + distance_traveled * 2 -
 					character.stats.resistance
 				)
 
