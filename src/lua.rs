@@ -70,46 +70,34 @@ fn combat(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 }
 
 /// Implemented via lua to allow for yields.
-///
-/// These serde tables should really be constructor functions (like the client-only input library)
 fn world() -> impl AsChunk<'static> {
+	let make_characters =
+		mlua::Function::wrap(|| Ok(world::LuaRequest::Characters { query: None }));
+	let make_characters_within = mlua::Function::wrap(|x, y, range| {
+		Ok(world::LuaRequest::Characters {
+			query: Some(world::LuaCharacterQuery::Within { x, y, range }),
+		})
+	});
+	let make_tile = mlua::Function::wrap(|x, y| Ok(world::LuaRequest::Tile { x, y }));
 	chunk! {
-		return {
-			characters = function()
-				return coroutine.yield({ type = "Characters" })
-			end,
+		local world = {}
 
-			character_at = function(x, y)
-				assert(x, "missing x position")
-				assert(y, "missing y position")
-				return coroutine.yield({
-					type = "Characters",
-					query = {
-						Within = {
-							x = x,
-							y = y,
-							range = 0,
-						}
-					}
-				})[1]
-			end,
+		function world.characters()
+			return coroutine.yield($make_characters())
+		end
 
-			characters_within = function(x, y, radius)
-				return coroutine.yield({
-					type = "Characters",
-					query = {
-						Within = {
-							x = x,
-							y = y,
-							range = radius,
-						}
-					}
-				})
-			end,
+		function world.character_at(x, y)
+			return world.characters_within(x, y, 0)[1]
+		end
 
-			tile = function(x, y)
-				return coroutine.yield({ type = "Tile", x = x, y = y })
-			end,
-		}
+		function world.characters_within(x, y, range)
+			return coroutine.yield($make_characters_within(x, y, range))
+		end
+
+		function world.tile(x, y)
+			return coroutine.yield($make_tile(x, y))
+		end
+
+		return world
 	}
 }

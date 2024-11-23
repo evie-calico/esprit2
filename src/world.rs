@@ -504,29 +504,14 @@ impl Manager {
 		thread: mlua::Thread,
 		args: impl mlua::IntoLuaMulti,
 	) -> mlua::Result<T> {
-		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-		pub enum CharacterQuery {
-			Within { x: i32, y: i32, range: u32 },
-		}
-
-		// Handle requests for extra information from the lua function.
-		// These may or may not be inputs.
-		#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-		#[serde(tag = "type")]
-		pub enum LuaRequest {
-			// World manager communication
-			Characters { query: Option<CharacterQuery> },
-			Tile { x: i32, y: i32 },
-		}
-
 		let mut value = thread.resume(args)?;
 		loop {
 			// A resumable thread is expecting an action request response.
 			if thread.status() == mlua::ThreadStatus::Resumable {
-				match lua.from_value::<LuaRequest>(value)? {
+				match <LuaRequest as mlua::FromLua>::from_lua(value, lua)? {
 					LuaRequest::Characters { query } => {
 						value = match query {
-							Some(CharacterQuery::Within { x, y, range }) => thread.resume(
+							Some(LuaCharacterQuery::Within { x, y, range }) => thread.resume(
 								lua.create_sequence_from(
 									self.characters
 										.iter()
@@ -560,3 +545,18 @@ impl Manager {
 		}
 	}
 }
+
+#[derive(Clone, Debug)]
+pub(crate) enum LuaCharacterQuery {
+	Within { x: i32, y: i32, range: u32 },
+}
+
+/// Handle requests for extra information from a lua function.
+#[derive(Clone, Debug, mlua::FromLua)]
+pub(crate) enum LuaRequest {
+	// World manager communication
+	Characters { query: Option<LuaCharacterQuery> },
+	Tile { x: i32, y: i32 },
+}
+
+impl mlua::UserData for LuaRequest {}
