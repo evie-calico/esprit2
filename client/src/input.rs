@@ -181,23 +181,6 @@ pub(crate) enum Request {
 
 impl mlua::UserData for Request {}
 
-pub(crate) struct RequestConstructor;
-
-impl mlua::UserData for RequestConstructor {
-	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_function("Cursor", |_, (x, y, range, radius)| {
-			Ok(Request::Cursor {
-				x,
-				y,
-				range,
-				radius,
-			})
-		});
-		methods.add_function("Prompt", |_, message| Ok(Request::Prompt { message }));
-		methods.add_function("Direction", |_, message| Ok(Request::Direction { message }));
-	}
-}
-
 pub(crate) enum PartialAction {
 	Attack(resource::Attack, character::Ref, mlua::Thread),
 	Spell(resource::Spell, character::Ref, mlua::Thread),

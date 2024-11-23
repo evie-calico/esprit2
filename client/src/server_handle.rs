@@ -55,23 +55,32 @@ impl<'texture> ServerHandle<'texture> {
 		let handle = resources.clone();
 		esprit2::lua::init(lua, handle, console_impl::Dummy).into_error()?;
 		// input requests need to yield so this library is written in lua.
-		let request_constructor = input::RequestConstructor;
+		let make_cursor = mlua::Function::wrap(|x, y, range, radius| {
+			Ok(input::Request::Cursor {
+				x,
+				y,
+				range,
+				radius,
+			})
+		});
+		let make_prompt = mlua::Function::wrap(|message| Ok(input::Request::Prompt { message }));
+		let make_direction =
+			mlua::Function::wrap(|message| Ok(input::Request::Direction { message }));
 		lua.load_from_function::<mlua::Value>(
 			"esprit.input",
 			lua.load(mlua::chunk! {
-				local request_constructor = $request_constructor
 				return {
 					cursor = function(x, y, range, radius)
-						x, y = coroutine.yield(request_constructor.Cursor(x, y, range, radius))
+						x, y = coroutine.yield($make_cursor(x, y, range, radius))
 						return { x = x, y = y }
 					end,
 
 					prompt = function(message)
-						return coroutine.yield(request_constructor.Prompt(message))
+						return coroutine.yield($make_prompt(message))
 					end,
 
 					direction = function(message)
-						return coroutine.yield(request_constructor.Direction(message))
+						return coroutine.yield($make_direction(message))
 					end,
 				}
 			})
