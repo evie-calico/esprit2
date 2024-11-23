@@ -123,8 +123,10 @@ pub(crate) async fn main() {
 		options
 	});
 
-	// Create a Lua runtime.
-	let lua = mlua::Lua::new();
+	let lua = esprit2::lua::init().unwrap_or_else(|e| {
+		error!("failed to initialize lua runtime: {e}");
+		exit(1);
+	});
 
 	let scripts =
 		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {

@@ -3,22 +3,8 @@ use consider::Heuristic;
 use mlua::Function as F;
 use mlua::{chunk, AsChunk};
 
-pub fn init(
-	lua: &mlua::Lua,
-	resources: resource::Handle,
-	console: impl console::Handle + Clone + 'static,
-) -> mlua::Result<()> {
-	// These two "libraries" are actually just handles to engine resources.
-	// Maybe they really should be globals?
-	lua.load_from_function::<mlua::Value>(
-		"esprit.resources",
-		lua.create_function(move |_, ()| Ok(resources.clone()))?,
-	)?;
-	lua.load_from_function::<mlua::Value>(
-		"esprit.console",
-		lua.create_function(move |_, ()| Ok(console::LuaHandle(console.clone())))?,
-	)?;
-
+pub fn init() -> mlua::Result<mlua::Lua> {
+	let lua = mlua::Lua::new();
 	// Libraries
 	lua.load_from_function::<mlua::Value>("esprit.combat", lua.create_function(combat)?)?;
 	lua.load_from_function::<mlua::Value>("esprit.world", lua.load(world()).into_function()?)?;
@@ -31,13 +17,14 @@ pub fn init(
 			lua.create_function(|_, (action, heuristics)| Ok(Consider { action, heuristics }))
 		})?,
 	)?;
+	lua.load_from_function::<mlua::Value>("esprit.types.duration", lua.create_function(duration)?)?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.heuristic",
 		lua.create_function(heuristic)?,
 	)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.log", lua.create_function(log)?)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.stats", lua.create_function(stats)?)?;
-	Ok(())
+	Ok(lua)
 }
 
 fn combat(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
@@ -111,6 +98,13 @@ fn action(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 		F::wrap(|spell, args| Ok(character::Action::Cast(spell, args))),
 	)?;
 	Ok(action)
+}
+
+fn duration(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+	let duration = lua.create_table()?;
+	duration.set("turn", status::Duration::Turn)?;
+	duration.set("rest", status::Duration::Rest)?;
+	Ok(duration)
 }
 
 fn heuristic(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {

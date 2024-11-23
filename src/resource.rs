@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use mlua::FromLua;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -251,16 +252,58 @@ impl Manager {
 	///
 	/// Returns an error if ANYTHING fails to be read/parsed.
 	/// This is probably undesirable and should be moved to logging/diagnostics.
-	pub fn open(path: impl AsRef<Path>) -> Result<Manager> {
+	pub fn open(path: impl AsRef<Path>, lua: &mlua::Lua) -> Result<Manager> {
 		let path = path.as_ref();
 
 		let sheets = register(&path.join("sheets"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let statuses = register(&path.join("statuses"), |path| {
-			Ok(toml::from_str(&fs::read_to_string(path)?)?)
+		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
+		let handle = Rc::downgrade(&statuses);
+		let status_registrar = lua.create_function(move |lua, identifier: Box<str>| {
+			let handle = handle.clone();
+			let identifier = Cell::new(Some(identifier));
+			lua.create_function(move |_, table: mlua::Table| {
+				let Some(handle) = handle.upgrade() else {
+					return Err(mlua::Error::runtime(
+						"status resource registration has closed",
+					));
+				};
+				let Some(identifier) = identifier.take() else {
+					return Err(mlua::Error::runtime(
+						"resources registration functions may only be used once",
+					));
+				};
+
+				let status = status::Status {
+					name: table.get("name")?,
+					icon: table.get("icon")?,
+					duration: table.get("duration")?,
+					on_debuff: table.get("on_debuff")?,
+				};
+
+				handle.borrow_mut().0.insert(identifier, Rc::new(status));
+				Ok(())
+			})
 		})?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.status",
+			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
+		)?;
+
+		recurse(&path.join("init"), |path, _| {
+			lua.load(&fs::read_to_string(path)?)
+				.set_name(path.to_string_lossy())
+				.exec()?;
+			Ok(())
+		})?;
+
+		lua.unload("esprit.resources.status")?;
+
+		let statuses = Rc::into_inner(statuses)
+			.expect("statuses must have only one strong reference")
+			.into_inner();
 
 		let attacks = register(&path.join("attacks"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)

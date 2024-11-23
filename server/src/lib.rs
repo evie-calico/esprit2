@@ -103,9 +103,9 @@ pub(crate) struct Server {
 }
 
 impl Server {
-	pub(crate) fn new(resource_directory: PathBuf) -> esprit2::Result<Self> {
+	pub(crate) fn new(resource_directory: PathBuf, lua: &mlua::Lua) -> esprit2::Result<Self> {
 		// Game initialization.
-		let resources = match resource::Manager::open(&resource_directory) {
+		let resources = match resource::Manager::open(&resource_directory, lua) {
 			Ok(resources) => resource::Handle::new(resources.into()),
 			Err(msg) => {
 				error!("failed to open resource directory: {msg}");
@@ -218,15 +218,25 @@ pub fn instance(
 	mut router: mpsc::Receiver<(Client, ReceiverStream<AlignedVec>)>,
 	res: PathBuf,
 ) -> esprit2::Result<()> {
-	let lua = mlua::Lua::new();
+	let lua = esprit2::lua::init()?;
+
 	let scripts = resource::Scripts::open(res.join("scripts"), &lua)?;
 
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
-	let console_handle = Console { sender };
-	let mut server = Server::new(res)?;
+	let console = Console { sender };
+	let mut server = Server::new(res, &lua)?;
 	let mut clients = ClientParty::default();
 
-	esprit2::lua::init(&lua, server.resources.clone(), console_handle.clone())?;
+	let resources = server.resources.clone();
+	lua.load_from_function::<mlua::Value>(
+		"esprit.resources",
+		lua.create_function(move |_, ()| Ok(resources.clone()))?,
+	)?;
+	let console_handle = console.clone();
+	lua.load_from_function::<mlua::Value>(
+		"esprit.console",
+		lua.create_function(move |_, ()| Ok(console::LuaHandle(console_handle.clone())))?,
+	)?;
 
 	tokio::runtime::Builder::new_multi_thread()
 		.enable_all()
@@ -253,7 +263,7 @@ pub fn instance(
 						if let Err(msg) = client_tick(
 							client,
 							packet,
-							&console_handle,
+							&console,
 							&scripts,
 							&mut server,
 						)
@@ -266,10 +276,7 @@ pub fn instance(
 				}
 
 				loop {
-					match server
-						.world
-						.tick(&server.resources, &scripts, &console_handle)
-					{
+					match server.world.tick(&server.resources, &scripts, &console) {
 						Ok(true) => (),
 						Ok(false) => break,
 						Err(msg) => {

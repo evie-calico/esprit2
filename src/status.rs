@@ -1,31 +1,17 @@
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, mlua::FromLua)]
 pub enum Duration {
 	Rest,
 	Turn,
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+impl mlua::UserData for Duration {}
+
+#[derive(Clone, Debug)]
 pub struct Status {
 	pub name: String,
 	pub icon: String,
 	pub duration: Duration,
-	pub on_debuff: Box<str>,
+	pub on_debuff: Option<mlua::Function>,
 }
 
 impl mlua::UserData for Status {}

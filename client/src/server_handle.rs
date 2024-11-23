@@ -36,7 +36,7 @@ impl<'texture> ServerHandle<'texture> {
 		let console = Console::default();
 
 		let resources = resource::Handle::new(
-			resource::Manager::open(options::resource_directory())
+			resource::Manager::open(options::resource_directory(), lua)
 				.into_error()?
 				.into(),
 		);
@@ -53,7 +53,18 @@ impl<'texture> ServerHandle<'texture> {
 		let chase_point = None;
 
 		let handle = resources.clone();
-		esprit2::lua::init(lua, handle, console_impl::Dummy).into_error()?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources",
+			lua.create_function(move |_, ()| Ok(handle.clone()))
+				.into_error()?,
+		)
+		.into_error()?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.console",
+			lua.create_function(move |_, ()| Ok(console::LuaHandle(console_impl::Dummy)))
+				.into_error()?,
+		)
+		.into_error()?;
 		// input requests need to yield so this library is written in lua.
 		let make_cursor = mlua::Function::wrap(|x, y, range, radius| {
 			Ok(input::Request::Cursor {

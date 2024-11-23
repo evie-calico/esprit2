@@ -1,7 +1,0 @@
-name = "Close Combat"
-icon = "dummy"
-duration = "Turn"
-on_debuff = '''
-local stats = require "esprit.types.stats"
-return stats.defense(4)
-'''

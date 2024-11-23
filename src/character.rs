@@ -345,8 +345,10 @@ impl Piece {
 
 		for (status_id, value) in &self.statuses {
 			let status = resources.statuses.get(status_id.as_ref())?;
-			let debuff = lua.load(&*status.on_debuff).call(value.as_lua(lua)?)?;
-			debuffs = debuffs + debuff;
+			if let Some(on_debuff) = &status.on_debuff {
+				let debuff = on_debuff.call(value.as_lua(lua)?)?;
+				debuffs = debuffs + debuff;
+			}
 		}
 
 		let mut stats = self.sheet.stats();
