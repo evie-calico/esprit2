@@ -1,6 +1,9 @@
 ---@meta esprit.world
 
----@alias Tile "Floor"|"Wall"|"Exit"|
+---@class (exact) Tile: userdata
+---@field floor fun(self): boolean
+---@field wall fun(self): boolean
+---@field exit fun(self): boolean
 
 local world = {}
 

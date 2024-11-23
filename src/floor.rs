@@ -24,6 +24,14 @@ pub enum Tile {
 	Exit,
 }
 
+impl mlua::UserData for Tile {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+		methods.add_method("floor", |_, this, ()| Ok(matches!(this, Tile::Floor)));
+		methods.add_method("wall", |_, this, ()| Ok(matches!(this, Tile::Wall)));
+		methods.add_method("exit", |_, this, ()| Ok(matches!(this, Tile::Exit)));
+	}
+}
+
 const CHUNK_SIZE: usize = 16;
 
 #[derive(

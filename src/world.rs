@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use mlua::LuaSerdeExt;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{collections::VecDeque, rc::Rc};
 
@@ -536,12 +535,7 @@ impl Manager {
 						}
 					}
 					LuaRequest::Tile { x, y } => {
-						let tile = self.current_floor.get(x, y);
-						value = thread.resume(
-							tile.map(|x| lua.to_value(&x))
-								.transpose()?
-								.unwrap_or(mlua::Value::Nil),
-						)?;
+						value = thread.resume(self.current_floor.get(x, y))?;
 					}
 				}
 			} else {

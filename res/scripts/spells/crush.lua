@@ -53,13 +53,13 @@ for _, character in ipairs(characters) do
 
 			local tile = world.tile(projected_x, projected_y)
 			-- TODO: This is insufficient
-			if tile ~= nil and tile ~= "Wall" then
+			if tile ~= nil and not tile:wall() then
 				character.x = projected_x
 				character.y = projected_y
 			else
 				local damage, pierce_failed = combat.apply_pierce(
 					spell.pierce_threshold --[[@as integer]],
-					spell:affinity(user):magnitude(spell.magnitude(user)) + distance_traveled * 2 -
+					spell:affinity(user):magnitude(spell.magnitude(user.stats:as_table())) + distance_traveled * 2 -
 					character.stats.resistance
 				)
 
