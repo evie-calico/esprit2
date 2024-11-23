@@ -33,11 +33,6 @@ pub enum Heuristic {
 	},
 }
 
-fn saturating_cast(x: mlua::Integer) -> u32 {
-	x.max(u32::MIN as mlua::Integer)
-		.min(u32::MAX as mlua::Integer) as u32
-}
-
 fn wrong_variant() -> mlua::Error {
 	mlua::Error::runtime("attempted to retrieve missing field from heuristic variant")
 }
@@ -71,26 +66,6 @@ impl mlua::UserData for Heuristic {
 		methods.add_method("debuff", |_, this, ()| {
 			Ok(matches!(this, Heuristic::Debuff { .. }))
 		});
-	}
-}
-
-pub struct HeuristicConstructor;
-
-impl mlua::UserData for HeuristicConstructor {
-	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_function("damage", |_, (target, amount)| {
-			Ok(Heuristic::Damage {
-				target,
-				amount: saturating_cast(amount),
-			})
-		});
-		methods.add_function("debuff", |_, (target, amount)| {
-			Ok(Heuristic::Debuff {
-				target,
-				amount: saturating_cast(amount),
-			})
-		});
-		methods.add_function("move", |_, (x, y)| Ok(Heuristic::Move { x, y }));
 	}
 }
 

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use consider::Heuristic;
 use mlua::Function as F;
 use mlua::{chunk, AsChunk};
 
@@ -24,15 +25,15 @@ pub fn init(
 
 	// Constructors
 	lua.load_from_function::<mlua::Value>("esprit.types.action", lua.create_function(action)?)?;
-	let consider_constructor =
-		lua.create_function(|_lua, (action, heuristics)| Ok(Consider { action, heuristics }))?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.consider",
-		lua.create_function(move |_, ()| Ok(consider_constructor.clone()))?,
+		lua.create_function(move |lua, ()| {
+			lua.create_function(|_, (action, heuristics)| Ok(Consider { action, heuristics }))
+		})?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.heuristic",
-		lua.create_function(move |_, ()| Ok(consider::HeuristicConstructor))?,
+		lua.create_function(heuristic)?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.log",
@@ -113,6 +114,35 @@ fn action(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 		F::wrap(|spell, args| Ok(character::Action::Cast(spell, args))),
 	)?;
 	Ok(action)
+}
+
+fn heuristic(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+	fn saturating_cast(x: mlua::Integer) -> u32 {
+		x.max(u32::MIN as mlua::Integer)
+			.min(u32::MAX as mlua::Integer) as u32
+	}
+
+	let heuristic = lua.create_table()?;
+	heuristic.set(
+		"damage",
+		F::wrap(|target, amount| {
+			Ok(Heuristic::Damage {
+				target,
+				amount: saturating_cast(amount),
+			})
+		}),
+	)?;
+	heuristic.set(
+		"debuff",
+		F::wrap(|target, amount| {
+			Ok(Heuristic::Debuff {
+				target,
+				amount: saturating_cast(amount),
+			})
+		}),
+	)?;
+	heuristic.set("move", F::wrap(|x, y| Ok(Heuristic::Move { x, y })))?;
+	Ok(heuristic)
 }
 
 fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
