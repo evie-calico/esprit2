@@ -247,6 +247,7 @@ impl<'texture> ServerHandle<'texture> {
 		&self,
 		input_mode: &input::Mode,
 		ctx: &mut gui::Context,
+		lua: &mlua::Lua,
 		textures: &'texture texture::Manager,
 		options: &Options,
 	) {
@@ -315,6 +316,7 @@ impl<'texture> ServerHandle<'texture> {
 				options,
 				input_mode,
 				world,
+				lua,
 				&self.console,
 				&self.resources,
 				textures,
@@ -335,8 +337,14 @@ impl<'texture> ServerHandle<'texture> {
 				(0x08, 0x0f, 0x25).into(),
 			);
 
-			self.pamphlet
-				.draw(&mut pamphlet_ctx, world, textures, &self.soul_jar);
+			self.pamphlet.draw(
+				&mut pamphlet_ctx,
+				world,
+				lua,
+				&self.resources,
+				textures,
+				&self.soul_jar,
+			);
 		}
 	}
 }

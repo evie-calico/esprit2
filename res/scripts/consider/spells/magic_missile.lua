@@ -20,7 +20,8 @@ for _, character in ipairs(world.characters_within(user.x, user.y, spell.range -
 				{
 					heuristic.damage(
 						character,
-						spell:affinity(user, spell.magnitude(user.stats:as_table())) - character.stats.resistance
+						spell:affinity(user):magnitude(spell.magnitude(user.stats:as_table())) -
+						character.stats.resistance
 					),
 				}
 			)

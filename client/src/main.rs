@@ -269,7 +269,7 @@ pub(crate) async fn main() {
 			menu.draw(&mut gui, &textures);
 		}
 		if let Some((input_mode, world)) = &server {
-			world.draw(input_mode, &mut gui, &textures, &options);
+			world.draw(input_mode, &mut gui, &lua, &textures, &options);
 		}
 
 		canvas.present();

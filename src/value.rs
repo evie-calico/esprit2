@@ -29,6 +29,38 @@ pub enum Value {
 	OrderedTable(#[rkyv(omit_bounds)] Box<[Value]>),
 }
 
+impl Value {
+	pub fn as_lua(&self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
+		Ok(match self {
+			Value::Nil => mlua::Value::Nil,
+			Value::Boolean(i) => mlua::Value::Boolean(*i),
+			Value::Integer(i) => mlua::Value::Integer(*i),
+			Value::Number(i) => mlua::Value::Number(*i),
+			Value::String(i) => mlua::Value::String(lua.create_string(&**i)?),
+			Value::Table(i) => {
+				let table = lua.create_table()?;
+				for (k, v) in i {
+					table.set(k.as_lua(lua)?, v.as_lua(lua)?)?;
+				}
+				mlua::Value::Table(table)
+			}
+			Value::OrderedTable(i) => {
+				let table = lua.create_table()?;
+				let mut k = 0;
+				#[expect(
+					clippy::explicit_counter_loop,
+					reason = "https://doc.rust-lang.org/stable/edition-guide/rust-2024/intoiterator-box-slice.html"
+				)]
+				for v in i {
+					table.set(k + 1, v.as_lua(lua)?)?;
+					k += 1;
+				}
+				mlua::Value::Table(table)
+			}
+		})
+	}
+}
+
 impl mlua::FromLua for Value {
 	fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
 		match value {
@@ -67,32 +99,6 @@ impl mlua::FromLua for Value {
 
 impl mlua::IntoLua for Value {
 	fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
-		Ok(match self {
-			Value::Nil => mlua::Value::Nil,
-			Value::Boolean(i) => mlua::Value::Boolean(i),
-			Value::Integer(i) => mlua::Value::Integer(i),
-			Value::Number(i) => mlua::Value::Number(i),
-			Value::String(i) => mlua::Value::String(lua.create_string(&*i)?),
-			Value::Table(i) => {
-				let table = lua.create_table()?;
-				for (k, v) in i {
-					table.set(k.into_lua(lua)?, v.into_lua(lua)?)?;
-				}
-				mlua::Value::Table(table)
-			}
-			Value::OrderedTable(i) => {
-				let table = lua.create_table()?;
-				let mut k = 0;
-				#[expect(
-					clippy::explicit_counter_loop,
-					reason = "https://doc.rust-lang.org/stable/edition-guide/rust-2024/intoiterator-box-slice.html"
-				)]
-				for v in i {
-					table.set(k.into_lua(lua)?, v.into_lua(lua)?)?;
-					k += 1;
-				}
-				mlua::Value::Table(table)
-			}
-		})
+		self.as_lua(lua)
 	}
 }

@@ -1,4 +1,7 @@
 use crate::prelude::*;
+use mlua::IntoLuaMulti;
+use resource::Id;
+use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -62,29 +65,10 @@ fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> 
 }
 
 /// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
-fn inflict(
-	lua: &mlua::Lua,
-	this: &Ref,
-	(key, magnitude): (String, Option<u32>),
-) -> mlua::Result<()> {
-	let resources: resource::Handle = lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
-	let status = resources
-		.statuses
-		.get(&key)
-		.map_err(mlua::Error::external)?;
-	let mut entry = this.borrow_mut();
-	let entry = entry
-		.statuses
-		.entry(key.into_boxed_str())
-		.or_insert_with(|| (**status).clone());
-	if let Some(magnitude) = magnitude {
-		entry.add_magnitude(magnitude);
-	}
+fn inflict(_lua: &mlua::Lua, this: &Ref, (key, value): (Box<str>, Value)) -> mlua::Result<()> {
+	this.borrow_mut().statuses.insert(key.into(), value);
 	Ok(())
 }
-
-use mlua::IntoLuaMulti;
-use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
 
 pub struct InlineRefCell;
 
@@ -193,8 +177,8 @@ impl mlua::UserData for Ref {
 			}
 		}
 		fields.add_field_method_get("level", |_, this| Ok(this.borrow().sheet.level));
-		fields.add_field_method_get("stats", |_, this| {
-			this.borrow().stats().map_err(mlua::Error::runtime)
+		fields.add_field_method_get("stats", |lua, this| {
+			this.borrow().stats(lua).map_err(mlua::Error::runtime)
 		});
 		fields.add_field_method_get("alliance", |_, this| Ok(this.borrow().alliance as u32));
 		get!(hp, sp, x, y);
@@ -272,7 +256,7 @@ pub struct Piece {
 	pub hp: i32,
 	pub sp: i32,
 
-	pub statuses: HashMap<Box<str>, Status>,
+	pub statuses: HashMap<resource::Status, Value>,
 
 	pub x: i32,
 	pub y: i32,
@@ -310,29 +294,33 @@ impl Piece {
 		}
 	}
 
-	pub fn new_turn(&mut self) {
+	pub fn new_turn(&mut self, resources: &resource::Manager) {
 		// Remove any status effects with the duration of one turn.
-		self.statuses
-			.retain(|_, status| !matches!(status.duration, status::Duration::Turn));
+		self.statuses.retain(|k, _| {
+			k.get(resources)
+				.ok()
+				.map(|status| !matches!(status.duration, status::Duration::Turn))
+				.unwrap_or(false)
+		});
 	}
 
-	pub fn rest(&mut self) -> Result<()> {
-		let stats = self.stats()?;
-		self.restore_hp(stats.heart as u32 / 2)?;
-		self.restore_sp(stats.soul as u32)?;
+	pub fn rest(&mut self, resources: &resource::Manager, lua: &mlua::Lua) -> Result<()> {
+		let stats = self.stats(lua)?;
+		self.hp = i32::min(
+			self.hp + (stats.heart as u32 / 2) as i32,
+			stats.heart as i32,
+		);
+		self.sp = i32::min(self.sp + (stats.soul as u32) as i32, stats.soul as i32);
 		// Remove any status effects lasting until the next rest.
-		self.statuses
-			.retain(|_, status| !matches!(status.duration, status::Duration::Rest));
-		Ok(())
-	}
-
-	pub fn restore_hp(&mut self, amount: u32) -> Result<()> {
-		self.hp = i32::min(self.hp + amount as i32, self.stats()?.heart as i32);
-		Ok(())
-	}
-
-	pub fn restore_sp(&mut self, amount: u32) -> Result<()> {
-		self.sp = i32::min(self.sp + amount as i32, self.stats()?.soul as i32);
+		self.statuses.retain(|k, _| {
+			k.get(resources)
+				// It's not very practical to handle missing resources in this retain,
+				// nor should it ever happen in the first place,
+				// so missing statuses just get discarded.
+				.ok()
+				.map(|status| !matches!(status.duration, status::Duration::Rest))
+				.unwrap_or(false)
+		});
 		Ok(())
 	}
 }
@@ -345,20 +333,20 @@ pub struct StatOutcomes {
 }
 
 impl Piece {
-	pub fn stats(&self) -> Result<Stats> {
-		self.stat_outcomes().map(|x| x.stats)
+	pub fn stats(&self, lua: &mlua::Lua) -> Result<Stats> {
+		self.stat_outcomes(lua).map(|x| x.stats)
 	}
 
-	pub fn stat_outcomes(&self) -> Result<StatOutcomes> {
+	pub fn stat_outcomes(&self, lua: &mlua::Lua) -> Result<StatOutcomes> {
 		let buffs = Stats::default();
 		let mut debuffs = Stats::default();
+		let resources: resource::Handle =
+			lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
 
-		for debuff in self
-			.statuses
-			.values()
-			.filter_map(|x| x.on_debuff().transpose())
-		{
-			debuffs = debuffs + debuff?;
+		for (status_id, value) in &self.statuses {
+			let status = resources.statuses.get(status_id.as_ref())?;
+			let debuff = lua.load(&*status.on_debuff).call(value.as_lua(lua)?)?;
+			debuffs = debuffs + debuff;
 		}
 
 		let mut stats = self.sheet.stats();
@@ -534,6 +522,7 @@ fn as_table(lua: &mlua::Lua, this: &mut Stats, _: ()) -> mlua::Result<mlua::Tabl
 	serde::Serialize,
 	serde::Deserialize,
 	alua::UserData,
+	mlua::FromLua,
 	rkyv::Archive,
 	rkyv::Serialize,
 	rkyv::Deserialize,

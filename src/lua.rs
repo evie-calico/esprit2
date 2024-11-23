@@ -23,10 +23,6 @@ pub fn init(
 
 	// Constructors
 	lua.load_from_function::<mlua::Value>(
-		"esprit.types.heuristic",
-		lua.create_function(move |_, ()| Ok(consider::HeuristicConstructor))?,
-	)?;
-	lua.load_from_function::<mlua::Value>(
 		"esprit.types.action",
 		lua.create_function(move |_, ()| Ok(character::ActionConstructor))?,
 	)?;
@@ -37,9 +33,14 @@ pub fn init(
 		lua.create_function(move |_, ()| Ok(consider_constructor.clone()))?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
+		"esprit.types.heuristic",
+		lua.create_function(move |_, ()| Ok(consider::HeuristicConstructor))?,
+	)?;
+	lua.load_from_function::<mlua::Value>(
 		"esprit.types.log",
 		lua.create_function(move |_, ()| Ok(combat::LogConstructor))?,
 	)?;
+	lua.load_from_function::<mlua::Value>("esprit.types.stats", lua.create_function(stats)?)?;
 	Ok(())
 }
 
@@ -100,4 +101,59 @@ fn world() -> impl AsChunk<'static> {
 
 		return world
 	}
+}
+
+fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+	use character::Stats;
+
+	let stats_meta = lua.create_table()?;
+	let stats = lua.create_table()?;
+
+	macro_rules! single {
+		($stat:ident) => {
+			stats.set(
+				stringify!($stat),
+				mlua::Function::wrap(|$stat|
+					Ok(Stats {
+						$stat,
+						..Default::default()
+					})
+				),
+			)?;
+		};
+		($stat:ident, $($next:ident),*) => {
+			single!($stat);
+			single!($($next),*);
+		}
+	}
+
+	macro_rules! constructor {
+		($($stats:ident),*) => {
+			stats_meta.set(
+				"__call",
+				lua.create_function(|_, table: mlua::Table| {
+					$(let mut $stats = 0;)*
+
+					for i in table.pairs::<mlua::String, u16>() {
+						let (k, v) = i?;
+						match k.to_str()?.as_ref() {
+							$( stringify!($stats) => $stats = v,)*
+							k => {
+								return Err(mlua::Error::runtime(format!(
+									"unexpected key name: {k}"
+								)))
+							}
+						}
+					}
+					Ok(Stats { $($stats),* })
+				})?,
+			)?;
+			stats.set_metatable(Some(stats_meta));
+			single!($($stats),*);
+		};
+	}
+
+	constructor!(heart, soul, power, defense, magic, resistance);
+
+	Ok(stats)
 }

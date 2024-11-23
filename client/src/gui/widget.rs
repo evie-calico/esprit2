@@ -37,11 +37,13 @@ impl<'texture> SoulJar<'texture> {
 	}
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn menu(
 	menu: &mut gui::Context,
 	options: &Options,
 	input_mode: &input::Mode,
 	world_manager: &world::Manager,
+	lua: &mlua::Lua,
 	console: &Console,
 	resources: &resource::Manager,
 	textures: &texture::Manager,
@@ -108,10 +110,10 @@ pub(crate) fn menu(
 			);
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
 				let mut character_fn = |menu: &mut gui::Context| {
-					character_info(menu, &selected_character.borrow());
+					character_info(menu, &selected_character.borrow(), lua);
 				};
 				let mut buff_fn = |menu: &mut gui::Context| {
-					character_buffs(menu, &selected_character.borrow(), textures);
+					character_buffs(menu, &selected_character.borrow(), resources, textures);
 				};
 				menu.hsplit(&mut [
 					Some((&mut character_fn) as &mut dyn FnMut(&mut gui::Context)),
@@ -219,6 +221,8 @@ impl Pamphlet {
 		&self,
 		pamphlet: &mut gui::Context,
 		world_manager: &world::Manager,
+		lua: &mlua::Lua,
+		resources: &resource::Manager,
 		textures: &texture::Manager,
 		soul_jar: &SoulJar<'_>,
 	) {
@@ -273,8 +277,8 @@ impl Pamphlet {
 						texture,
 						layout.flipped,
 						|player_window| {
-							character_info(player_window, &piece);
-							character_buffs(player_window, &piece, textures);
+							character_info(player_window, &piece, lua);
+							character_buffs(player_window, &piece, resources, textures);
 						},
 					);
 				});
@@ -425,7 +429,11 @@ pub(crate) fn on_cloud(
 	gui.advance(width, height_used + radius * 2);
 }
 
-fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &character::Piece) {
+fn character_info(
+	player_window: &mut gui::Context<'_, '_, '_>,
+	piece: &character::Piece,
+	lua: &mlua::Lua,
+) {
 	let character::Piece {
 		sheet: character::Sheet { nouns, level, .. },
 		hp,
@@ -445,7 +453,7 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 			},
 		buffs,
 		debuffs,
-	}) = piece.stat_outcomes()
+	}) = piece.stat_outcomes(lua)
 	else {
 		return;
 	};
@@ -520,8 +528,19 @@ fn character_info(player_window: &mut gui::Context<'_, '_, '_>, piece: &characte
 	player_window.hsplit(&mut magical_stats);
 }
 
-fn character_buffs(gui: &mut gui::Context, piece: &character::Piece, textures: &texture::Manager) {
-	let mut statuses = piece.statuses.values().peekable();
+fn character_buffs(
+	gui: &mut gui::Context,
+	piece: &character::Piece,
+	resources: &resource::Manager,
+	textures: &texture::Manager,
+) {
+	use resource::Id;
+	let mut statuses = piece
+		.statuses
+		.keys()
+		.filter_map(|x| x.get(resources).ok())
+		.peekable();
+	let statuses_copy = statuses.clone();
 	while statuses.peek().is_some() {
 		let textures_per_row = gui.rect.width() / (32 + 8);
 		gui.horizontal();
@@ -534,38 +553,7 @@ fn character_buffs(gui: &mut gui::Context, piece: &character::Piece, textures: &
 		gui.vertical();
 		gui.advance(8, 8);
 	}
-	for status in piece.statuses.values() {
-		character_status(gui, status);
-	}
-}
-
-fn character_status(gui: &mut gui::Context, status: &Status) {
-	gui.label(&status.name);
-
-	let mut print_stats = |stats: character::Stats| {
-		for (name, value) in [
-			("Heart", stats.heart),
-			("Soul", stats.soul),
-			("Power", stats.power),
-			("Defense", stats.defense),
-			("Magic", stats.magic),
-			("Resistance", stats.resistance),
-		] {
-			if value > 0 {
-				gui.horizontal();
-				gui.advance(30, 0);
-				gui.label(&format!("-{value} {name}"));
-				gui.vertical();
-			}
-		}
-	};
-
-	match &status.effect {
-		status::Effect::Debuff(debuff) => {
-			if let Ok(stats) = debuff.get() {
-				print_stats(stats);
-			}
-		}
-		status::Effect::StaticDebuff(stats) => print_stats(*stats),
+	for status in statuses_copy {
+		gui.label(&status.name);
 	}
 }

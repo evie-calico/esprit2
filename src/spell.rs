@@ -162,6 +162,7 @@ pub struct Spell {
 
 impl mlua::UserData for Spell {
 	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+		fields.add_field_method_get("level", |_, this| Ok(this.level));
 		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
 	}
 

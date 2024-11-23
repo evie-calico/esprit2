@@ -1,7 +1,8 @@
 local console = require "esprit.console"
 local world = require "esprit.world"
 
-local args = ...
+---@type Piece, Spell
+local _, _, args = ...
 
 local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end

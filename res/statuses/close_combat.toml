@@ -1,6 +1,7 @@
 name = "Close Combat"
 icon = "dummy"
 duration = "Turn"
-
-[effect.StaticDebuff]
-defense = 4
+on_debuff = '''
+local stats = require "esprit.types.stats"
+return stats.defense(4)
+'''

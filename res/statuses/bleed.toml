@@ -1,14 +1,14 @@
 name = "Bleeding"
 icon = "dummy"
 duration = "Rest"
-
-[effect.Debuff]
 on_debuff = '''
-local debuff = 0
+local stats = require "esprit.types.stats"
+
+local debuff, magnitude = 0, ...
 while magnitude > (debuff + 1) * 10 do
 	magnitude = magnitude - (debuff + 1) * 10;
 	debuff = debuff + 1;
 end
 
-return { defense = debuff }
+return stats.defense(debuff)
 '''

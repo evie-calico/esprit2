@@ -1,7 +1,7 @@
 ---@meta _
 
----@alias PieceNextAttack fun(self, value: integer?): integer?, Attack
----@alias PieceNextSpell fun(self, value: integer?): integer?, Spell
+---@alias PieceNextAttack fun(self, value: integer?): integer?, string
+---@alias PieceNextSpell fun(self, value: integer?): integer?, string
 
 ---@class (exact) Piece: userdata
 ---@field x integer
@@ -48,8 +48,8 @@
 ---@field on_consider string?
 ---@field on_input string
 ---@field use_time integer
----@field [string] integer|Expression Represents the contents of the spell's parameters field.
 ---@field affinity fun(self, character: Piece): Affinity
+---@field [string] integer|Expression Represents the contents of the spell's parameters field.
 
 ---@class (exact) Affinity: userdata
 ---@field magnitude fun(self, magnitude: integer): integer

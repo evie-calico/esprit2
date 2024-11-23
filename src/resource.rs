@@ -32,10 +32,11 @@ macro_rules! impl_resource {
 	};
 	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt ) => {
 		#[derive(
-			Clone, Debug, Eq, PartialEq,
+			Clone, Debug, Eq, PartialEq, Hash,
 			serde::Serialize, serde::Deserialize,
 			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 		)]
+		#[rkyv(derive(Eq, PartialEq, Hash))]
 		pub struct $Name(Box<str>);
 
 		impl $Name {

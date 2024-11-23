@@ -143,7 +143,12 @@ impl Manager {
 		})
 	}
 
-	pub fn new_floor(&mut self, console: &impl console::Handle) -> Result<()> {
+	pub fn new_floor(
+		&mut self,
+		resources: &resource::Manager,
+		lua: &mlua::Lua,
+		console: &impl console::Handle,
+	) -> Result<()> {
 		self.location.floor += 1;
 		console.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
@@ -158,7 +163,7 @@ impl Manager {
 			i.x = 0;
 			i.y = 0;
 			// Rest
-			i.rest()?;
+			i.rest(resources, lua)?;
 			// Award experience
 			i.sheet.experience += 40;
 			while i.sheet.experience >= 100 {
@@ -316,8 +321,8 @@ impl Manager {
 	) -> Result<character::Action> {
 		let thread = scripts.thread(&character.borrow().sheet.on_consider)?;
 		Ok(self
-			.poll(scripts.runtime, thread, character)
-			.map(|x: Consider| x.action)
+			.poll::<Option<Consider>>(scripts.runtime, thread, character)?
+			.map(|x| x.action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
@@ -340,7 +345,7 @@ impl Manager {
 			*action_delay = action_delay.saturating_sub(delay);
 		}
 		// Once an action has been provided, pending turn updates may run.
-		next_character.borrow_mut().new_turn();
+		next_character.borrow_mut().new_turn(resources);
 
 		let delay = match action {
 			character::Action::Wait(delay) => Some(delay),
