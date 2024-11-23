@@ -43,22 +43,3 @@ impl Log {
 		}
 	}
 }
-
-pub struct LogConstructor;
-
-impl mlua::UserData for LogConstructor {
-	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-		macro_rules! units {
-			($unit:ident) => {
-				fields.add_field(stringify!($unit), Log::$unit);
-			};
-		}
-		units!(Success);
-		units!(Miss);
-		units!(Glance);
-	}
-
-	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_function("Hit", |_, damage| Ok(Log::Hit { damage }));
-	}
-}

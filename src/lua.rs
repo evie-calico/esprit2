@@ -35,10 +35,7 @@ pub fn init(
 		"esprit.types.heuristic",
 		lua.create_function(heuristic)?,
 	)?;
-	lua.load_from_function::<mlua::Value>(
-		"esprit.types.log",
-		lua.create_function(move |_, ()| Ok(combat::LogConstructor))?,
-	)?;
+	lua.load_from_function::<mlua::Value>("esprit.types.log", lua.create_function(log)?)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.stats", lua.create_function(stats)?)?;
 	Ok(())
 }
@@ -143,6 +140,15 @@ fn heuristic(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 	)?;
 	heuristic.set("move", F::wrap(|x, y| Ok(Heuristic::Move { x, y })))?;
 	Ok(heuristic)
+}
+
+fn log(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+	let log = lua.create_table()?;
+	log.set("Success", combat::Log::Success)?;
+	log.set("Miss", combat::Log::Miss)?;
+	log.set("Glance", combat::Log::Glance)?;
+	log.set("Hit", F::wrap(|damage| Ok(combat::Log::Hit { damage })))?;
+	Ok(log)
 }
 
 fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
