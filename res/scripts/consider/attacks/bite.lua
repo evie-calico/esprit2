@@ -4,6 +4,7 @@ local action = require "esprit.types.action"
 local consider = require "esprit.types.consider"
 local heuristic = require "esprit.types.heuristic"
 
+---@type Piece, string, [Consider]
 local user, attack_id, considerations = ...
 local attack = resources:attack(attack_id)
 

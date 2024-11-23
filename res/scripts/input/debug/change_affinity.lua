@@ -18,7 +18,7 @@ local names = {
 	"Order Negative",
 }
 
-local target = input.cursor(user.x, user.y, spell.range)
+local target = input.cursor(user.x, user.y, spell.range --[[@as integer]])
 local is_energy = input.prompt("Major (Y: Energy, N: Harmony)")
 local first_major = input.prompt(is_energy and "Energy (Y: Positive, N: Negative)" or "Harmony (Y: Chaos, N: Order)")
 local id = input.prompt("Configure Minor?") and

@@ -13,6 +13,7 @@ function world.characters() end
 
 --- Return the character at the given position.
 ---@param x integer
+---@param y integer
 ---@return Piece?
 function world.character_at(x, y) end
 

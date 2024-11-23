@@ -1,8 +1,9 @@
 local scripts = require "esprit.scripts"
 local resources = require "esprit.resources"
 
---- @type Piece
+---@type Piece
 local user = ...
+---@type [Consider]
 local considerations = {}
 
 scripts["consider/movement"](user, considerations)
@@ -28,6 +29,8 @@ local function correct_risk(score, risky)
 	return score
 end
 
+---@param heuristic DamageHeuristic
+---@return integer
 local function damage_score(heuristic)
 	local damages_ally = heuristic.target.alliance == user.alliance
 	local score = heuristic.amount
@@ -38,6 +41,8 @@ local function damage_score(heuristic)
 	return correct_risk(score, damages_ally)
 end
 
+---@param heuristic DebuffHeuristic
+---@return integer
 local function debuff_score(heuristic)
 	local damages_ally = heuristic.target.alliance == user.alliance
 	return correct_risk(
@@ -46,19 +51,27 @@ local function debuff_score(heuristic)
 	)
 end
 
+---@param consider Consider
+---@param weight integer?
+---@return integer
 local function sum_heuristics(consider, weight)
 	if weight == nil then weight = 1 end
 	local score = 0
 	for _, heuristic in consider:ipairs() do
 		if heuristic:damage() then
-			score = score + damage_score(heuristic) * weight
+			score = score + damage_score(heuristic --[[@as DamageHeuristic]]) * weight
 		elseif heuristic:debuff() then
-			score = score + debuff_score(heuristic) * weight
+			score = score + debuff_score(heuristic --[[@as DebuffHeuristic]]) * weight
 		end
 	end
 	return score
 end
 
+---@class Score
+---@field index integer
+---@field score integer
+
+---@type [Score]
 local scores = {}
 for i, consider in ipairs(considerations) do
 	table.insert(scores, {
@@ -67,6 +80,7 @@ for i, consider in ipairs(considerations) do
 	})
 end
 
+---@type Score
 local highest
 
 for _, x in ipairs(scores) do
