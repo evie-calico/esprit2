@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use mlua::Function as F;
 use mlua::{chunk, AsChunk};
 
 pub fn init(
@@ -22,10 +23,7 @@ pub fn init(
 	lua.load_from_function::<mlua::Value>("esprit.world", lua.load(world()).into_function()?)?;
 
 	// Constructors
-	lua.load_from_function::<mlua::Value>(
-		"esprit.types.action",
-		lua.create_function(move |_, ()| Ok(character::ActionConstructor))?,
-	)?;
+	lua.load_from_function::<mlua::Value>("esprit.types.action", lua.create_function(action)?)?;
 	let consider_constructor =
 		lua.create_function(|_lua, (action, heuristics)| Ok(Consider { action, heuristics }))?;
 	lua.load_from_function::<mlua::Value>(
@@ -72,14 +70,13 @@ fn combat(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 
 /// Implemented via lua to allow for yields.
 fn world() -> impl AsChunk<'static> {
-	let make_characters =
-		mlua::Function::wrap(|| Ok(world::LuaRequest::Characters { query: None }));
-	let make_characters_within = mlua::Function::wrap(|x, y, range| {
+	let make_characters = F::wrap(|| Ok(world::LuaRequest::Characters { query: None }));
+	let make_characters_within = F::wrap(|x, y, range| {
 		Ok(world::LuaRequest::Characters {
 			query: Some(world::LuaCharacterQuery::Within { x, y, range }),
 		})
 	});
-	let make_tile = mlua::Function::wrap(|x, y| Ok(world::LuaRequest::Tile { x, y }));
+	let make_tile = F::wrap(|x, y| Ok(world::LuaRequest::Tile { x, y }));
 	chunk! {
 		local world = {}
 
@@ -103,6 +100,21 @@ fn world() -> impl AsChunk<'static> {
 	}
 }
 
+fn action(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+	let action = lua.create_table()?;
+	action.set("wait", F::wrap(|time| Ok(character::Action::Wait(time))))?;
+	action.set("move", F::wrap(|x, y| Ok(character::Action::Move(x, y))))?;
+	action.set(
+		"attack",
+		F::wrap(|attack, args| Ok(character::Action::Attack(attack, args))),
+	)?;
+	action.set(
+		"cast",
+		F::wrap(|spell, args| Ok(character::Action::Cast(spell, args))),
+	)?;
+	Ok(action)
+}
+
 fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 	use character::Stats;
 
@@ -113,7 +125,7 @@ fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 		($stat:ident) => {
 			stats.set(
 				stringify!($stat),
-				mlua::Function::wrap(|$stat|
+				F::wrap(|$stat|
 					Ok(Stats {
 						$stat,
 						..Default::default()

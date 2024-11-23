@@ -380,19 +380,6 @@ pub enum Action {
 
 impl mlua::UserData for Action {}
 
-pub struct ActionConstructor;
-
-impl mlua::UserData for ActionConstructor {
-	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_function("wait", |_, time| Ok(Action::Wait(time)));
-		methods.add_function("move", |_, (x, y)| Ok(Action::Move(x, y)));
-		methods.add_function("attack", |_, (attack, args)| {
-			Ok(Action::Attack(attack, args))
-		});
-		methods.add_function("cast", |_, (spell, args)| Ok(Action::Cast(spell, args)));
-	}
-}
-
 #[derive(
 	Copy,
 	PartialEq,
