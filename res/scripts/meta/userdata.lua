@@ -61,15 +61,3 @@
 
 ---@class (exact) Consider: userdata
 ---@field ipairs fun(self): ConsiderNext, self
-
----@class Heuristic: DamageHeuristic, DebuffHeuristic
----@field damage fun(self): boolean
----@field debuff fun(self): boolean
-
----@class (exact) DamageHeuristic: userdata
----@field target Piece
----@field amount integer
-
----@class (exact) DebuffHeuristic: userdata
----@field target Piece
----@field amount integer
