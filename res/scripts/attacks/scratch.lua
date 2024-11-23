@@ -3,7 +3,8 @@ local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
 
-local args = ...
+---@type Piece, Attack, table<string, any>
+local user, attack, args = ...
 
 local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end
@@ -11,7 +12,7 @@ if target == nil then return end
 -- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-local damage, pierce_failed = combat.apply_pierce(1, Magnitude - target.stats.defense)
+local damage, pierce_failed = combat.apply_pierce(1, attack.magnitude(user.stats:as_table()) - target.stats.defense)
 
 target.hp = target.hp - damage
 if damage > 0 or pierce_failed then
@@ -39,7 +40,7 @@ local failure_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, target, table[math.random(#table)])
+	return combat.format(user, target, table[math.random(#table)])
 end
 
 if pierce_failed then
@@ -50,4 +51,4 @@ else
 	console:combat_log(pick(damage_messages), log.Hit(damage))
 end
 
-return UseTime
+return attack.use_time

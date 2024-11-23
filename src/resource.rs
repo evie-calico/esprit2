@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use mlua::{FromLua, FromLuaMulti};
+use mlua::FromLua;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,8 +15,10 @@ pub enum Error {
 
 pub trait Id<Manager> {
 	type Resource;
-	fn get<'resources>(&self, resources: &'resources Manager)
-		-> Result<&'resources Self::Resource>;
+	fn get<'resources>(
+		&self,
+		resources: &'resources Manager,
+	) -> Result<&'resources Rc<Self::Resource>>;
 }
 
 macro_rules! impl_resource {
@@ -59,7 +61,7 @@ macro_rules! impl_resource {
 			fn get<'resources>(
 				&$self,
 				$resources: &'resources $Manager,
-			) -> Result<&'resources Self::Resource> {
+			) -> Result<&'resources Rc<Self::Resource>> {
 				#[allow(unused_braces)]
 				$body
 			}
@@ -119,11 +121,10 @@ impl<T> Resource<T> {
 		Self(HashMap::new())
 	}
 
-	pub fn get(&self, key: &str) -> Result<&T> {
-		Ok(self
-			.0
+	pub fn get(&self, key: &str) -> Result<&Rc<T>> {
+		self.0
 			.get(key)
-			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))?)
+			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))
 	}
 }
 
@@ -194,7 +195,6 @@ impl mlua::UserData for Handle {
 // TODO: Remove this.
 pub struct Scripts<'lua> {
 	pub runtime: &'lua mlua::Lua,
-	sandbox_metatable: mlua::Table,
 }
 
 pub fn register<T>(
@@ -280,41 +280,8 @@ impl Manager {
 		})
 	}
 
-	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&T::Resource> {
+	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&Rc<T::Resource>> {
 		id.get(self)
-	}
-}
-
-pub struct SandboxBuilder<'lua> {
-	runtime: &'lua mlua::Lua,
-	function: mlua::Function,
-	environment: mlua::Table,
-}
-
-impl<'lua> SandboxBuilder<'lua> {
-	pub fn insert(self, key: impl mlua::IntoLua, value: impl mlua::IntoLua) -> Result<Self> {
-		self.environment.set(key, value)?;
-		Ok(self)
-	}
-
-	pub fn thread(self) -> mlua::Result<mlua::Thread> {
-		self.function.set_environment(self.environment)?;
-		self.runtime.create_thread(self.function.clone())
-	}
-
-	pub fn call<R: FromLuaMulti>(self, args: impl mlua::IntoLuaMulti) -> mlua::Result<R> {
-		self.function.set_environment(self.environment)?;
-		self.function.call::<R>(args)
-	}
-
-	pub fn world<R: FromLua>(
-		self,
-		world: &world::Manager,
-		args: impl mlua::IntoLuaMulti,
-	) -> Result<R> {
-		self.function.set_environment(self.environment)?;
-		let thread = self.runtime.create_thread(self.function.clone())?;
-		Ok(world.poll(self.runtime, thread, args)?)
 	}
 }
 
@@ -334,29 +301,18 @@ impl<'lua> Scripts<'lua> {
 			"esprit.scripts",
 			lua.create_function(move |_, ()| Ok(scripts.clone()))?,
 		)?;
-		Ok(Self {
-			runtime: lua,
-			sandbox_metatable: lua.create_table_from([("__index", lua.globals())])?,
-		})
+		Ok(Self { runtime: lua })
 	}
 
-	pub fn function(&self, key: &str) -> Result<mlua::Function> {
-		Ok(self
-			.runtime
+	pub fn function(&self, key: &str) -> mlua::Result<mlua::Function> {
+		self.runtime
 			.load(mlua::chunk! {
 				return require "esprit.scripts" [$key]
 			})
-			.eval()?)
+			.eval()
 	}
 
-	pub fn sandbox(&self, key: &str) -> Result<SandboxBuilder<'lua>> {
-		let environment = self.runtime.create_table()?;
-		// This is cloning a reference, which is a lot cheaper than creating a new table.
-		environment.set_metatable(Some(self.sandbox_metatable.clone()));
-		Ok(SandboxBuilder {
-			runtime: self.runtime,
-			function: self.function(key)?,
-			environment,
-		})
+	pub fn thread(&self, key: &str) -> mlua::Result<mlua::Thread> {
+		self.runtime.create_thread(self.function(key)?)
 	}
 }

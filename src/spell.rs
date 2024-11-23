@@ -175,12 +175,9 @@ impl mlua::UserData for Spell {
 				None => Ok(mlua::Nil),
 			}
 		});
-		methods.add_method(
-			"affinity",
-			|_, this, (character, magnitude): (character::Ref, u32)| {
-				Ok(this.affinity(&character.borrow()).magnitude(magnitude))
-			},
-		)
+		methods.add_method("affinity", |_, this, character: character::Ref| {
+			Ok(this.affinity(&character.borrow()))
+		})
 	}
 }
 

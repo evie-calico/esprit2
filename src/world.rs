@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use mlua::LuaSerdeExt;
 use rand::{seq::SliceRandom, SeedableRng};
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 /// This struct contains all information that is relevant during gameplay.
 #[derive(
@@ -100,7 +100,7 @@ impl Manager {
 			let character = character::Ref::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
-				..character::Piece::new(sheet.clone())
+				..character::Piece::new((**sheet).clone())
 			});
 			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push_front(character);
@@ -281,7 +281,7 @@ impl Manager {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new(resources.get(sheet)?.clone())
+				..character::Piece::new((**resources.get(sheet)?).clone())
 			};
 			self.characters.push_front(character::Ref::new(piece));
 		}
@@ -314,11 +314,10 @@ impl Manager {
 		scripts: &resource::Scripts,
 		character: character::Ref,
 	) -> Result<character::Action> {
-		Ok(scripts
-			.sandbox(&character.borrow().sheet.on_consider)?
-			.insert("User", character.clone())?
-			.world::<Option<Consider>>(self, ())?
-			.map(|x| x.action)
+		let thread = scripts.thread(&character.borrow().sheet.on_consider)?;
+		Ok(self
+			.poll(scripts.runtime, thread, character)
+			.map(|x: Consider| x.action)
 			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
@@ -374,11 +373,14 @@ impl Manager {
 					}
 				}
 			}
-			character::Action::Attack(attack, arguments) => {
-				self.attack(scripts, resources.get(&attack)?, next_character, arguments)?
-			}
+			character::Action::Attack(attack, arguments) => self.attack(
+				scripts,
+				resources.get(&attack)?.clone(),
+				next_character,
+				arguments,
+			)?,
 			character::Action::Cast(spell, arguments) => self.cast(
-				resources.get(&spell)?,
+				resources.get(&spell)?.clone(),
 				next_character,
 				scripts,
 				arguments,
@@ -415,7 +417,7 @@ impl Manager {
 
 	fn cast(
 		&mut self,
-		spell: &Spell,
+		spell: Rc<Spell>,
 		user: character::Ref,
 		scripts: &resource::Scripts,
 		argument: Value,
@@ -423,19 +425,11 @@ impl Manager {
 	) -> Result<Option<u32>, Error> {
 		let castable = spell.castable_by(&user.borrow());
 		Ok(match castable {
-			spell::Castable::Yes => {
-				let affinity = spell.affinity(&user.borrow());
-				let parameters = spell.parameter_table(scripts, &*user.borrow())?;
-				let thread = scripts
-					.sandbox(&spell.on_cast)?
-					.insert("Parameters", parameters)?
-					.insert("User", user)?
-					// Maybe these should be members of the spell?
-					.insert("Level", spell.level)?
-					.insert("Affinity", affinity)?
-					.thread()?;
-				self.poll::<Option<Aut>>(scripts.runtime, thread, argument)?
-			}
+			spell::Castable::Yes => self.poll::<Option<Aut>>(
+				scripts.runtime,
+				scripts.thread(&spell.on_cast)?,
+				(user, spell, argument),
+			)?,
 			spell::Castable::NotEnoughSP => {
 				let message = format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
 					.replace_nouns(&user.borrow().sheet.nouns);
@@ -454,20 +448,12 @@ impl Manager {
 	pub fn attack(
 		&self,
 		scripts: &resource::Scripts,
-		attack: &Attack,
+		attack: Rc<Attack>,
 		user: character::Ref,
 		argument: Value,
 	) -> Result<Option<Aut>> {
-		// Calculate damage
-		let magnitude = u32::evalv(&attack.magnitude, &*user.borrow())?;
-
-		let thread = scripts
-			.sandbox(&attack.on_use)?
-			.insert("User", user)?
-			.insert("UseTime", attack.use_time)?
-			.insert("Magnitude", magnitude)?
-			.thread()?;
-		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, argument)?)
+		let thread = scripts.thread(&attack.on_use)?;
+		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, (user, attack, argument))?)
 	}
 
 	pub fn move_piece(

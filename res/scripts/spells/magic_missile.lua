@@ -3,7 +3,8 @@ local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
 
-local args = ...
+---@type Piece, Spell, table<string, any>
+local user, spell, args = ...
 
 local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end
@@ -12,12 +13,12 @@ if target == nil then return end
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 local damage, pierce_failed = combat.apply_pierce(
-	Parameters.pierce_threshold,
-	Affinity:magnitude(Parameters.magnitude) - target.stats.resistance
+	spell.pierce_threshold --[[@as integer]],
+	spell:affinity(user):magnitude(spell.magnitude(user)) - target.stats.resistance
 )
 
 target.hp = target.hp - damage
-User.sp = User.sp - Level
+user.sp = user.sp - spell.level
 
 local damage_messages = {
 	"{self_Address}'s magic missile strikes {target_address}",
@@ -46,7 +47,7 @@ local unskilled_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, target, table[math.random(#table)])
+	return combat.format(user, target, table[math.random(#table)])
 end
 
 -- Avoid showing unskilled messages too often;
@@ -54,7 +55,7 @@ end
 if pierce_failed then
 	console:combat_log(pick(glancing_messages), log.Glance)
 elseif damage == 0 then
-	if Affinity:weak() and math.random(0, 1) == 1 then
+	if spell.affinity:weak() and math.random(0, 1) == 1 then
 		console:combat_log(pick(unskilled_messages), log.Miss)
 	else
 		console:combat_log(pick(failure_messages), log.Miss)
@@ -63,4 +64,4 @@ else
 	console:combat_log(pick(damage_messages), log.Hit(damage))
 end
 
-return Parameters.cast_time
+return spell.cast_time

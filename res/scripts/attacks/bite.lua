@@ -3,7 +3,8 @@ local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
 
-local args = ...
+--- @type Piece, Attack, table<string, any>
+local user, attack, args = ...
 
 local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end
@@ -12,10 +13,10 @@ if target == nil then return end
 -- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 -- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-local damage, pierce_failed = combat.apply_pierce(4, Magnitude - target.stats.defense)
+local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats:as_table()) - target.stats.defense)
 
 -- Biting requires you to get closer to the enemy, lowering your physical defense.
-User:inflict("close_combat")
+user:inflict("close_combat")
 
 target.hp = target.hp - damage
 
@@ -35,7 +36,7 @@ local failure_messages = {
 }
 
 local function pick(table)
-	return combat.format(User, target, table[math.random(#table)])
+	return combat.format(user, target, table[math.random(#table)])
 end
 
 if pierce_failed then

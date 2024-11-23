@@ -3,31 +3,32 @@ local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
 
-local args = ...
+---@type Piece, Spell, table<string, any>
+local user, spell, args = ...
 
 local target = world.character_at(args.target.x, args.target.y)
 if target == nil then return end
 
-User.sp = User.sp - Level
+user.sp = user.sp - spell.level
 
-if not User:is_allied(target)
-	and Affinity:magnitude(Parameters.magnitude) - target.stats.resistance <= 0
+if not user:is_allied(target)
+	and spell:affinity(user):magnitude(spell.magnitude(user)) - target.stats.resistance <= 0
 then
 	console:combat_log(
-		combat.format(User, target, "{target_Address} resisted {self_address}'s swap."),
+		combat.format(user, target, "{target_Address} resisted {self_address}'s swap."),
 		log.Miss
 	)
 else
-	local cx, cy = User.x, User.y
-	User.x = target.x
-	User.y = target.y
+	local cx, cy = user.x, user.y
+	user.x = target.x
+	user.y = target.y
 	target.x = cx
 	target.y = cy
 
 	console:combat_log(
-		combat.format(User, target, "{self_Address} swapped positions with {target_address}."),
+		combat.format(user, target, "{self_Address} swapped positions with {target_address}."),
 		log.Success
 	)
 end
 
-return Parameters.cast_time
+return spell.cast_time

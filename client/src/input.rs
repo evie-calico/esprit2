@@ -540,17 +540,9 @@ fn gather_attack_inputs(
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let attack = resources.get(&attack_id)?;
-	let thread = scripts
-		.sandbox(&attack.on_input)?
-		.insert("UseTime", attack.use_time)?
-		.insert(
-			"Magnitude",
-			u32::evalv(&attack.magnitude, &*next_character.borrow())?,
-		)?
-		.insert("User", next_character.clone())?
-		.thread()?;
-
-	PartialAction::Attack(attack_id, next_character, thread).resolve(scripts.runtime, ())
+	let thread = scripts.thread(&attack.on_input)?;
+	PartialAction::Attack(attack_id, next_character.clone(), thread)
+		.resolve(scripts.runtime, (next_character, attack.clone()))
 }
 
 fn gather_spell_inputs(
@@ -560,11 +552,7 @@ fn gather_spell_inputs(
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let spell = resources.get(&spell_id)?;
-	let parameters = spell.parameter_table(scripts, &*next_character.borrow())?;
-	let thread = scripts
-		.sandbox(&spell.on_input)?
-		.insert("Parameters", parameters)?
-		.insert("User", next_character.clone())?
-		.thread()?;
-	PartialAction::Spell(spell_id, next_character, thread).resolve(scripts.runtime, ())
+	let thread = scripts.thread(&spell.on_input)?;
+	PartialAction::Spell(spell_id, next_character.clone(), thread)
+		.resolve(scripts.runtime, (next_character, spell.clone()))
 }

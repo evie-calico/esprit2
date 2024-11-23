@@ -1,5 +1,8 @@
 local input = require "esprit.input"
 
+---@type Piece, Spell
+local user, spell = ...
+
 local names = {
 	"Positive",
 	"Positive Chaos",
@@ -15,7 +18,7 @@ local names = {
 	"Order Negative",
 }
 
-local target = input.cursor(User.x, User.y, Parameters.range)
+local target = input.cursor(user.x, user.y, spell.range)
 local is_energy = input.prompt("Major (Y: Energy, N: Harmony)")
 local first_major = input.prompt(is_energy and "Energy (Y: Positive, N: Negative)" or "Harmony (Y: Chaos, N: Order)")
 local id = input.prompt("Configure Minor?") and

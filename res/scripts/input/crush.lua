@@ -1,6 +1,9 @@
 local input = require "esprit.input"
 
+---@type Piece, Spell
+local user, spell = ...
+
 return {
-	target = input.cursor(User.x, User.y, Parameters.range, Parameters.radius),
+	target = input.cursor(user.x, user.y, spell.parameters.range, spell.parameters.radius),
 	direction = input.direction("Crush in which direction?"),
 }

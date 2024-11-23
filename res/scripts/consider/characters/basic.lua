@@ -1,21 +1,23 @@
 local scripts = require "esprit.scripts"
 local resources = require "esprit.resources"
 
+--- @type Piece
+local user = ...
 local considerations = {}
 
-scripts["consider/movement"](User, considerations)
+scripts["consider/movement"](user, considerations)
 
-for _, attack_id in User:attacks() do
+for _, attack_id in user:attacks() do
 	local attack = resources:attack(attack_id)
 	if attack.on_consider ~= nil then
-		scripts[attack.on_consider](User, attack_id, considerations)
+		scripts[attack.on_consider](user, attack_id, considerations)
 	end
 end
 
-for _, spell_id in User:spells() do
+for _, spell_id in user:spells() do
 	local spell = resources:spell(spell_id)
 	if spell.on_consider ~= nil then
-		scripts[spell.on_consider](User, spell_id, considerations)
+		scripts[spell.on_consider](user, spell_id, considerations)
 	end
 end
 
@@ -27,7 +29,7 @@ local function correct_risk(score, risky)
 end
 
 local function damage_score(heuristic)
-	local damages_ally = heuristic.target.alliance == User.alliance
+	local damages_ally = heuristic.target.alliance == user.alliance
 	local score = heuristic.amount
 	if heuristic.target.hp - heuristic.amount <= 0 then
 		-- huge emphasis on killing
@@ -37,7 +39,7 @@ local function damage_score(heuristic)
 end
 
 local function debuff_score(heuristic)
-	local damages_ally = heuristic.target.alliance == User.alliance
+	local damages_ally = heuristic.target.alliance == user.alliance
 	return correct_risk(
 		heuristic.amount * 2, -- give debuffs some extra weight
 		damages_ally

@@ -3,7 +3,8 @@ local console = require "esprit.console"
 local world = require "esprit.world"
 local log = require "esprit.types.log"
 
-local args = ...
+---@type Piece, Spell, table<string, any>
+local user, spell, args = ...
 
 -- It would be nice to all some filters for *requesting* a list of characters,
 -- (sort of like yielding a Cursor ActionRequest) with some sort of query language
@@ -29,12 +30,12 @@ local failure_messages = {
 	"{Address} slides down the wall, hitting the ground unscatched",
 }
 
-console:combat_log(User:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
+console:combat_log(user:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
 
 for _, character in ipairs(characters) do
-	if math.abs(character.x - args.target.x) <= Parameters.radius and math.abs(character.y - args.target.y) <= Parameters.radius then
+	if math.abs(character.x - args.target.x) <= spell.radius and math.abs(character.y - args.target.y) <= spell.radius then
 		-- we'll start with a basic rightward movement.
-		for distance_traveled = 0, Affinity:magnitude(Parameters.displacement) do
+		for distance_traveled = 0, spell:affinity(user):magnitude(spell.displacement --[[@as integer]]) do
 			local projected_x = character.x
 			local projected_y = character.y
 			if args.direction == "Left" then
@@ -57,8 +58,9 @@ for _, character in ipairs(characters) do
 				character.y = projected_y
 			else
 				local damage, pierce_failed = combat.apply_pierce(
-					Parameters.pierce_threshold,
-					Affinity:magnitude(Parameters.magnitude) + distance_traveled * 2 - character.stats.resistance
+					spell.pierce_threshold --[[@as integer]],
+					spell:affinity(user):magnitude(spell.magnitude(user)) + distance_traveled * 2 -
+					character.stats.resistance
 				)
 
 				-- TODO Make messages vary based on distance travelled.
@@ -87,6 +89,6 @@ for _, character in ipairs(characters) do
 	end
 end
 
-User.sp = User.sp - Level
+user.sp = user.sp - spell.level
 
-return Parameters.cast_time
+return spell.cast_time

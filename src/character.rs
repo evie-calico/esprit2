@@ -71,13 +71,12 @@ fn inflict(
 	let status = resources
 		.statuses
 		.get(&key)
-		.cloned()
 		.map_err(mlua::Error::external)?;
 	let mut entry = this.borrow_mut();
 	let entry = entry
 		.statuses
 		.entry(key.into_boxed_str())
-		.or_insert_with(|| status);
+		.or_insert_with(|| (**status).clone());
 	if let Some(magnitude) = magnitude {
 		entry.add_magnitude(magnitude);
 	}

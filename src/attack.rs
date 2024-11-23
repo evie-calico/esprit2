@@ -24,6 +24,7 @@ pub struct Attack {
 impl mlua::UserData for Attack {
 	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
 		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
+		fields.add_field_method_get("use_time", |_, this| Ok(this.use_time));
 	}
 
 	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {

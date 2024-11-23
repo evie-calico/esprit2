@@ -6,7 +6,7 @@ default-members = ["client"]
 
 [workspace.dependencies]
 rkyv = "0.8.8"
-mlua = { version = "0.10.1", features = ["luajit", "macros", "serialize", "error-send"] }
+mlua = { version = "0.10.1", features = ["luajit", "macros", "serialize", "error-send", "userdata-wrappers"] }
 
 [workspace.lints]
 clippy.module_name_repetitions = "warn"
