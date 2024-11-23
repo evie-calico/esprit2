@@ -2,19 +2,16 @@
 
 local resources = {}
 
----@param this self
 ---@param key string
 ---@return Status
-function resources.status(this, key) end
+function resources:status(key) end
 
----@param this self
 ---@param key string
 ---@return Attack
-function resources.attack(this, key) end
+function resources:attack(key) end
 
----@param this self
 ---@param key string
 ---@return Spell
-function resources.spell(this, key) end
+function resources:spell(key) end
 
 return resources
