@@ -4,6 +4,7 @@
 	core_io_borrowed_buf,
 	read_buf
 )]
+#![expect(clippy::unwrap_used)]
 
 use clap::Parser;
 use esprit2::prelude::*;

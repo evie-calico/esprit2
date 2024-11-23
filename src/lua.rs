@@ -3,14 +3,14 @@ use mlua::{chunk, AsChunk};
 
 pub fn init(
 	lua: &mlua::Lua,
-	handle: resource::Handle,
+	resources: resource::Handle,
 	console: impl console::Handle + Clone + 'static,
 ) -> mlua::Result<()> {
 	// These two "libraries" are actually just handles to engine resources.
 	// Maybe they really should be globals?
 	lua.load_from_function::<mlua::Value>(
 		"esprit.resources",
-		lua.create_function(move |_, ()| Ok(handle.clone()))?,
+		lua.create_function(move |_, ()| Ok(resources.clone()))?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.console",
