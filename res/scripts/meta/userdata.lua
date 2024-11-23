@@ -56,8 +56,3 @@
 ---@field weak fun(self): boolean
 ---@field average fun(self): boolean
 ---@field strong fun(self): boolean
-
----@alias ConsiderNext fun(self, value: integer?): integer?, Heuristic
-
----@class (exact) Consider: userdata
----@field ipairs fun(self): ConsiderNext, self
