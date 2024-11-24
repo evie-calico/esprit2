@@ -2,6 +2,7 @@
     "runtime": {
         "version": "LuaJIT",
         "path": [
+            "res/lib/?.lua"
             "res/scripts/meta/?.lua"
         ],
         "pathStrict": true

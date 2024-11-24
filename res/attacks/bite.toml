@@ -1,8 +1,0 @@
-name = "Bite"
-description = "Lowers your defense until your next turn."
-magnitude = "power + 8"
-use_time = 12
-
-on_input = "input/melee"
-on_use = "attacks/bite"
-on_consider = "consider/attacks/bite"

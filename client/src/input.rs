@@ -523,7 +523,7 @@ fn gather_attack_inputs(
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let attack = resources.get(&attack_id)?;
-	let thread = scripts.thread(&attack.on_input)?;
+	let thread = scripts.runtime.create_thread(attack.on_input.clone())?;
 	PartialAction::Attack(attack_id, next_character.clone(), thread)
 		.resolve(scripts.runtime, (next_character, attack.clone()))
 }

@@ -19,6 +19,14 @@ pub fn init() -> mlua::Result<mlua::Lua> {
 	)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.duration", lua.create_function(duration)?)?;
 	lua.load_from_function::<mlua::Value>(
+		"esprit.types.expression",
+		lua.create_function(|lua, ()| {
+			lua.create_function(|_, s: String| {
+				Expression::try_from(s).map_err(mlua::Error::external)
+			})
+		})?,
+	)?;
+	lua.load_from_function::<mlua::Value>(
 		"esprit.types.heuristic",
 		lua.create_function(heuristic)?,
 	)?;

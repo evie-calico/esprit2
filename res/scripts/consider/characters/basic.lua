@@ -11,7 +11,7 @@ scripts["consider/movement"](user, considerations)
 for _, attack_id in user:attacks() do
 	local attack = resources:attack(attack_id)
 	if attack.on_consider ~= nil then
-		scripts[attack.on_consider](user, attack_id, considerations)
+		attack.on_consider(user, attack_id, considerations)
 	end
 end
 

@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -245,6 +245,33 @@ fn recurse(directory: &Path, mut loader: impl FnMut(&Path, &str) -> Result<()>) 
 	recurse(directory, directory, &mut loader)
 }
 
+fn make_registrar<T: 'static>(
+	handle: Weak<RefCell<Resource<T>>>,
+	constructor: impl Fn(mlua::Table) -> mlua::Result<T> + Clone + 'static,
+) -> impl Fn(&mlua::Lua, Box<str>) -> mlua::Result<mlua::Function> {
+	move |lua, identifier| {
+		let handle = handle.clone();
+		let identifier = Cell::new(Some(identifier));
+		let constructor = constructor.clone();
+		lua.create_function(move |_, table: mlua::Table| {
+			let Some(handle) = handle.upgrade() else {
+				return Err(mlua::Error::runtime("resource registration has closed"));
+			};
+			let Some(identifier) = identifier.take() else {
+				return Err(mlua::Error::runtime(
+					"resources registration functions may only be used once",
+				));
+			};
+
+			handle
+				.borrow_mut()
+				.0
+				.insert(identifier, Rc::new(constructor(table)?));
+			Ok(())
+		})
+	}
+}
+
 impl Manager {
 	/// Collect known resources into a new resource manager.
 	///
@@ -259,38 +286,46 @@ impl Manager {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)
 		})?;
 
-		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
-		let handle = Rc::downgrade(&statuses);
-		let status_registrar = lua.create_function(move |lua, identifier: Box<str>| {
-			let handle = handle.clone();
-			let identifier = Cell::new(Some(identifier));
-			lua.create_function(move |_, table: mlua::Table| {
-				let Some(handle) = handle.upgrade() else {
-					return Err(mlua::Error::runtime(
-						"status resource registration has closed",
-					));
-				};
-				let Some(identifier) = identifier.take() else {
-					return Err(mlua::Error::runtime(
-						"resources registration functions may only be used once",
-					));
-				};
+		let attacks = Rc::new(RefCell::new(Resource::<attack::Attack>::default()));
+		let attack_registrar = lua.create_function(make_registrar(
+			Rc::downgrade(&attacks),
+			|table: mlua::Table| -> mlua::Result<_> {
+				Ok(attack::Attack {
+					name: table.get("name")?,
+					description: table.get("description")?,
+					magnitude: table.get("magnitude")?,
+					on_input: table.get("on_input")?,
+					on_use: table.get("on_use")?,
+					on_consider: table.get("on_consider")?,
+					use_time: table.get("use_time")?,
+				})
+			},
+		))?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.attack",
+			lua.create_function(move |_, ()| Ok(attack_registrar.clone()))?,
+		)?;
 
-				let status = status::Status {
+		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
+		let status_registrar = lua.create_function(make_registrar(
+			Rc::downgrade(&statuses),
+			|table: mlua::Table| -> mlua::Result<_> {
+				Ok(status::Status {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
 					duration: table.get("duration")?,
 					on_debuff: table.get("on_debuff")?,
-				};
-
-				handle.borrow_mut().0.insert(identifier, Rc::new(status));
-				Ok(())
-			})
-		})?;
+				})
+			},
+		))?;
 		lua.load_from_function::<mlua::Value>(
 			"esprit.resources.status",
 			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
 		)?;
+
+		lua.globals()
+			.get::<mlua::Table>("package")?
+			.set("path", path.join("lib/?.lua"))?;
 
 		recurse(&path.join("init"), |path, _| {
 			lua.load(&fs::read_to_string(path)?)
@@ -299,15 +334,19 @@ impl Manager {
 			Ok(())
 		})?;
 
+		lua.globals()
+			.get::<mlua::Table>("package")?
+			.set("path", "")?;
+
+		lua.unload("esprit.resources.attack")?;
 		lua.unload("esprit.resources.status")?;
 
+		let attacks = Rc::into_inner(attacks)
+			.expect("attacks must have only one strong reference")
+			.into_inner();
 		let statuses = Rc::into_inner(statuses)
 			.expect("statuses must have only one strong reference")
 			.into_inner();
-
-		let attacks = register(&path.join("attacks"), |path| {
-			Ok(toml::from_str(&fs::read_to_string(path)?)?)
-		})?;
 
 		let spells = register(&path.join("spells"), |path| {
 			Ok(toml::from_str(&fs::read_to_string(path)?)?)

@@ -23,7 +23,7 @@
 
 ---@class (exact) Attack: userdata
 ---@field magnitude Expression
----@field on_consider string?
+---@field on_consider fun(user: Piece, id: string, considerations: [Consider])?
 ---@field use_time integer
 
 ---@class (exact) Spell: userdata

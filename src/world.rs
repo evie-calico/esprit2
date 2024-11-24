@@ -456,7 +456,7 @@ impl Manager {
 		user: character::Ref,
 		argument: Value,
 	) -> Result<Option<Aut>> {
-		let thread = scripts.thread(&attack.on_use)?;
+		let thread = scripts.runtime.create_thread(attack.on_use.clone())?;
 		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, (user, attack, argument))?)
 	}
 

@@ -95,7 +95,7 @@ impl Variables for mlua::AnyUserData {
 	}
 }
 
-#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, mlua::FromLua)]
 pub struct Expression {
 	pub source: String,
 	pub root: Operation,
