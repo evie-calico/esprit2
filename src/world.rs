@@ -267,13 +267,13 @@ impl Manager {
 	pub fn tick(
 		&mut self,
 		resources: &resource::Manager,
-		scripts: &resource::Scripts,
+		lua: &mlua::Lua,
 		console: impl console::Handle,
 	) -> Result<bool> {
 		let character = self.next_character();
 		if !character.borrow().player_controlled {
-			let action = self.consider_action(scripts, character.clone())?;
-			self.perform_action(&console, resources, scripts, action)?;
+			let action = self.consider_action(resources, lua, character.clone())?;
+			self.perform_action(&console, resources, lua, action)?;
 			Ok(true)
 		} else {
 			Ok(false)
@@ -282,11 +282,20 @@ impl Manager {
 
 	pub fn consider_action(
 		&self,
-		scripts: &resource::Scripts,
+		resources: &resource::Manager,
+		lua: &mlua::Lua,
 		character: character::Ref,
 	) -> Result<character::Action> {
-		// TODO
-		Ok(character::Action::Wait(TURN))
+		let thread = lua.create_thread(
+			resources
+				.functions
+				.get(&character.borrow().sheet.on_consider)?
+				.clone(),
+		)?;
+		Ok(self
+			.poll::<Option<Consider>>(lua, thread, character)?
+			.map(|x| x.action)
+			.unwrap_or(character::Action::Wait(TURN)))
 	}
 
 	/// Causes the next character in the queue to perform a given action.
@@ -294,7 +303,7 @@ impl Manager {
 		&mut self,
 		console: impl console::Handle,
 		resources: &resource::Manager,
-		scripts: &resource::Scripts,
+		lua: &mlua::Lua,
 		action: character::Action,
 	) -> Result<()> {
 		let next_character = self.next_character().clone();
@@ -342,7 +351,7 @@ impl Manager {
 				}
 			}
 			character::Action::Attack(attack, arguments) => self.attack(
-				scripts,
+				lua,
 				resources.get(&attack)?.clone(),
 				next_character,
 				arguments,
@@ -350,7 +359,7 @@ impl Manager {
 			character::Action::Cast(spell, arguments) => self.cast(
 				resources.get(&spell)?.clone(),
 				next_character,
-				scripts,
+				lua,
 				arguments,
 				console,
 			)?,
@@ -387,15 +396,15 @@ impl Manager {
 		&mut self,
 		spell: Rc<Spell>,
 		user: character::Ref,
-		scripts: &resource::Scripts,
+		lua: &mlua::Lua,
 		argument: Value,
 		console: impl console::Handle,
 	) -> Result<Option<u32>, Error> {
 		let castable = spell.castable_by(&user.borrow());
 		Ok(match castable {
 			spell::Castable::Yes => self.poll::<Option<Aut>>(
-				scripts.runtime,
-				scripts.runtime.create_thread(spell.on_cast.clone())?,
+				lua,
+				lua.create_thread(spell.on_cast.clone())?,
 				(user, spell, argument),
 			)?,
 			spell::Castable::NotEnoughSP => {
@@ -415,13 +424,13 @@ impl Manager {
 
 	pub fn attack(
 		&self,
-		scripts: &resource::Scripts,
+		lua: &mlua::Lua,
 		attack: Rc<Attack>,
 		user: character::Ref,
 		argument: Value,
 	) -> Result<Option<Aut>> {
-		let thread = scripts.runtime.create_thread(attack.on_use.clone())?;
-		Ok(self.poll::<Option<Aut>>(scripts.runtime, thread, (user, attack, argument))?)
+		let thread = lua.create_thread(attack.on_use.clone())?;
+		Ok(self.poll::<Option<Aut>>(lua, thread, (user, attack, argument))?)
 	}
 
 	pub fn move_piece(

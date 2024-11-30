@@ -30,8 +30,8 @@ require "esprit.resources.spell" "magic_missile" {
 		-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 		local damage, pierce_failed = combat.apply_pierce(
-			spell.pierce_threshold --[[@as integer]],
-			spell:affinity(user):magnitude(spell.magnitude(user.stats)) - target.stats.resistance
+			spell.parameters.pierce_threshold --[[@as integer]],
+			spell:affinity(user):magnitude(spell.parameters.magnitude(user.stats)) - target.stats.resistance
 		)
 
 		target.hp = target.hp - damage
@@ -81,7 +81,7 @@ require "esprit.resources.spell" "magic_missile" {
 			console:combat_log(pick(damage_messages), log.Hit(damage))
 		end
 
-		return spell.cast_time
+		return spell.parameters.cast_time
 	end,
 	on_consider = function(user, spell_id, considerations)
 		local resources = require "esprit.resources"
@@ -92,7 +92,7 @@ require "esprit.resources.spell" "magic_missile" {
 
 		local spell = resources:spell(spell_id)
 
-		for _, character in ipairs(world.characters_within(user.x, user.y, spell.range --[[@as integer]])) do
+		for _, character in ipairs(world.characters_within(user.x, user.y, spell.parameters.range --[[@as integer]])) do
 			if not user:is_allied(character) then
 				table.insert(
 					considerations,
@@ -104,7 +104,9 @@ require "esprit.resources.spell" "magic_missile" {
 						{
 							heuristic.damage(
 								character,
-								spell:affinity(user):magnitude(spell.magnitude(user.stats)) -
+								spell:affinity(user):magnitude(
+									spell.parameters.magnitude(user.stats)
+								) -
 								character.stats.resistance
 							),
 						}

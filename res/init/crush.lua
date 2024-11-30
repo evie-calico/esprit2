@@ -54,9 +54,9 @@ require "esprit.resources.spell" "crush" {
 		console:combat_log(user:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
 
 		for _, character in ipairs(characters) do
-			if math.abs(character.x - args.target.x) <= spell.radius and math.abs(character.y - args.target.y) <= spell.radius then
+			if math.abs(character.x - args.target.x) <= spell.parameters.radius and math.abs(character.y - args.target.y) <= spell.parameters.radius then
 				-- we'll start with a basic rightward movement.
-				for distance_traveled = 0, spell:affinity(user):magnitude(spell.displacement --[[@as integer]]) do
+				for distance_traveled = 0, spell:affinity(user):magnitude(spell.parameters.displacement --[[@as integer]]) do
 					local projected_x = character.x
 					local projected_y = character.y
 					if args.direction == "Left" then
@@ -79,8 +79,9 @@ require "esprit.resources.spell" "crush" {
 						character.y = projected_y
 					else
 						local damage, pierce_failed = combat.apply_pierce(
-							spell.pierce_threshold --[[@as integer]],
-							spell:affinity(user):magnitude(spell.magnitude(user.stats)) + distance_traveled * 2 -
+							spell.parameters.pierce_threshold --[[@as integer]],
+							spell:affinity(user):magnitude(spell.parameters.magnitude(user.stats)) +
+							distance_traveled * 2 -
 							character.stats.resistance
 						)
 
@@ -112,7 +113,7 @@ require "esprit.resources.spell" "crush" {
 
 		user.sp = user.sp - spell.level
 
-		return spell.cast_time
+		return spell.parameters.cast_time
 	end,
 	-- TODO: on_consider
 	on_input = function(user, spell)

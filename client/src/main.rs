@@ -128,15 +128,6 @@ pub(crate) async fn main() {
 		exit(1);
 	});
 
-	let scripts =
-		match resource::Scripts::open(options::resource_directory().join("scripts/"), &lua) {
-			Ok(scripts) => scripts,
-			Err(msg) => {
-				error!("failed to open scripts directory: {msg}");
-				exit(1);
-			}
-		};
-
 	let textures = match texture::Manager::new(
 		options::resource_directory().join("textures/"),
 		&texture_creator,
@@ -230,7 +221,7 @@ pub(crate) async fn main() {
 						}
 					} else if let Some((mut input_mode, mut world_state)) = server {
 						input_mode = world_state
-							.event(input_mode, event, &scripts, &options)
+							.event(input_mode, event, &lua, &options)
 							.await
 							.unwrap();
 						server = Some((input_mode, world_state));
@@ -253,7 +244,7 @@ pub(crate) async fn main() {
 			if let Some(world) = &mut server.world {
 				// TODO: Avoid ticking more than once when too late in the frame.
 				while world
-					.tick(&server.resources, &scripts, &server.console)
+					.tick(&server.resources, &lua, &server.console)
 					.unwrap()
 				{}
 			}

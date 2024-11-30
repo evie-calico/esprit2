@@ -262,7 +262,7 @@ pub(crate) fn controllable_character(
 	world: &world::Manager,
 	console: impl console::Handle,
 	resources: &resource::Manager,
-	scripts: &resource::Scripts,
+	lua: &mlua::Lua,
 	mode: Mode,
 	options: &Options,
 ) -> Result<(Mode, Option<Response>)> {
@@ -353,7 +353,8 @@ pub(crate) fn controllable_character(
 			}
 
 			if options.controls.autocombat.contains(keycode) {
-				let action = world.consider_action(scripts, world.next_character().clone())?;
+				let action =
+					world.consider_action(resources, lua, world.next_character().clone())?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
 			} else {
 				Ok((Mode::Normal, None))
@@ -392,7 +393,7 @@ pub(crate) fn controllable_character(
 					Mode::Normal,
 					Some(gather_attack_inputs(
 						resources,
-						scripts,
+						lua,
 						attack_id,
 						world.next_character().clone(),
 					)?),
@@ -422,7 +423,7 @@ pub(crate) fn controllable_character(
 					Mode::Normal,
 					Some(gather_spell_inputs(
 						resources,
-						scripts,
+						lua,
 						spell_id,
 						world.next_character().clone(),
 					)?),
@@ -462,7 +463,7 @@ pub(crate) fn controllable_character(
 			} else if options.controls.confirm.contains(keycode) {
 				Ok((
 					Mode::Normal,
-					Some(cursor.callback.resolve(scripts.runtime, cursor.position)?),
+					Some(cursor.callback.resolve(lua, cursor.position)?),
 				))
 			} else {
 				Ok((Mode::Cursor(cursor), None))
@@ -470,15 +471,9 @@ pub(crate) fn controllable_character(
 		}
 		Mode::Prompt(prompt) => {
 			if options.controls.yes.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, true)?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, true)?)))
 			} else if options.controls.no.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, false)?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, false)?)))
 			} else if options.controls.escape.contains(keycode) {
 				Ok((Mode::Normal, None))
 			} else {
@@ -487,25 +482,13 @@ pub(crate) fn controllable_character(
 		}
 		Mode::DirectionPrompt(prompt) => {
 			if options.controls.left.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, "Left")?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, "Left")?)))
 			} else if options.controls.right.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, "Right")?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, "Right")?)))
 			} else if options.controls.up.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, "Up")?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, "Up")?)))
 			} else if options.controls.down.contains(keycode) {
-				Ok((
-					Mode::Normal,
-					Some(prompt.callback.resolve(scripts.runtime, "Down")?),
-				))
+				Ok((Mode::Normal, Some(prompt.callback.resolve(lua, "Down")?)))
 			} else if options.controls.escape.contains(keycode) {
 				Ok((Mode::Normal, None))
 			} else {
@@ -517,24 +500,24 @@ pub(crate) fn controllable_character(
 
 fn gather_attack_inputs(
 	resources: &resource::Manager,
-	scripts: &resource::Scripts,
+	lua: &mlua::Lua,
 	attack_id: resource::Attack,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let attack = resources.get(&attack_id)?;
-	let thread = scripts.runtime.create_thread(attack.on_input.clone())?;
+	let thread = lua.create_thread(attack.on_input.clone())?;
 	PartialAction::Attack(attack_id, next_character.clone(), thread)
-		.resolve(scripts.runtime, (next_character, attack.clone()))
+		.resolve(lua, (next_character, attack.clone()))
 }
 
 fn gather_spell_inputs(
 	resources: &resource::Manager,
-	scripts: &resource::Scripts,
+	lua: &mlua::Lua,
 	spell_id: resource::Spell,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let spell = resources.get(&spell_id)?;
-	let thread = scripts.runtime.create_thread(spell.on_input.clone())?;
+	let thread = lua.create_thread(spell.on_input.clone())?;
 	PartialAction::Spell(spell_id, next_character.clone(), thread)
-		.resolve(scripts.runtime, (next_character, spell.clone()))
+		.resolve(lua, (next_character, spell.clone()))
 }

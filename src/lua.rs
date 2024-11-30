@@ -47,7 +47,6 @@ macro_rules! make_lua_enum{
 
 make_lua_enum! { spell::Energy: positive, | negative }
 make_lua_enum! { spell::Harmony: chaos, | order }
-make_lua_enum! { spell::Affinity: uncastable, weak, average, | strong }
 make_lua_enum! { nouns::Pronouns: female, male, neutral, | object }
 
 impl mlua::FromLua for Nouns {

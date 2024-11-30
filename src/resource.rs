@@ -16,10 +16,8 @@ pub enum Error {
 
 pub trait Id<Manager> {
 	type Resource;
-	fn get<'resources>(
-		&self,
-		resources: &'resources Manager,
-	) -> Result<&'resources Rc<Self::Resource>>;
+	fn get<'resources>(&self, resources: &'resources Manager)
+		-> Result<&'resources Self::Resource>;
 }
 
 // TODO: This was a mistake, please remove.
@@ -63,7 +61,7 @@ macro_rules! impl_resource {
 			fn get<'resources>(
 				&$self,
 				$resources: &'resources $Manager,
-			) -> Result<&'resources Rc<Self::Resource>> {
+			) -> Result<&'resources Self::Resource> {
 				#[allow(unused_braces)]
 				$body
 			}
@@ -94,36 +92,40 @@ macro_rules! impl_resource {
 }
 
 impl_resource! {
-	impl Sheet as character::Sheet where (self, resources: resource::Manager) {
-		resources.sheets.get(&self.0)
-	}
-
-	impl Status as status::Status where (self, resources: resource::Manager) {
-		resources.statuses.get(&self.0)
-	}
-
-	impl Attack as attack::Attack where (self, resources: resource::Manager) {
+	impl Attack as Rc<attack::Attack> where (self, resources: resource::Manager) {
 		resources.attacks.get(&self.0)
 	}
 
-	impl Spell as spell::Spell where (self, resources: resource::Manager) {
+	impl Function as mlua::Function where (self, resources: resource::Manager) {
+		resources.functions.get(&self.0)
+	}
+
+	impl Sheet as Rc<character::Sheet> where (self, resources: resource::Manager) {
+		resources.sheets.get(&self.0)
+	}
+
+	impl Spell as Rc<spell::Spell> where (self, resources: resource::Manager) {
 		resources.spells.get(&self.0)
 	}
 
-	impl Vault as vault::Vault where (self, resources: resource::Manager) {
+	impl Status as Rc<status::Status> where (self, resources: resource::Manager) {
+		resources.statuses.get(&self.0)
+	}
+
+	impl Vault as Rc<vault::Vault> where (self, resources: resource::Manager) {
 		resources.vaults.get(&self.0)
 	}
 }
 
 #[derive(Debug)]
-pub struct Resource<T: ?Sized>(HashMap<Box<str>, Rc<T>>);
+pub struct Resource<T>(HashMap<Box<str>, T>);
 
 impl<T> Resource<T> {
 	pub fn new() -> Self {
 		Self(HashMap::new())
 	}
 
-	pub fn get(&self, key: &str) -> Result<&Rc<T>> {
+	pub fn get(&self, key: &str) -> Result<&T> {
 		self.0
 			.get(key)
 			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))
@@ -144,14 +146,13 @@ impl<T> Default for Resource<T> {
 /// meaning outside code doesn't need to store permanent references to resources.
 #[derive(Debug)]
 pub struct Manager {
-	/// `Attack`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	pub attacks: Resource<attack::Attack>,
-	/// `Spells`s need to be owned by many pieces, but rarely need to be mutated, so it's more convenient to provide an `Rc`.
-	pub spells: Resource<spell::Spell>,
+	pub attacks: Resource<Rc<attack::Attack>>,
+	pub functions: Resource<mlua::Function>,
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
-	pub sheets: Resource<character::Sheet>,
-	pub statuses: Resource<status::Status>,
-	pub vaults: Resource<vault::Vault>,
+	pub sheets: Resource<Rc<character::Sheet>>,
+	pub spells: Resource<Rc<spell::Spell>>,
+	pub statuses: Resource<Rc<status::Status>>,
+	pub vaults: Resource<Rc<vault::Vault>>,
 }
 
 #[derive(Debug, Clone, FromLua)]
@@ -173,14 +174,14 @@ impl std::ops::Deref for Handle {
 
 impl mlua::UserData for Handle {
 	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
-		methods.add_method("status", |_lua, this, key: Box<str>| {
-			this.statuses
+		methods.add_method("attack", |_lua, this, key: Box<str>| {
+			this.attacks
 				.get(&key)
 				.cloned()
 				.map_err(mlua::Error::external)
 		});
-		methods.add_method("attack", |_lua, this, key: Box<str>| {
-			this.attacks
+		methods.add_method("function", |_lua, this, key: Box<str>| {
+			this.functions
 				.get(&key)
 				.cloned()
 				.map_err(mlua::Error::external)
@@ -191,12 +192,13 @@ impl mlua::UserData for Handle {
 				.cloned()
 				.map_err(mlua::Error::external)
 		});
+		methods.add_method("status", |_lua, this, key: Box<str>| {
+			this.statuses
+				.get(&key)
+				.cloned()
+				.map_err(mlua::Error::external)
+		});
 	}
-}
-
-// TODO: Remove this.
-pub struct Scripts<'lua> {
-	pub runtime: &'lua mlua::Lua,
 }
 
 pub fn register<T>(
@@ -206,7 +208,7 @@ pub fn register<T>(
 	let mut container = Resource::new();
 	recurse(directory, |path, reference| {
 		loader(path).map(|x| {
-			container.0.insert(reference.into(), x.into());
+			container.0.insert(reference.into(), x);
 		})
 	})?;
 	Ok(container)
@@ -245,9 +247,9 @@ fn recurse(directory: &Path, mut loader: impl FnMut(&Path, &str) -> Result<()>) 
 	recurse(directory, directory, &mut loader)
 }
 
-fn make_registrar<T: 'static>(
+fn make_registrar<T: 'static, IntoT: Into<T>>(
 	handle: Weak<RefCell<Resource<T>>>,
-	constructor: impl Fn(mlua::Table) -> mlua::Result<T> + Clone + 'static,
+	constructor: impl Fn(mlua::Table) -> mlua::Result<IntoT> + Clone + 'static,
 ) -> impl Fn(&mlua::Lua, Box<str>) -> mlua::Result<mlua::Function> {
 	move |lua, identifier| {
 		let handle = handle.clone();
@@ -266,7 +268,7 @@ fn make_registrar<T: 'static>(
 			handle
 				.borrow_mut()
 				.0
-				.insert(identifier, Rc::new(constructor(table)?));
+				.insert(identifier, constructor(table)?.into());
 			Ok(())
 		})
 	}
@@ -282,7 +284,7 @@ impl Manager {
 	pub fn open(path: impl AsRef<Path>, lua: &mlua::Lua) -> Result<Manager> {
 		let path = path.as_ref();
 
-		let attacks = Rc::new(RefCell::new(Resource::<attack::Attack>::default()));
+		let attacks = Rc::new(RefCell::new(Resource::<Rc<attack::Attack>>::default()));
 		let attack_registrar =
 			lua.create_function(make_registrar(Rc::downgrade(&attacks), |table| {
 				Ok(attack::Attack {
@@ -300,7 +302,22 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(attack_registrar.clone()))?,
 		)?;
 
-		let sheets = Rc::new(RefCell::new(Resource::<character::Sheet>::default()));
+		let functions = Rc::new(RefCell::new(Resource::<mlua::Function>::default()));
+		let functions_handle = Rc::downgrade(&functions);
+		let function_registrar =
+			lua.create_function(move |_, (id, func): (Box<str>, mlua::Function)| {
+				let Some(handle) = functions_handle.upgrade() else {
+					return Err(mlua::Error::runtime("resource registration has closed"));
+				};
+				handle.borrow_mut().0.insert(id, func);
+				Ok(())
+			})?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.function",
+			lua.create_function(move |_, ()| Ok(function_registrar.clone()))?,
+		)?;
+
+		let sheets = Rc::new(RefCell::new(Resource::<Rc<character::Sheet>>::default()));
 		let sheet_registrar =
 			lua.create_function(make_registrar(Rc::downgrade(&sheets), |table| {
 				let stats = |table: mlua::Table| -> mlua::Result<_> {
@@ -336,7 +353,7 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(sheet_registrar.clone()))?,
 		)?;
 
-		let spells = Rc::new(RefCell::new(Resource::<spell::Spell>::default()));
+		let spells = Rc::new(RefCell::new(Resource::<Rc<spell::Spell>>::default()));
 		let spell_registrar =
 			lua.create_function(make_registrar(Rc::downgrade(&spells), |table| {
 				Ok(spell::Spell {
@@ -357,7 +374,22 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(spell_registrar.clone()))?,
 		)?;
 
-		let vaults = Rc::new(RefCell::new(Resource::<vault::Vault>::default()));
+		let statuses = Rc::new(RefCell::new(Resource::<Rc<status::Status>>::default()));
+		let status_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&statuses), |table| {
+				Ok(status::Status {
+					name: table.get("name")?,
+					icon: table.get("icon")?,
+					duration: table.get("duration")?,
+					on_debuff: table.get("on_debuff")?,
+				})
+			}))?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.status",
+			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
+		)?;
+
+		let vaults = Rc::new(RefCell::new(Resource::<Rc<vault::Vault>>::default()));
 		let vault_registrar = make_registrar(Rc::downgrade(&vaults), |table| {
 			let source = table.get::<mlua::String>(1)?;
 			let source = source.to_str()?;
@@ -404,21 +436,6 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(vault.clone()))?,
 		)?;
 
-		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
-		let status_registrar =
-			lua.create_function(make_registrar(Rc::downgrade(&statuses), |table| {
-				Ok(status::Status {
-					name: table.get("name")?,
-					icon: table.get("icon")?,
-					duration: table.get("duration")?,
-					on_debuff: table.get("on_debuff")?,
-				})
-			}))?;
-		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.status",
-			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
-		)?;
-
 		lua.globals()
 			.get::<mlua::Table>("package")?
 			.set("path", path.join("lib/?.lua"))?;
@@ -435,13 +452,17 @@ impl Manager {
 			.set("path", "")?;
 
 		lua.unload("esprit.resources.attack")?;
+		lua.unload("esprit.resources.function")?;
 		lua.unload("esprit.resources.sheet")?;
 		lua.unload("esprit.resources.spells")?;
 		lua.unload("esprit.resources.status")?;
-		lua.unload("esprit.resources.vaults")?;
+		lua.unload("esprit.resources.vault")?;
 
 		let attacks = Rc::into_inner(attacks)
 			.expect("attacks must have only one strong reference")
+			.into_inner();
+		let functions = Rc::into_inner(functions)
+			.expect("functions must have only one strong reference")
 			.into_inner();
 		let sheets = Rc::into_inner(sheets)
 			.expect("sheets must have only one strong reference")
@@ -458,20 +479,15 @@ impl Manager {
 
 		Ok(Self {
 			attacks,
-			spells,
+			functions,
 			sheets,
+			spells,
 			statuses,
 			vaults,
 		})
 	}
 
-	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&Rc<T::Resource>> {
+	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&T::Resource> {
 		id.get(self)
-	}
-}
-
-impl<'lua> Scripts<'lua> {
-	pub fn open(path: impl AsRef<Path>, lua: &'lua mlua::Lua) -> Result<Scripts<'lua>> {
-		Ok(Self { runtime: lua })
 	}
 }

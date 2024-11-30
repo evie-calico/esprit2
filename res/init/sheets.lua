@@ -1,7 +1,10 @@
+local functions = require "esprit.resources.function"
 local sheet = require "esprit.resources.sheet"
 local skillset = require "esprit.types.skillset"
 
 local attacks = { "scratch", "bite" }
+
+functions("basic", require "basic")
 
 sheet "luvui" {
 	level = 1,
@@ -10,7 +13,6 @@ sheet "luvui" {
 	speed = 12,
 	icon = "luvui",
 
-	-- TODO
 	on_consider = "basic",
 	nouns = {
 		name = "Luvui",
@@ -42,7 +44,6 @@ sheet "aris" {
 	speed = 12,
 	icon = "aris",
 
-	-- TODO
 	on_consider = "basic",
 	nouns = {
 		name = "Aris",

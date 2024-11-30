@@ -56,6 +56,19 @@ impl Affinity {
 	}
 }
 
+impl mlua::UserData for Affinity {
+	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+		methods.add_method("magnitude", |_, this, magnitude: u32| {
+			Ok(this.magnitude(magnitude))
+		});
+		methods.add_method("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
+		methods.add_method("average", |_, this, ()| {
+			Ok(matches!(this, Affinity::Average))
+		});
+		methods.add_method("strong", |_, this, ()| Ok(matches!(this, Affinity::Strong)));
+	}
+}
+
 #[derive(Clone, Debug)]
 pub struct Spell {
 	pub name: Box<str>,

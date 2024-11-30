@@ -220,8 +220,6 @@ pub fn instance(
 ) -> esprit2::Result<()> {
 	let lua = esprit2::lua::init()?;
 
-	let scripts = resource::Scripts::open(res.join("scripts"), &lua)?;
-
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
 	let console = Console { sender };
 	let mut server = Server::new(res, &lua)?;
@@ -264,7 +262,7 @@ pub fn instance(
 							client,
 							packet,
 							&console,
-							&scripts,
+							&lua,
 							&mut server,
 						)
 						.await {
@@ -276,7 +274,7 @@ pub fn instance(
 				}
 
 				loop {
-					match server.world.tick(&server.resources, &scripts, &console) {
+					match server.world.tick(&server.resources, &lua, &console) {
 						Ok(true) => (),
 						Ok(false) => break,
 						Err(msg) => {
@@ -322,7 +320,7 @@ async fn client_tick(
 	client: &mut Client,
 	packet: AlignedVec,
 	console_handle: &Console,
-	scripts: &resource::Scripts<'_>,
+	lua: &mlua::Lua,
 	server: &mut Server,
 ) -> Result<(), Error> {
 	let span = tracing::error_span!(
@@ -341,14 +339,13 @@ async fn client_tick(
 		protocol::ArchivedClientPacket::Action { action } => {
 			let action: character::Action = rkyv::deserialize(action).map_err(Error::De)?;
 			let console = console_handle;
-			let scripts: &resource::Scripts = scripts;
 			let next_character = server.world.next_character();
 			// TODO: Uuid-based piece ownership.
 			// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
 			if next_character.borrow().player_controlled {
 				server
 					.world
-					.perform_action(console, &server.resources, scripts, action)?;
+					.perform_action(console, &server.resources, lua, action)?;
 			} else {
 				warn!("client attempted to move piece it did not own");
 				client

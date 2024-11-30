@@ -130,17 +130,12 @@ impl<'texture> ServerHandle<'texture> {
 
 	pub(crate) async fn perform_action(
 		&mut self,
-		scripts: &resource::Scripts<'_>,
+		lua: &mlua::Lua,
 		action: character::Action,
 	) -> Result<(), rancor::BoxedError> {
 		let world = self.world.as_mut().expect("world must be present");
 		world
-			.perform_action(
-				console_impl::Dummy,
-				&self.resources,
-				scripts,
-				action.clone(),
-			)
+			.perform_action(console_impl::Dummy, &self.resources, lua, action.clone())
 			.into_trace("failed to perform action")?;
 		self.sender
 			.send(&protocol::ClientPacket::Action { action })
@@ -152,7 +147,7 @@ impl<'texture> ServerHandle<'texture> {
 		&mut self,
 		input_mode: input::Mode,
 		event: sdl2::event::Event,
-		scripts: &resource::Scripts<'_>,
+		lua: &mlua::Lua,
 		options: &Options,
 	) -> Result<input::Mode, rancor::BoxedError> {
 		let sdl2::event::Event::KeyDown {
@@ -174,7 +169,7 @@ impl<'texture> ServerHandle<'texture> {
 			world,
 			&self.console,
 			&self.resources,
-			scripts,
+			lua,
 			input_mode,
 			options,
 		) {
@@ -184,7 +179,7 @@ impl<'texture> ServerHandle<'texture> {
 					mode
 				}
 				Some(input::Response::Act(action)) => {
-					self.perform_action(scripts, action).await?;
+					self.perform_action(lua, action).await?;
 					mode
 				}
 
