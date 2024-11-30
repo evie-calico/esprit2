@@ -65,8 +65,26 @@ fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> 
 }
 
 /// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
-fn inflict(_lua: &mlua::Lua, this: &Ref, (key, value): (Box<str>, Value)) -> mlua::Result<()> {
-	this.borrow_mut().statuses.insert(key.into(), value);
+fn inflict(
+	_lua: &mlua::Lua,
+	this: &Ref,
+	(key, value, update): (resource::Status, Value, Option<mlua::Function>),
+) -> mlua::Result<()> {
+	let value = this
+		.borrow_mut()
+		.statuses
+		.entry(key.clone())
+		.or_insert(value)
+		.clone();
+	if let Some(update) = update {
+		let result = update.call(value)?;
+		// It's a weird thing to do but an expect may panic here if the update function removes the status,
+		// so the status value only gets updated if it still exists.
+		// This also has to reborrow since `this` must be unlocked before `update` is called.
+		if let Some(value) = this.borrow_mut().statuses.get_mut(&key) {
+			*value = result;
+		}
+	}
 	Ok(())
 }
 
@@ -109,28 +127,10 @@ where
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	mlua::FromLua,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, mlua::FromLua, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 struct InnerRef(#[rkyv(with = InlineRefCell)] RefCell<character::Piece>);
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	mlua::FromLua,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, mlua::FromLua, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Ref(Rc<InnerRef>);
 
 impl Ref {
@@ -235,21 +235,12 @@ impl mlua::UserData for Ref {
 			*level = level.saturating_add(1);
 			Ok(())
 		});
-		// TODO: Make these functions into Rust methods of Piece.
 		methods.add_method("force_affinity", force_affinity);
 		methods.add_method("inflict", inflict);
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Piece {
 	pub sheet: Sheet,
 
@@ -434,27 +425,17 @@ fn growth_bonuses() -> Stats {
 	bonuses
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Sheet {
 	pub icon: Box<str>,
 	/// Note that this includes the character's name.
 	pub nouns: Nouns,
 
 	pub level: u16,
-	#[serde(default)] // There's no reason for most sheets to care about this.
 	pub experience: u32,
 
 	pub bases: Stats,
 	pub growths: Stats,
-	#[serde(default = "growth_bonuses")]
 	pub growth_bonuses: Stats,
 
 	pub skillset: spell::Skillset,

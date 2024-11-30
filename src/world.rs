@@ -3,9 +3,7 @@ use rand::{seq::SliceRandom, SeedableRng};
 use std::{collections::VecDeque, rc::Rc};
 
 /// This struct contains all information that is relevant during gameplay.
-#[derive(
-	Debug, serde::Serialize, serde::Deserialize, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
-)]
+#[derive(Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Manager {
 	/// Where in the world the characters are.
 	pub location: Location,
@@ -34,15 +32,7 @@ impl Default for Level {
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.
 	pub piece: character::Ref,
@@ -155,7 +145,7 @@ impl Manager {
 		self.characters
 			.retain(|x| self.party.iter().any(|y| x.as_ptr() == y.piece.as_ptr()));
 
-		console.print_unimportant("You take some time to rest...".into());
+		console.print_unimportant("You take some time to rest...");
 		for i in &self.characters {
 			let mut i = i.borrow_mut();
 			// Reset positions
@@ -318,11 +308,8 @@ impl Manager {
 		scripts: &resource::Scripts,
 		character: character::Ref,
 	) -> Result<character::Action> {
-		let thread = scripts.thread(&character.borrow().sheet.on_consider)?;
-		Ok(self
-			.poll::<Option<Consider>>(scripts.runtime, thread, character)?
-			.map(|x| x.action)
-			.unwrap_or(character::Action::Wait(TURN)))
+		// TODO
+		Ok(character::Action::Wait(TURN))
 	}
 
 	/// Causes the next character in the queue to perform a given action.
@@ -431,7 +418,7 @@ impl Manager {
 		Ok(match castable {
 			spell::Castable::Yes => self.poll::<Option<Aut>>(
 				scripts.runtime,
-				scripts.thread(&spell.on_cast)?,
+				scripts.runtime.create_thread(spell.on_cast.clone())?,
 				(user, spell, argument),
 			)?,
 			spell::Castable::NotEnoughSP => {
@@ -492,11 +479,13 @@ impl Manager {
 				Ok(Some(delay))
 			}
 			Some(Tile::Wall) => {
-				console.say(character.borrow().sheet.nouns.name.clone(), "Ouch!".into());
+				console.say(character.borrow().sheet.nouns.name.clone(), "Ouch!");
 				Ok(None)
 			}
 			None => {
-				console.print_system("You stare out into the void: an infinite expanse of nothingness enclosed within a single tile.".into());
+				console.print_system(
+					"You stare out into the void: an infinite expanse of nothingness enclosed within a single tile."
+				);
 				Ok(None)
 			}
 		}

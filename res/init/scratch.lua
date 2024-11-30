@@ -25,7 +25,8 @@ require "esprit.resources.attack" "scratch" {
 			-- Apply a small bleeding effect even if damage is 0
 			-- to help weaker characters overcome their glancing blows
 			-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
-			target:inflict("bleed", 5 + damage);
+			local new_magnitude = 5 + damage
+			target:inflict("bleed", new_magnitude, function(old_magnitude) return old_magnitude + new_magnitude end);
 		end
 
 		local damage_messages = {

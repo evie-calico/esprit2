@@ -1,18 +1,6 @@
 use crate::prelude::*;
-use std::collections::HashMap;
 
-#[derive(
-	Copy,
-	Clone,
-	Debug,
-	Eq,
-	PartialEq,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum Energy {
 	/// Positive energy, like heat.
 	Positive,
@@ -20,18 +8,7 @@ pub enum Energy {
 	Negative,
 }
 
-#[derive(
-	Copy,
-	Clone,
-	Debug,
-	Eq,
-	PartialEq,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum Harmony {
 	/// Spells with unconventional, unpredictable effects.
 	Chaos,
@@ -42,18 +19,7 @@ pub enum Harmony {
 /// A character's magical skills.
 ///
 /// Only skill from each axis may be chosen, and the minor skill is optional.
-#[derive(
-	Copy,
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
-// This gives the Skillset a cool toml representation.
-#[serde(untagged)]
+#[derive(Copy, Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, mlua::FromLua)]
 pub enum Skillset {
 	EnergyMajor {
 		major: Energy,
@@ -64,6 +30,8 @@ pub enum Skillset {
 		minor: Option<Energy>,
 	},
 }
+
+impl mlua::UserData for Skillset {}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Affinity {
@@ -88,54 +56,16 @@ impl Affinity {
 	}
 }
 
-impl mlua::UserData for Affinity {
-	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_method("magnitude", |_, this, magnitude: u32| {
-			Ok(this.magnitude(magnitude))
-		});
-		methods.add_method("weak", |_, this, ()| Ok(matches!(this, Affinity::Weak)));
-		methods.add_method("average", |_, this, ()| {
-			Ok(matches!(this, Affinity::Average))
-		});
-		methods.add_method("strong", |_, this, ()| Ok(matches!(this, Affinity::Strong)));
-	}
-}
-
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
-#[serde(untagged)]
-pub enum Parameter {
-	Integer(i32),
-	Expression(Expression),
-}
-
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug)]
 pub struct Spell {
-	pub name: String,
-	pub description: String,
-	pub icon: String,
+	pub name: Box<str>,
+	pub description: Box<str>,
+	pub icon: Box<str>,
 	/// Configurable spell parameters.
 	///
-	/// There are passed to spell scripts as global variables,
-	/// and may be displayed to the user as information about the spell.
+	/// These may be displayed to the user as information about the spell.
 	/// (in addition to its description)
-	#[serde(default)]
-	pub parameters: HashMap<Box<str>, Parameter>,
+	pub parameters: mlua::Table,
 
 	/// Whether the spell concentrates or disperses energy.
 	pub energy: Energy,
@@ -146,7 +76,7 @@ pub struct Spell {
 	pub level: u8,
 
 	/// Script to execute upon casting the spell.
-	pub on_cast: Box<str>,
+	pub on_cast: mlua::Function,
 	/// Script to return all possible spell actions.
 	///
 	/// Returns an array of `consider::Consideration`s for each possible usage of the spell.
@@ -156,26 +86,18 @@ pub struct Spell {
 	/// When an on_consider script is about to be called, it's fed a list of characters that are potential targets for the spell.
 	/// If a spell parameter named "range" exists, the script will only be provided with characters within this range.
 	/// Otherwise, consideration scripts are expected to filter targets themselves.
-	pub on_consider: Option<Box<str>>,
-	pub on_input: Box<str>,
+	pub on_consider: Option<mlua::Function>,
+	pub on_input: mlua::Function,
 }
 
 impl mlua::UserData for Spell {
 	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
 		fields.add_field_method_get("level", |_, this| Ok(this.level));
 		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
+		fields.add_field_method_get("parameters", |_, this| Ok(this.parameters.clone()));
 	}
 
 	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_meta_method("__index", |lua, this, key: String| {
-			match this.parameters.get(key.as_str()) {
-				Some(Parameter::Integer(i)) => Ok(mlua::Value::Integer(*i as mlua::Integer)),
-				Some(Parameter::Expression(e)) => {
-					Ok(mlua::Value::UserData(lua.create_userdata(e.clone())?))
-				}
-				None => Ok(mlua::Nil),
-			}
-		});
 		methods.add_method("affinity", |_, this, character: character::Ref| {
 			Ok(this.affinity(&character.borrow()))
 		})
@@ -234,27 +156,5 @@ impl Spell {
 				}
 			}
 		}
-	}
-
-	pub fn parameter_table(
-		&self,
-		scripts: &resource::Scripts,
-		eval_vars: &impl expression::Variables,
-	) -> mlua::Result<mlua::Table> {
-		scripts
-			.runtime
-			.create_table_from(self.parameters.iter().filter_map(|(k, v)| {
-				let k = k.as_ref();
-				match v {
-					spell::Parameter::Integer(v) => Some((k, *v)),
-					spell::Parameter::Expression(v) => {
-						let result = i32::evalv(v, eval_vars);
-						if let Err(msg) = &result {
-							error!("failed to evaluate {}: {msg}", v.source);
-						}
-						result.ok().map(|v| (k, v))
-					}
-				}
-			}))
 	}
 }

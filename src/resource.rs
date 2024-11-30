@@ -22,6 +22,7 @@ pub trait Id<Manager> {
 	) -> Result<&'resources Rc<Self::Resource>>;
 }
 
+// TODO: This was a mistake, please remove.
 macro_rules! impl_resource {
 	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt $(impl$(<$($next_lifetime:lifetime),*>)? $NextName:ident as $NextResource:ty where ($next_self:ident, $next_resources:ident: $NextManager:ty) $next_body:tt)+) => {
 		impl_resource! {
@@ -282,14 +283,9 @@ impl Manager {
 	pub fn open(path: impl AsRef<Path>, lua: &mlua::Lua) -> Result<Manager> {
 		let path = path.as_ref();
 
-		let sheets = register(&path.join("sheets"), |path| {
-			Ok(toml::from_str(&fs::read_to_string(path)?)?)
-		})?;
-
 		let attacks = Rc::new(RefCell::new(Resource::<attack::Attack>::default()));
-		let attack_registrar = lua.create_function(make_registrar(
-			Rc::downgrade(&attacks),
-			|table: mlua::Table| -> mlua::Result<_> {
+		let attack_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&attacks), |table| {
 				Ok(attack::Attack {
 					name: table.get("name")?,
 					description: table.get("description")?,
@@ -299,25 +295,79 @@ impl Manager {
 					on_consider: table.get("on_consider")?,
 					use_time: table.get("use_time")?,
 				})
-			},
-		))?;
+			}))?;
 		lua.load_from_function::<mlua::Value>(
 			"esprit.resources.attack",
 			lua.create_function(move |_, ()| Ok(attack_registrar.clone()))?,
 		)?;
 
+		let sheets = Rc::new(RefCell::new(Resource::<character::Sheet>::default()));
+		let sheet_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&sheets), |table| {
+				let stats = |table: mlua::Table| -> mlua::Result<_> {
+					Ok(character::Stats {
+						heart: table.get("heart")?,
+						soul: table.get("soul")?,
+						power: table.get("power")?,
+						defense: table.get("defense")?,
+						magic: table.get("magic")?,
+						resistance: table.get("resistance")?,
+					})
+				};
+
+				Ok(character::Sheet {
+					icon: table.get("icon")?,
+					nouns: table.get("nouns")?,
+					level: table.get("level")?,
+					experience: table.get::<Option<_>>("experience")?.unwrap_or_default(),
+					bases: stats(table.get("bases")?)?,
+					growths: stats(table.get("growths")?)?,
+					growth_bonuses: table
+						.get::<Option<_>>("growth_bonuses")?
+						.unwrap_or_default(),
+					skillset: table.get("skillset")?,
+					speed: table.get::<Option<_>>("speed")?.unwrap_or(TURN),
+					attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),
+					spells: table.get::<Option<_>>("spells")?.unwrap_or_default(),
+					on_consider: table.get("on_consider")?,
+				})
+			}))?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.sheet",
+			lua.create_function(move |_, ()| Ok(sheet_registrar.clone()))?,
+		)?;
+
+		let spells = Rc::new(RefCell::new(Resource::<spell::Spell>::default()));
+		let spell_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&spells), |table| {
+				Ok(spell::Spell {
+					name: table.get("name")?,
+					icon: table.get("icon")?,
+					description: table.get("description")?,
+					on_input: table.get("on_input")?,
+					on_cast: table.get("on_cast")?,
+					on_consider: table.get("on_consider")?,
+					parameters: table.get("parameters")?,
+					energy: table.get("energy")?,
+					harmony: table.get("harmony")?,
+					level: table.get("level")?,
+				})
+			}))?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.spell",
+			lua.create_function(move |_, ()| Ok(spell_registrar.clone()))?,
+		)?;
+
 		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
-		let status_registrar = lua.create_function(make_registrar(
-			Rc::downgrade(&statuses),
-			|table: mlua::Table| -> mlua::Result<_> {
+		let status_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&statuses), |table| {
 				Ok(status::Status {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
 					duration: table.get("duration")?,
 					on_debuff: table.get("on_debuff")?,
 				})
-			},
-		))?;
+			}))?;
 		lua.load_from_function::<mlua::Value>(
 			"esprit.resources.status",
 			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
@@ -344,13 +394,15 @@ impl Manager {
 		let attacks = Rc::into_inner(attacks)
 			.expect("attacks must have only one strong reference")
 			.into_inner();
+		let sheets = Rc::into_inner(sheets)
+			.expect("sheets must have only one strong reference")
+			.into_inner();
+		let spells = Rc::into_inner(spells)
+			.expect("spells must have only one strong reference")
+			.into_inner();
 		let statuses = Rc::into_inner(statuses)
 			.expect("statuses must have only one strong reference")
 			.into_inner();
-
-		let spells = register(&path.join("spells"), |path| {
-			Ok(toml::from_str(&fs::read_to_string(path)?)?)
-		})?;
 
 		let vaults = register(&path.join("vaults"), |path| vault::Vault::open(path))?;
 
@@ -370,32 +422,6 @@ impl Manager {
 
 impl<'lua> Scripts<'lua> {
 	pub fn open(path: impl AsRef<Path>, lua: &'lua mlua::Lua) -> Result<Scripts<'lua>> {
-		let scripts = lua.create_table()?;
-		recurse(path.as_ref(), |path, reference| {
-			scripts.set(
-				reference,
-				lua.load(&fs::read_to_string(path)?)
-					.set_name(reference)
-					.into_function()?,
-			)?;
-			Ok(())
-		})?;
-		lua.load_from_function::<mlua::Value>(
-			"esprit.scripts",
-			lua.create_function(move |_, ()| Ok(scripts.clone()))?,
-		)?;
 		Ok(Self { runtime: lua })
-	}
-
-	pub fn function(&self, key: &str) -> mlua::Result<mlua::Function> {
-		self.runtime
-			.load(mlua::chunk! {
-				return require "esprit.scripts" [$key]
-			})
-			.eval()
-	}
-
-	pub fn thread(&self, key: &str) -> mlua::Result<mlua::Thread> {
-		self.runtime.create_thread(self.function(key)?)
 	}
 }

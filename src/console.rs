@@ -1,30 +1,29 @@
 use crate::prelude::*;
 use paste::paste;
-use std::sync::Arc;
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub enum MessagePrinter {
 	Console(Color),
-	Dialogue { speaker: Arc<str>, progress: f64 },
+	Dialogue { speaker: Box<str>, progress: f64 },
 	Combat(combat::Log),
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Message {
-	pub text: String,
+	pub text: Box<str>,
 	pub printer: MessagePrinter,
 }
 
 macro_rules! console_colored_print {
 	(normal) => {
-		fn print(&self, text: String) {
+		fn print(&self, text: impl Into<Box<str>>) {
 			self.print_colored(text, Color::Normal);
 		}
 	};
 
 	($which:ident) => {
 		paste! {
-			fn [<print_ $which>](&self, text: String) {
+			fn [<print_ $which>](&self, text: impl Into<Box<str>>) {
 				self.print_colored(text, Color::[<$which:camel>]);
 			}
 		}
@@ -34,8 +33,8 @@ macro_rules! console_colored_print {
 macro_rules! handle_colored_print {
 	(normal, $methods:ident) => {
 		paste! {
-			$methods.add_method("print", |_, this, text: String| {
-				this.0.print_colored(text, Color::Normal);
+			$methods.add_method("print", |_, this, text: mlua::String| {
+				this.0.print_colored(text.to_str()?.as_ref(), Color::Normal);
 				Ok(())
 			});
 		}
@@ -43,8 +42,8 @@ macro_rules! handle_colored_print {
 
 	($which:ident, $methods:ident) => {
 		paste! {
-			$methods.add_method(concat!("print_", stringify!($which)), |_, this, text: String| {
-				this.0.print_colored(text, Color::[<$which:camel>]);
+			$methods.add_method(concat!("print_", stringify!($which)), |_, this, text: mlua::String| {
+				this.0.print_colored(text.to_str()?.as_ref(), Color::[<$which:camel>]);
 				Ok(())
 			});
 		}
@@ -67,16 +66,16 @@ macro_rules! impl_console {
 		pub trait Handle {
 			fn send_message(&self, message: Message);
 
-			fn print_colored(&self, text: String, color: Color) {
-				self.send_message(Message { text, printer: MessagePrinter::Console(color) })
+			fn print_colored(&self, text: impl Into<Box<str>>, color: Color) {
+				self.send_message(Message { text: text.into(), printer: MessagePrinter::Console(color) })
 			}
 
-			fn say(&self, speaker: Arc<str>, text: String) {
-				self.send_message(Message { text, printer: MessagePrinter::Dialogue { speaker, progress: 0.0 } })
+			fn say(&self, speaker: impl Into<Box<str>>, text: impl Into<Box<str>>) {
+				self.send_message(Message { text: text.into(), printer: MessagePrinter::Dialogue { speaker: speaker.into(), progress: 0.0 } })
 			}
 
-			fn combat_log(&self, text: String, log: combat::Log) {
-				self.send_message(Message { text, printer: MessagePrinter::Combat(log) })
+			fn combat_log(&self, text: impl Into<Box<str>>, log: combat::Log) {
+				self.send_message(Message { text: text.into(), printer: MessagePrinter::Combat(log) })
 			}
 
 			$(console_colored_print! { $impl_colors } )*

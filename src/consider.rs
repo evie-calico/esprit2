@@ -13,7 +13,7 @@ use mlua::IntoLuaMulti;
 /// Many effects and outcomes will be ignored or oversimplified by this system.
 /// If this becomes an issue more heuristics can be added to better express the outcomes of spells,
 /// but low performance costs should be a priority over accuracy.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
+#[derive(Clone, Debug, mlua::FromLua)]
 pub enum Heuristic {
 	Damage {
 		target: character::Ref,

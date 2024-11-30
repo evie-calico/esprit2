@@ -1,10 +1,79 @@
 use crate::prelude::*;
 use consider::Heuristic;
 use mlua::Function as F;
-use mlua::{chunk, AsChunk};
+use mlua::{chunk, AsChunk, Either, Error, Lua, Result};
+use paste::paste;
 
-pub fn init() -> mlua::Result<mlua::Lua> {
-	let lua = mlua::Lua::new();
+macro_rules! make_lua_enum{
+    { $Type:path: $($variant:ident,)+ | $last:ident} => {
+        impl mlua::FromLua for $Type {
+			fn from_lua(value: mlua::Value, _: &mlua::Lua) -> mlua::Result<Self> {
+				match value {
+					mlua::Value::String(s) => match s.to_str()?.as_ref() {
+						$( stringify!($variant) => Ok(paste!(Self::[<$variant:camel>])), )+
+						stringify!($last) => Ok(paste!(Self::[<$last:camel>])),
+						s => Err(mlua::Error::runtime(format!(
+							concat!(
+								"unexpected string: {}, expected ",
+								$( "\"", stringify!($variant), "\"|", )+
+								"\"", stringify!($last), "\"",
+							),
+							s,
+						))),
+					},
+					mlua::Value::UserData(any) => Ok(*any.borrow()?),
+					_ => Err(mlua::Error::runtime(
+						format!(
+							concat!(
+								"unexpected type: {}, expected strings",
+								$( "\"", stringify!($variant), "\"|", )+
+								"\"", stringify!($last), "\", or the `Energy` userdata type",
+							),
+							value.type_name(),
+						)
+					)),
+				}
+			}
+        }
+
+		impl mlua::UserData for $Type {
+			fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+				$( methods.add_method(stringify!($variant), |_, this, ()| Ok(*this == paste!(Self::[<$variant:camel>]))); )+
+				methods.add_method(stringify!($last), |_, this, ()| Ok(*this == paste!(Self::[<$last:camel>])));
+			}
+		}
+    };
+}
+
+make_lua_enum! { spell::Energy: positive, | negative }
+make_lua_enum! { spell::Harmony: chaos, | order }
+make_lua_enum! { spell::Affinity: uncastable, weak, average, | strong }
+make_lua_enum! { nouns::Pronouns: female, male, neutral, | object }
+
+impl mlua::FromLua for Nouns {
+	fn from_lua(value: mlua::Value, _: &Lua) -> Result<Self> {
+		let Some(table) = value.as_table() else {
+			return Err(Error::runtime(format!(
+				"expected table, got {}",
+				value.type_name()
+			)));
+		};
+		Ok(Nouns {
+			name: table.get::<mlua::String>("name")?.to_str()?.as_ref().into(),
+			proper_name: table.get("proper_name")?,
+			pronouns: table.get("pronouns")?,
+		})
+	}
+}
+
+impl mlua::UserData for Nouns {
+	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+		fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
+	}
+}
+
+pub fn init() -> Result<Lua> {
+	let lua = Lua::new();
 	// Libraries
 	lua.load_from_function::<mlua::Value>("esprit.combat", lua.create_function(combat)?)?;
 	lua.load_from_function::<mlua::Value>("esprit.world", lua.load(world()).into_function()?)?;
@@ -21,9 +90,7 @@ pub fn init() -> mlua::Result<mlua::Lua> {
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.expression",
 		lua.create_function(|lua, ()| {
-			lua.create_function(|_, s: String| {
-				Expression::try_from(s).map_err(mlua::Error::external)
-			})
+			lua.create_function(|_, s: String| Expression::try_from(s).map_err(Error::external))
 		})?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
@@ -31,11 +98,12 @@ pub fn init() -> mlua::Result<mlua::Lua> {
 		lua.create_function(heuristic)?,
 	)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.log", lua.create_function(log)?)?;
+	lua.load_from_function::<mlua::Value>("esprit.types.skillset", lua.create_function(skillset)?)?;
 	lua.load_from_function::<mlua::Value>("esprit.types.stats", lua.create_function(stats)?)?;
 	Ok(lua)
 }
 
-fn combat(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+fn combat(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let combat = lua.create_table()?;
 	combat.set(
 		"format",
@@ -93,7 +161,7 @@ fn world() -> impl AsChunk<'static> {
 	}
 }
 
-fn action(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let action = lua.create_table()?;
 	action.set("wait", F::wrap(|time| Ok(character::Action::Wait(time))))?;
 	action.set("move", F::wrap(|x, y| Ok(character::Action::Move(x, y))))?;
@@ -108,14 +176,14 @@ fn action(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 	Ok(action)
 }
 
-fn duration(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+fn duration(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let duration = lua.create_table()?;
 	duration.set("turn", status::Duration::Turn)?;
 	duration.set("rest", status::Duration::Rest)?;
 	Ok(duration)
 }
 
-fn heuristic(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+fn heuristic(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	fn saturating_cast(x: mlua::Integer) -> u32 {
 		x.max(u32::MIN as mlua::Integer)
 			.min(u32::MAX as mlua::Integer) as u32
@@ -144,7 +212,7 @@ fn heuristic(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 	Ok(heuristic)
 }
 
-fn log(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+fn log(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let log = lua.create_table()?;
 	log.set("Success", combat::Log::Success)?;
 	log.set("Miss", combat::Log::Miss)?;
@@ -153,7 +221,44 @@ fn log(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 	Ok(log)
 }
 
-fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
+type SkillsetArguments = (
+	mlua::Table,
+	Either<spell::Energy, spell::Harmony>,
+	Either<Option<spell::Energy>, Option<spell::Harmony>>,
+);
+
+fn skillset(lua: &Lua, _: ()) -> Result<mlua::Table> {
+	let skillset = lua.create_table()?;
+	skillset.set("chaos", spell::Harmony::Chaos)?;
+	skillset.set("order", spell::Harmony::Order)?;
+	skillset.set("positive", spell::Energy::Positive)?;
+	skillset.set("negative", spell::Energy::Negative)?;
+	let skillset_meta = lua.create_table()?;
+	skillset_meta.set(
+		"__call",
+		lua.create_function(|_, (_this, major, minor): SkillsetArguments| {
+			Ok(match (major, minor) {
+				(Either::Left(energy), Either::Right(harmony)) => spell::Skillset::EnergyMajor {
+					major: energy,
+					minor: harmony,
+				},
+				(Either::Right(harmony), Either::Left(energy)) => spell::Skillset::HarmonyMajor {
+					major: harmony,
+					minor: energy,
+				},
+				_ => {
+					return Err(Error::runtime(
+						"skillset arguments must not be of the same axis",
+					))
+				}
+			})
+		})?,
+	)?;
+	skillset.set_metatable(Some(skillset_meta));
+	Ok(skillset)
+}
+
+fn stats(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	use character::Stats;
 
 	let stats_meta = lua.create_table()?;
@@ -181,7 +286,7 @@ fn stats(lua: &mlua::Lua, _: ()) -> mlua::Result<mlua::Table> {
 		($($stats:ident),*) => {
 			stats_meta.set(
 				"__call",
-				lua.create_function(|_, table: mlua::Table| {
+				lua.create_function(|_, (_this, table): (mlua::Table, mlua::Table)| {
 					$(let mut $stats = 0;)*
 
 					for i in table.pairs::<mlua::String, u16>() {

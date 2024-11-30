@@ -334,7 +334,7 @@ pub(crate) fn controllable_character(
 			if options.controls.underfoot.contains(keycode) {
 				match world.current_floor.get(x, y) {
 					Some(floor::Tile::Floor) => {
-						console.print_unimportant("There's nothing on the ground here.".into());
+						console.print_unimportant("There's nothing on the ground here.");
 					}
 					Some(floor::Tile::Exit) => {
 						// TODO: move to server.
@@ -342,15 +342,15 @@ pub(crate) fn controllable_character(
 						todo!();
 					}
 					None => {
-						console.print_unimportant("That's the void.".into());
+						console.print_unimportant("That's the void.");
 					}
 					Some(floor::Tile::Wall) => (),
 				}
 			}
 
 			if options.controls.talk.contains(keycode) {
-				console.say("Luvui".into(), "Meow!".into());
-				console.say("Aris".into(), "I am a kitty :3".into());
+				console.say("Luvui", "Meow!");
+				console.say("Aris", "I am a kitty :3");
 			}
 
 			if options.controls.autocombat.contains(keycode) {
@@ -535,7 +535,7 @@ fn gather_spell_inputs(
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
 	let spell = resources.get(&spell_id)?;
-	let thread = scripts.thread(&spell.on_input)?;
+	let thread = scripts.runtime.create_thread(spell.on_input.clone())?;
 	PartialAction::Spell(spell_id, next_character.clone(), thread)
 		.resolve(scripts.runtime, (next_character, spell.clone()))
 }
