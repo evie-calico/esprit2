@@ -11,7 +11,7 @@ pub(crate) struct Typography<'ttf_module, 'rwops> {
 	pub(crate) color: Color,
 }
 
-impl<'ttf_module, 'rwops> Typography<'ttf_module, 'rwops> {
+impl<'ttf_module> Typography<'ttf_module, '_> {
 	/// # Errors
 	///
 	/// Returns an error if the font file could not be read.

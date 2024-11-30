@@ -148,11 +148,11 @@ impl<'texture> ServerHandle<'texture> {
 			.into_trace("failed to serialize action packet")
 	}
 
-	pub(crate) async fn event<'lua>(
+	pub(crate) async fn event(
 		&mut self,
 		input_mode: input::Mode,
 		event: sdl2::event::Event,
-		scripts: &resource::Scripts<'lua>,
+		scripts: &resource::Scripts<'_>,
 		options: &Options,
 	) -> Result<input::Mode, rancor::BoxedError> {
 		let sdl2::event::Event::KeyDown {

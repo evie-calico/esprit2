@@ -153,7 +153,7 @@ impl serde::Serialize for Key {
 
 struct KeyVisitor;
 
-impl<'de> serde::de::Visitor<'de> for KeyVisitor {
+impl serde::de::Visitor<'_> for KeyVisitor {
 	type Value = String;
 
 	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

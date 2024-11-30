@@ -130,7 +130,7 @@ impl Floor {
 				let x = x + xoff;
 				let y = y + yoff;
 				let tile = self.get(x, y);
-				if tile != IMPASSABLE && tile != UNEXPLORED && !a.is_some_and(|a| a.1 < tile) {
+				if tile != IMPASSABLE && tile != UNEXPLORED && a.is_none_or(|a| a.1 >= tile) {
 					Some((direction, tile))
 				} else {
 					a
