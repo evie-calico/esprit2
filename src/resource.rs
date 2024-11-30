@@ -358,6 +358,53 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(spell_registrar.clone()))?,
 		)?;
 
+		let vaults = Rc::new(RefCell::new(Resource::<vault::Vault>::default()));
+		let vault_registrar = make_registrar(Rc::downgrade(&vaults), |table| {
+			let source = table.get::<mlua::String>(1)?;
+			let source = source.to_str()?;
+			let source = source.as_ref();
+			table.set(1, mlua::Nil)?;
+			let symbols: Box<[(char, vault::SymbolMeaning)]> = table
+				.pairs::<mlua::String, mlua::Either<vault::SymbolMeaning, floor::Tile>>()
+				.map(|x| {
+					x.and_then(|(k, v)| {
+						let k = k.to_str()?;
+						let mut chars = k.as_ref().chars();
+						if let Some(c) = chars.next()
+							&& chars.next().is_none()
+						{
+							Ok((c, v.left_or_else(vault::SymbolMeaning::Tile)))
+						} else {
+							Err(mlua::Error::runtime(
+								"expected a string containing a single character",
+							))
+						}
+					})
+				})
+				.collect::<mlua::Result<Box<[(char, vault::SymbolMeaning)]>>>()?;
+			vault::Vault::parse(source, symbols.iter()).map_err(mlua::Error::external)
+		});
+		let vault = lua.create_table()?;
+		let vault_meta = lua.create_table()?;
+		vault_meta.set(
+			"__call",
+			lua.create_function(move |lua, (_, id): (mlua::Table, _)| vault_registrar(lua, id))?,
+		)?;
+		vault.set_metatable(Some(vault_meta));
+		vault.set(
+			"character",
+			lua.create_function(|_, (sheet, tile): (resource::Sheet, Option<floor::Tile>)| {
+				Ok(vault::SymbolMeaning::Character {
+					sheet,
+					tile: tile.unwrap_or(floor::Tile::Floor),
+				})
+			})?,
+		)?;
+		lua.load_from_function::<mlua::Value>(
+			"esprit.resources.vault",
+			lua.create_function(move |_, ()| Ok(vault.clone()))?,
+		)?;
+
 		let statuses = Rc::new(RefCell::new(Resource::<status::Status>::default()));
 		let status_registrar =
 			lua.create_function(make_registrar(Rc::downgrade(&statuses), |table| {
@@ -389,7 +436,10 @@ impl Manager {
 			.set("path", "")?;
 
 		lua.unload("esprit.resources.attack")?;
+		lua.unload("esprit.resources.sheet")?;
+		lua.unload("esprit.resources.spells")?;
 		lua.unload("esprit.resources.status")?;
+		lua.unload("esprit.resources.vaults")?;
 
 		let attacks = Rc::into_inner(attacks)
 			.expect("attacks must have only one strong reference")
@@ -403,8 +453,9 @@ impl Manager {
 		let statuses = Rc::into_inner(statuses)
 			.expect("statuses must have only one strong reference")
 			.into_inner();
-
-		let vaults = register(&path.join("vaults"), |path| vault::Vault::open(path))?;
+		let vaults = Rc::into_inner(vaults)
+			.expect("vaults must have only one strong reference")
+			.into_inner();
 
 		Ok(Self {
 			attacks,

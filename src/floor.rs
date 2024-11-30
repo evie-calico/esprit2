@@ -12,6 +12,7 @@ use std::collections::HashMap;
 	rkyv::Archive,
 	rkyv::Serialize,
 	rkyv::Deserialize,
+	mlua::FromLua,
 )]
 // Keeping this very light is probably a good idea.
 // Decorations, like statues and fountains and such, are sporadic and should be stored seperately.

@@ -1,6 +1,5 @@
 use crate::floor::Tile;
 use crate::prelude::*;
-use std::{collections::HashMap, fs, path::Path};
 
 pub struct Set {
 	pub vaults: Vec<resource::Vault>,
@@ -23,7 +22,7 @@ fn tile_floor() -> Tile {
 	Tile::Floor
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
 pub enum SymbolMeaning {
 	Tile(Tile),
 	Character {
@@ -35,10 +34,7 @@ pub enum SymbolMeaning {
 	Void,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Metadata {
-	symbols: HashMap<char, SymbolMeaning>,
-}
+impl mlua::UserData for SymbolMeaning {}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -56,27 +52,18 @@ impl Vault {
 	/// # Errors
 	///
 	/// Returns an error if the file could not be opened or parsed.
-	pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-		let mut width = 0;
-
-		let vault_text = fs::read_to_string(path)?;
-
-		let (metadata, layout) = vault_text
-			.split_once("# Layout\n")
-			.ok_or(Error::MissingLayout)?;
-
-		let metadata: Metadata = toml::from_str(metadata)?;
-
-		// Before we can do anything, we need to know how wide this vault is.
-		for line in layout.lines() {
-			width = width.max(line.len());
-		}
+	pub fn parse(
+		source: &str,
+		symbols: impl Iterator<Item = &(char, SymbolMeaning)> + Clone,
+	) -> Result<Self, Error> {
+		let lines = source.lines().skip_while(|line| line.is_empty());
+		let width = lines.clone().fold(0, |width, line| width.max(line.len()));
 
 		let mut tiles = Vec::new();
 		let mut characters = Vec::new();
 		let mut edges = Vec::new();
 
-		for (y, line) in layout.lines().enumerate() {
+		for (y, line) in lines.enumerate() {
 			for (x, c) in line.chars().enumerate() {
 				let default_action = match c {
 					// This should define symbols for all Tile variants.
@@ -88,7 +75,11 @@ impl Vault {
 					'E' => Some(SymbolMeaning::Edge),
 					_ => None,
 				};
-				if let Some(action) = metadata.symbols.get(&c).or(default_action.as_ref()) {
+				if let Some(action) = symbols
+					.clone()
+					.find_map(|x| if x.0 == c { Some(&x.1) } else { None })
+					.or(default_action.as_ref())
+				{
 					match action {
 						SymbolMeaning::Edge => edges.push((x as i32, y as i32)),
 						SymbolMeaning::Character { sheet, tile: _ } => {
