@@ -17,21 +17,6 @@ pub struct Manager {
 	pub inventory: Vec<String>,
 }
 
-/// Contains information about what should generate on each floor.
-#[derive(Clone, Debug, alua::UserData)]
-pub struct Level {
-	#[alua(get, set)]
-	pub name: String,
-}
-
-impl Default for Level {
-	fn default() -> Self {
-		Self {
-			name: String::from("New Level"),
-		}
-	}
-}
-
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct PartyReference {
 	/// The piece that is being used by this party member.

@@ -464,35 +464,21 @@ impl expression::Variables for Sheet {
 }
 
 #[derive(
-	Clone,
-	Copy,
-	Debug,
-	Default,
-	alua::UserData,
-	mlua::FromLua,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
+	Clone, Copy, Debug, Default, mlua::FromLua, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
 pub struct Stats {
 	/// Health, or HP; Heart Points
-	#[alua(get)]
 	pub heart: u16,
 	/// Magic, or SP; Soul Points
-	#[alua(get)]
 	pub soul: u16,
 	/// Bonus damage applied to physical attacks.
-	#[alua(get)]
 	pub power: u16,
 	/// Damage reduction when recieving physical attacks.
-	#[alua(get)]
 	pub defense: u16,
 	/// Bonus damage applied to magical attacks.
-	#[alua(get)]
 	pub magic: u16,
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
-	#[alua(get)]
 	pub resistance: u16,
 }
 
@@ -568,6 +554,17 @@ impl std::ops::Div<u16> for Stats {
 			magic: self.magic / rhs,
 			resistance: self.resistance / rhs,
 		}
+	}
+}
+
+impl mlua::UserData for Stats {
+	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+		fields.add_field_method_get("heart", |_, this| Ok(this.heart));
+		fields.add_field_method_get("soul", |_, this| Ok(this.soul));
+		fields.add_field_method_get("power", |_, this| Ok(this.power));
+		fields.add_field_method_get("defense", |_, this| Ok(this.defense));
+		fields.add_field_method_get("magic", |_, this| Ok(this.magic));
+		fields.add_field_method_get("resistance", |_, this| Ok(this.resistance));
 	}
 }
 
