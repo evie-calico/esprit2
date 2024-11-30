@@ -32,8 +32,6 @@ pub enum Error {
 	#[error(transparent)]
 	Io(#[from] std::io::Error),
 	#[error(transparent)]
-	Toml(#[from] toml::de::Error),
-	#[error(transparent)]
 	Lua(#[from] mlua::Error),
 
 	#[error("lua function requested user input when it was unavailable")]
@@ -67,13 +65,13 @@ pub const SQRT2_TURN: Aut = 17;
 
 pub type Color = (u8, u8, u8, u8);
 
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug)]
 pub enum DirectionType {
 	Cardinal,
 	Ordinal,
 }
 
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug)]
 pub enum CardDir {
 	Up,
 	Right,
@@ -106,7 +104,7 @@ impl CardDir {
 	}
 }
 
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug)]
 pub enum OrdDir {
 	Up,
 	UpRight,

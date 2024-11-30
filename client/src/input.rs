@@ -162,8 +162,7 @@ pub(crate) struct CursorState {
 	pub(crate) float: SinWave,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, FromLua)]
-#[serde(tag = "type")]
+#[derive(Clone, Debug, FromLua)]
 pub(crate) enum Request {
 	Cursor {
 		x: i32,

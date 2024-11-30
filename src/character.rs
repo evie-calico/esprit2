@@ -316,7 +316,7 @@ impl Piece {
 	}
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default)]
 pub struct StatOutcomes {
 	pub stats: Stats,
 	pub buffs: Stats,
@@ -374,17 +374,7 @@ pub enum Action {
 impl mlua::UserData for Action {}
 
 #[derive(
-	Copy,
-	PartialEq,
-	Eq,
-	Clone,
-	Debug,
-	Default,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
+	Copy, PartialEq, Eq, Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
 #[repr(u32)]
 pub enum Alliance {
@@ -478,8 +468,6 @@ impl expression::Variables for Sheet {
 	Copy,
 	Debug,
 	Default,
-	serde::Serialize,
-	serde::Deserialize,
 	alua::UserData,
 	mlua::FromLua,
 	rkyv::Archive,
@@ -488,28 +476,22 @@ impl expression::Variables for Sheet {
 )]
 pub struct Stats {
 	/// Health, or HP; Heart Points
-	#[serde(default)]
 	#[alua(get)]
 	pub heart: u16,
 	/// Magic, or SP; Soul Points
-	#[serde(default)]
 	#[alua(get)]
 	pub soul: u16,
 	/// Bonus damage applied to physical attacks.
-	#[serde(default)]
 	#[alua(get)]
 	pub power: u16,
 	/// Damage reduction when recieving physical attacks.
-	#[serde(default)]
 	#[alua(get)]
 	pub defense: u16,
 	/// Bonus damage applied to magical attacks.
-	#[serde(default)]
 	#[alua(get)]
 	pub magic: u16,
 	/// Damage reduction when recieving magical attacks.
 	/// Also makes harmful spells more likely to fail.
-	#[serde(default)]
 	#[alua(get)]
 	pub resistance: u16,
 }

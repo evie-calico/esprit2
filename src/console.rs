@@ -56,8 +56,7 @@ macro_rules! impl_console {
 		$(let $colors:ident: $value:expr,)+
 	) => {
 		paste! {
-			#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-			#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+			#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 			pub enum Color {
 				$([<$impl_colors:camel>],)*
 			}

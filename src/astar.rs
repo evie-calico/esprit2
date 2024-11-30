@@ -16,17 +16,7 @@ pub const IMPASSABLE: u16 = u16::MAX - 1;
 const CHUNK_SIZE: usize = 16;
 
 #[derive(
-	Clone,
-	Copy,
-	Debug,
-	Eq,
-	PartialEq,
-	Hash,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
+	Clone, Copy, Debug, Eq, PartialEq, Hash, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
 #[rkyv(derive(Clone, Copy, Debug, Eq, PartialEq, Hash))]
 struct ChunkId(i32, i32);
@@ -40,18 +30,8 @@ impl ChunkId {
 	}
 }
 
-#[serde_with::serde_as]
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 struct Chunk {
-	#[serde_as(as = "[_; CHUNK_SIZE * CHUNK_SIZE]")]
 	map: [Distance; CHUNK_SIZE * CHUNK_SIZE],
 }
 
@@ -63,16 +43,7 @@ impl Default for Chunk {
 	}
 }
 
-#[derive(
-	Clone,
-	Debug,
-	Default,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Floor {
 	chunks: HashMap<ChunkId, Chunk>,
 	frontier: Vec<(i32, i32)>,

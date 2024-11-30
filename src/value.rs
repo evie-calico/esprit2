@@ -1,12 +1,4 @@
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[rkyv(serialize_bounds(
     __S: rkyv::ser::Writer + rkyv::ser::Allocator,
     __S::Error: rkyv::rancor::Source,
@@ -17,7 +9,6 @@
         __C: rkyv::validation::ArchiveContext,
     )
 ))]
-#[serde(untagged)]
 pub enum Value {
 	Nil,
 	Boolean(bool),

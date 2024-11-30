@@ -18,7 +18,7 @@ pub struct Manager {
 }
 
 /// Contains information about what should generate on each floor.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, alua::UserData)]
+#[derive(Clone, Debug, alua::UserData)]
 pub struct Level {
 	#[alua(get, set)]
 	pub name: String,
@@ -55,15 +55,7 @@ pub struct PartyReferenceBase {
 	pub accent_color: Color,
 }
 
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Location {
 	/// Which level is currently loaded.
 	pub level: String,

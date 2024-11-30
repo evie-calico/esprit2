@@ -234,50 +234,6 @@ impl_int!(i32);
 impl_int!(i64);
 impl_int!(i128);
 
-impl serde::Serialize for Expression {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		serializer.serialize_str(&self.source)
-	}
-}
-
-struct ExpressionVisitor;
-
-impl<'de> serde::de::Visitor<'de> for ExpressionVisitor {
-	type Value = String;
-
-	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-		formatter.write_str("a string containing an expression")
-	}
-
-	fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-	where
-		E: serde::de::Error,
-	{
-		Ok(value)
-	}
-
-	fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-	where
-		E: serde::de::Error,
-	{
-		Ok(value.to_string())
-	}
-}
-
-impl<'de> serde::Deserialize<'de> for Expression {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		use serde::de::Error;
-		Expression::try_from(deserializer.deserialize_string(ExpressionVisitor)?)
-			.map_err(D::Error::custom)
-	}
-}
-
 #[derive(pest_derive::Parser)]
 #[grammar = "expression.pest"]
 struct OperationParser;

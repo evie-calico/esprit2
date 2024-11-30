@@ -12,7 +12,7 @@ esprit2-server.path = "../server"
 mlua.workspace = true
 rand = "0.8.5"
 sdl2 = { version = "0.37.0", features = ["image", "ttf", "gfx"] }
-serde = "1.0.208"
+serde = { version = "1.0.208", features = ["derive"] }
 thiserror = "1.0.63"
 toml = "0.8.19"
 tracing = "0.1.40"

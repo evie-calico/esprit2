@@ -3,15 +3,7 @@ use std::sync::LazyLock;
 
 /// For dynamically addressing a character.
 /// This should encompass almost every (dynamic) way of addressing someone or something.
-#[derive(
-	Clone,
-	Debug,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
-)]
+#[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Nouns {
 	pub name: Box<str>,
 	/// If true, will be addressed as "Name", rather than "The name" or "A name".
@@ -20,17 +12,7 @@ pub struct Nouns {
 }
 
 #[derive(
-	Clone,
-	Copy,
-	Debug,
-	Default,
-	Eq,
-	PartialEq,
-	serde::Serialize,
-	serde::Deserialize,
-	rkyv::Archive,
-	rkyv::Serialize,
-	rkyv::Deserialize,
+	Clone, Copy, Debug, Default, Eq, PartialEq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
 pub enum Pronouns {
 	Female,

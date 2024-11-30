@@ -33,7 +33,7 @@ pub enum Skillset {
 
 impl mlua::UserData for Skillset {}
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Affinity {
 	/// No skillset matches; the spell is not castable.
 	Uncastable,

@@ -31,16 +31,9 @@ mlua.workspace = true
 pest = "2.7.10"
 pest_derive = "2.7.10"
 
-# Serialization
-serde = { version = "1.0.196", features = ["derive", "rc"] }
-serde_with = "3.9.0"
-toml = "0.8.10"
-rkyv.workspace = true
-
-# Error handling + logging
-thiserror = "1.0.57"
-tracing = "0.1.40"
-
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
 paste = "1.0.14" # Useful for proc macros
 rand = "0.8.5"
+rkyv.workspace = true
+thiserror = "1.0.57"
+tracing = "0.1.40"

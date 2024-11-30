@@ -18,18 +18,10 @@ pub struct Vault {
 	pub edges: Vec<(i32, i32)>,
 }
 
-fn tile_floor() -> Tile {
-	Tile::Floor
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, mlua::FromLua)]
+#[derive(Clone, Debug, mlua::FromLua)]
 pub enum SymbolMeaning {
 	Tile(Tile),
-	Character {
-		sheet: resource::Sheet,
-		#[serde(default = "tile_floor")]
-		tile: Tile,
-	},
+	Character { sheet: resource::Sheet, tile: Tile },
 	Edge,
 	Void,
 }
