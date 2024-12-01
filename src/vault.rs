@@ -2,7 +2,7 @@ use crate::floor::Tile;
 use crate::prelude::*;
 
 pub struct Set {
-	pub vaults: Vec<resource::Vault>,
+	pub vaults: Vec<Box<str>>,
 	/// Nodes per floor
 	pub density: u32,
 	/// ratio of halls to vaults.
@@ -14,14 +14,14 @@ pub struct Vault {
 	pub tiles: Vec<Option<Tile>>,
 	pub width: usize,
 
-	pub characters: Vec<(i32, i32, resource::Sheet)>,
+	pub characters: Vec<(i32, i32, Box<str>)>,
 	pub edges: Vec<(i32, i32)>,
 }
 
 #[derive(Clone, Debug, mlua::FromLua)]
 pub enum SymbolMeaning {
 	Tile(Tile),
-	Character { sheet: resource::Sheet, tile: Tile },
+	Character { sheet: Box<str>, tile: Tile },
 	Edge,
 	Void,
 }

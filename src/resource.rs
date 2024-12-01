@@ -14,109 +14,6 @@ pub enum Error {
 	InvalidKey,
 }
 
-pub trait Id<Manager> {
-	type Resource;
-	fn get<'resources>(&self, resources: &'resources Manager)
-		-> Result<&'resources Self::Resource>;
-}
-
-// TODO: This was a mistake, please remove.
-macro_rules! impl_resource {
-	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt $(impl$(<$($next_lifetime:lifetime),*>)? $NextName:ident as $NextResource:ty where ($next_self:ident, $next_resources:ident: $NextManager:ty) $next_body:tt)+) => {
-		impl_resource! {
-			impl<$($lifetime),*> $Name as $Resource where ($self, $resources: $Manager) $body
-		}
-		impl_resource! {
-			$(impl$(<$($next_lifetime),*>)? $NextName as $NextResource where ($next_self, $next_resources: $NextManager) $next_body)+
-		}
-	};
-	(impl$(<$($lifetime:lifetime),*>)? $Name:ident as $Resource:ty where ($self:ident, $resources:ident: $Manager:ty) $body:tt ) => {
-		#[derive(
-			Clone, Debug, Eq, PartialEq, Hash,
-			rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
-		)]
-		#[rkyv(derive(Eq, PartialEq, Hash))]
-		pub struct $Name(Box<str>);
-
-		impl $Name {
-			pub fn new(id: &str) -> Self {
-				id.into()
-			}
-		}
-
-		impl<T: Into<Box<str>>> From<T> for $Name {
-			fn from(s: T) -> Self {
-				Self(s.into())
-			}
-		}
-
-		impl AsRef<str> for $Name {
-			fn as_ref(&self) -> &str {
-				&*self.0
-			}
-		}
-
-		impl$(<$($lifetime),*>)? Id<$Manager> for $Name {
-			type Resource = $Resource;
-			fn get<'resources>(
-				&$self,
-				$resources: &'resources $Manager,
-			) -> Result<&'resources Self::Resource> {
-				#[allow(unused_braces)]
-				$body
-			}
-		}
-
-		impl ::std::fmt::Display for $Name {
-			fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-				f.write_str(&self.0)
-			}
-		}
-
-		impl mlua::IntoLua for $Name {
-			fn into_lua(self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
-				Ok(mlua::Value::String(lua.create_string(self.as_ref())?))
-			}
-		}
-
-		impl mlua::FromLua for $Name {
-			fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
-				Ok(value
-					.as_str()
-					.ok_or_else(|| mlua::Error::runtime("expected string"))?
-					.as_ref()
-					.into())
-			}
-		}
-	};
-}
-
-impl_resource! {
-	impl Attack as Rc<attack::Attack> where (self, resources: resource::Manager) {
-		resources.attacks.get(&self.0)
-	}
-
-	impl Function as mlua::Function where (self, resources: resource::Manager) {
-		resources.functions.get(&self.0)
-	}
-
-	impl Sheet as Rc<character::Sheet> where (self, resources: resource::Manager) {
-		resources.sheets.get(&self.0)
-	}
-
-	impl Spell as Rc<spell::Spell> where (self, resources: resource::Manager) {
-		resources.spells.get(&self.0)
-	}
-
-	impl Status as Rc<status::Status> where (self, resources: resource::Manager) {
-		resources.statuses.get(&self.0)
-	}
-
-	impl Vault as Rc<vault::Vault> where (self, resources: resource::Manager) {
-		resources.vaults.get(&self.0)
-	}
-}
-
 #[derive(Debug)]
 pub struct Resource<T>(HashMap<Box<str>, T>);
 
@@ -424,7 +321,7 @@ impl Manager {
 		vault.set_metatable(Some(vault_meta));
 		vault.set(
 			"character",
-			lua.create_function(|_, (sheet, tile): (resource::Sheet, Option<floor::Tile>)| {
+			lua.create_function(|_, (sheet, tile): (Box<str>, Option<floor::Tile>)| {
 				Ok(vault::SymbolMeaning::Character {
 					sheet,
 					tile: tile.unwrap_or(floor::Tile::Floor),
@@ -485,9 +382,5 @@ impl Manager {
 			statuses,
 			vaults,
 		})
-	}
-
-	pub fn get<T: Id<Self>>(&self, id: &T) -> Result<&T::Resource> {
-		id.get(self)
 	}
 }

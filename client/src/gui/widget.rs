@@ -162,7 +162,7 @@ pub(crate) fn spell_menu(
 		.sheet
 		.spells
 		.iter()
-		.map(|k| resources.get(k))
+		.map(|k| resources.spells.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(spell) = spell else {
@@ -190,7 +190,7 @@ pub(crate) fn attack_menu(
 		.sheet
 		.attacks
 		.iter()
-		.map(|k| resources.get(k))
+		.map(|k| resources.attacks.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(attack) = attack else {
@@ -534,11 +534,10 @@ fn character_buffs(
 	resources: &resource::Manager,
 	textures: &texture::Manager,
 ) {
-	use resource::Id;
 	let mut statuses = piece
 		.statuses
 		.keys()
-		.filter_map(|x| x.get(resources).ok())
+		.filter_map(|x| resources.statuses.get(x).ok())
 		.peekable();
 	let statuses_copy = statuses.clone();
 	while statuses.peek().is_some() {

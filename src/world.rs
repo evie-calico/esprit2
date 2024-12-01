@@ -36,7 +36,7 @@ impl PartyReference {
 
 // this is probably uneccessary and just makes main.rs look nicer
 pub struct PartyReferenceBase {
-	pub sheet: resource::Sheet,
+	pub sheet: Box<str>,
 	pub accent_color: Color,
 }
 
@@ -50,7 +50,7 @@ pub struct Location {
 impl Manager {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
-		resource_manager: &resource::Manager,
+		resources: &resource::Manager,
 	) -> Result<Self> {
 		let mut party = Vec::new();
 		let mut characters = VecDeque::new();
@@ -62,7 +62,7 @@ impl Manager {
 			accent_color,
 		} in party_blueprint
 		{
-			let sheet = resource_manager.get(&sheet)?;
+			let sheet = resources.sheets.get(&sheet)?;
 			let character = character::Ref::new(character::Piece {
 				player_controlled,
 				alliance: character::Alliance::Friendly,
@@ -192,7 +192,7 @@ impl Manager {
 					warn!("set has no vaults");
 					break 'placement;
 				};
-				let vault = resources.get(vault)?;
+				let vault = resources.vaults.get(vault)?;
 				// for every possible edge of the vault (shuffled), check if it fits.
 				let mut potential_edges = vault.edges.clone();
 				potential_edges.shuffle(&mut rng);
@@ -252,7 +252,7 @@ impl Manager {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new((**resources.get(sheet)?).clone())
+				..character::Piece::new((**resources.sheets.get(sheet)?).clone())
 			};
 			self.characters.push_front(character::Ref::new(piece));
 		}
@@ -352,12 +352,12 @@ impl Manager {
 			}
 			character::Action::Attack(attack, arguments) => self.attack(
 				lua,
-				resources.get(&attack)?.clone(),
+				resources.attacks.get(&attack)?.clone(),
 				next_character,
 				arguments,
 			)?,
 			character::Action::Cast(spell, arguments) => self.cast(
-				resources.get(&spell)?.clone(),
+				resources.spells.get(&spell)?.clone(),
 				next_character,
 				lua,
 				arguments,

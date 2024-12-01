@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use mlua::IntoLuaMulti;
-use resource::Id;
 use rkyv::with::{ArchiveWith, DeserializeWith, SerializeWith};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -68,12 +67,14 @@ fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> 
 fn inflict(
 	_lua: &mlua::Lua,
 	this: &Ref,
-	(key, value, update): (resource::Status, Value, Option<mlua::Function>),
+	(key, value, update): (mlua::String, Value, Option<mlua::Function>),
 ) -> mlua::Result<()> {
+	let key = key.to_str()?;
+	let key = key.as_ref();
 	let value = this
 		.borrow_mut()
 		.statuses
-		.entry(key.clone())
+		.entry(key.into())
 		.or_insert(value)
 		.clone();
 	if let Some(update) = update {
@@ -81,7 +82,7 @@ fn inflict(
 		// It's a weird thing to do but an expect may panic here if the update function removes the status,
 		// so the status value only gets updated if it still exists.
 		// This also has to reborrow since `this` must be unlocked before `update` is called.
-		if let Some(value) = this.borrow_mut().statuses.get_mut(&key) {
+		if let Some(value) = this.borrow_mut().statuses.get_mut(key) {
 			*value = result;
 		}
 	}
@@ -247,7 +248,7 @@ pub struct Piece {
 	pub hp: i32,
 	pub sp: i32,
 
-	pub statuses: HashMap<resource::Status, Value>,
+	pub statuses: HashMap<Box<str>, Value>,
 
 	pub x: i32,
 	pub y: i32,
@@ -288,7 +289,9 @@ impl Piece {
 	pub fn new_turn(&mut self, resources: &resource::Manager) {
 		// Remove any status effects with the duration of one turn.
 		self.statuses.retain(|k, _| {
-			k.get(resources)
+			resources
+				.statuses
+				.get(k)
 				.ok()
 				.map(|status| !matches!(status.duration, status::Duration::Turn))
 				.unwrap_or(false)
@@ -304,7 +307,9 @@ impl Piece {
 		self.sp = i32::min(self.sp + (stats.soul as u32) as i32, stats.soul as i32);
 		// Remove any status effects lasting until the next rest.
 		self.statuses.retain(|k, _| {
-			k.get(resources)
+			resources
+				.statuses
+				.get(k)
 				// It's not very practical to handle missing resources in this retain,
 				// nor should it ever happen in the first place,
 				// so missing statuses just get discarded.
@@ -367,8 +372,8 @@ impl Piece {
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(resource::Attack, Value),
-	Cast(resource::Spell, Value),
+	Attack(Box<str>, Value),
+	Cast(Box<str>, Value),
 }
 
 impl mlua::UserData for Action {}
@@ -431,8 +436,8 @@ pub struct Sheet {
 	pub skillset: spell::Skillset,
 	pub speed: Aut,
 
-	pub attacks: Vec<resource::Attack>,
-	pub spells: Vec<resource::Spell>,
+	pub attacks: Vec<Box<str>>,
+	pub spells: Vec<Box<str>>,
 
 	/// Script to decide on an action from a list of considerations
 	pub on_consider: Box<str>,

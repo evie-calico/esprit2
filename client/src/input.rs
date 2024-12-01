@@ -181,8 +181,8 @@ pub(crate) enum Request {
 impl mlua::UserData for Request {}
 
 pub(crate) enum PartialAction {
-	Attack(resource::Attack, character::Ref, mlua::Thread),
-	Spell(resource::Spell, character::Ref, mlua::Thread),
+	Attack(Box<str>, character::Ref, mlua::Thread),
+	Spell(Box<str>, character::Ref, mlua::Thread),
 }
 
 impl PartialAction {
@@ -501,10 +501,10 @@ pub(crate) fn controllable_character(
 fn gather_attack_inputs(
 	resources: &resource::Manager,
 	lua: &mlua::Lua,
-	attack_id: resource::Attack,
+	attack_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
-	let attack = resources.get(&attack_id)?;
+	let attack = resources.attacks.get(&attack_id)?;
 	let thread = lua.create_thread(attack.on_input.clone())?;
 	PartialAction::Attack(attack_id, next_character.clone(), thread)
 		.resolve(lua, (next_character, attack.clone()))
@@ -513,10 +513,10 @@ fn gather_attack_inputs(
 fn gather_spell_inputs(
 	resources: &resource::Manager,
 	lua: &mlua::Lua,
-	spell_id: resource::Spell,
+	spell_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
-	let spell = resources.get(&spell_id)?;
+	let spell = resources.spells.get(&spell_id)?;
 	let thread = lua.create_thread(spell.on_input.clone())?;
 	PartialAction::Spell(spell_id, next_character.clone(), thread)
 		.resolve(lua, (next_character, spell.clone()))
