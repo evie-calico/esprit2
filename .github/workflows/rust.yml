@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install Dependencies
-      run: sudo apt-get install -yq libsdl2-2.0-0-dev libsdl2-image-2.0-0-dev libsdl2-ttf-2.0-0-dev libsdl2-gfx-1.0-0-dev libluajit-5.1-2-dev
+      run: sudo apt-get install -yq libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-gfx-dev libluajit-5.1-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
