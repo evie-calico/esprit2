@@ -16,10 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install SDL 2
-      run: apt install sdl2
-    - name: Install LuaJIT
-      run: apt install luajit
+    - name: Install Dependencies
+      run: apt-get install -yq sdl2 luajit
     - name: Build
       run: cargo build --verbose
     - name: Run tests
