@@ -1,4 +1,5 @@
 local movement = require "movement"
+local team = require "team"
 
 ---@param user Piece
 return function(user)
@@ -33,7 +34,7 @@ return function(user)
 	---@param heuristic DamageHeuristic
 	---@return integer
 	local function damage_score(heuristic)
-		local damages_ally = heuristic.target.alliance == user.alliance
+		local damages_ally = team.friendly(user, heuristic.target)
 		local score = heuristic.amount
 		if heuristic.target.hp - heuristic.amount <= 0 then
 			-- huge emphasis on killing
@@ -45,7 +46,7 @@ return function(user)
 	---@param heuristic DebuffHeuristic
 	---@return integer
 	local function debuff_score(heuristic)
-		local damages_ally = heuristic.target.alliance == user.alliance
+		local damages_ally = team.friendly(user, heuristic.target)
 		return correct_risk(
 			heuristic.amount * 2, -- give debuffs some extra weight
 			damages_ally

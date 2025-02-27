@@ -37,7 +37,6 @@ pub type Checksum = u64;
 pub fn checksum(bytes: impl Iterator<Item = u8>) -> Checksum {
 	const CHECKSUM_BYTES: usize = Checksum::BITS as usize / 8;
 	bytes
-		.map(Into::into)
 		.array_chunks::<CHECKSUM_BYTES>()
 		.map(Checksum::from_le_bytes)
 		.reduce(|a, b| a ^ b)

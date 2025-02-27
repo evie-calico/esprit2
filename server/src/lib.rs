@@ -275,6 +275,7 @@ pub fn instance(
 
 				loop {
 					match server.world.tick(&server.resources, &lua, &console) {
+						// TODO: infinite loop when the player dies please fix. (how)
 						Ok(true) => (),
 						Ok(false) => break,
 						Err(msg) => {
@@ -342,7 +343,7 @@ async fn client_tick(
 			let next_character = server.world.next_character();
 			// TODO: Uuid-based piece ownership.
 			// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
-			if next_character.borrow().player_controlled {
+			if next_character.borrow().statuses.contains_key("_:conscious") {
 				server
 					.world
 					.perform_action(console, &server.resources, lua, action)?;

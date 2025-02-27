@@ -243,10 +243,9 @@ pub(crate) async fn main() {
 			server.tick(delta, input_mode).await.unwrap();
 			if let Some(world) = &mut server.world {
 				// TODO: Avoid ticking more than once when too late in the frame.
-				while world
+				world
 					.tick(&server.resources, &lua, &server.console)
-					.unwrap()
-				{}
+					.unwrap();
 			}
 		}
 

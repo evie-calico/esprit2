@@ -1,4 +1,5 @@
 local expression = require "esprit.types.expression"
+local team = require "team"
 
 require "esprit.resources.spell" "magic_missile" {
 	name = "Magic Missile",
@@ -93,7 +94,7 @@ require "esprit.resources.spell" "magic_missile" {
 		local spell = resources:spell(spell_id)
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, spell.parameters.range --[[@as integer]])) do
-			if not user:is_allied(character) then
+			if not team.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(

@@ -24,6 +24,34 @@ spell "debug/level_up" {
 	parameters = { range = 5 },
 }
 
+spell "debug/possess" {
+	name = "(DEBUG) Possess",
+	description = "Makes the targetted piece controllable by the user of this spell. Removes consciousness if it's already present.",
+	icon = "dummy",
+
+	energy = "positive",
+	harmony = "order",
+
+	level = 0,
+
+	on_cast = function(_, _, args)
+		local console = require "esprit.console"
+		local world = require "esprit.world"
+
+		local target = world.character_at(args.target.x, args.target.y)
+		if target == nil then return end
+		if target:detach("_:conscious") == nil then
+			console:print(target:replace_nouns("{Address} has been possessed!"))
+			target:attach("_:conscious")
+		else
+			console:print(target:replace_nouns("{Address} is thinking for {themself}."))
+		end
+	end,
+	on_input = require "input.single_target",
+
+	parameters = { range = 5 },
+}
+
 spell "debug/change_affinity" {
 	name = "(DEBUG) Change Affinity",
 	description = "Changes the target's magical affinity",

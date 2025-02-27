@@ -25,3 +25,19 @@ status "close_combat" {
 	duration = duration.turn,
 	on_debuff = function() return stats.defense(4) end
 }
+
+-- TODO: This should be an engine-internal resource (hence the _ namespace)
+-- TODO: This should be associated with a Value that denotes the owning player.
+status "_:conscious" {
+	name = "Conscious",
+	icon = "dummy",
+	duration = duration.rest, -- TODO duration.forever
+}
+
+-- TODO: This should be an engine-internal resource (hence the _ namespace)
+-- TODO: This should be associated with a Value that denotes the team's identifier. (eg, _:players, esprit:rats, etc.)
+status "_:team" {
+	name = "Teams",
+	icon = "dummy",
+	duration = duration.rest, -- TODO duration.forever
+}

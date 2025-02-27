@@ -1,4 +1,5 @@
 local expression = require "esprit.types.expression"
+local team = require "team"
 
 require "esprit.resources.attack" "scratch" {
 	name = "Scratch",
@@ -26,7 +27,8 @@ require "esprit.resources.attack" "scratch" {
 			-- to help weaker characters overcome their glancing blows
 			-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
 			local new_magnitude = 5 + damage
-			target:inflict("bleed", new_magnitude, function(old_magnitude) return old_magnitude + new_magnitude end);
+			local old_magnitude = target:component("bleed") or 0
+			target:attach("bleed", old_magnitude + new_magnitude)
 		end
 
 		local damage_messages = {
@@ -70,7 +72,7 @@ require "esprit.resources.attack" "scratch" {
 		local attack = resources:attack(attack_id)
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
-			if not user:is_allied(character) then
+			if team.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(

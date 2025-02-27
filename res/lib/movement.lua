@@ -1,3 +1,5 @@
+local team = require "team"
+
 ---@param user Piece
 ---@param considerations [Consider]
 return function(user, considerations)
@@ -7,7 +9,7 @@ return function(user, considerations)
 	local heuristic = require "esprit.types.heuristic"
 
 	for _, v in ipairs(world.characters()) do
-		if user.alliance ~= v.alliance then
+		if team.friendly(user, v) then
 			table.insert(
 				considerations,
 				consider(

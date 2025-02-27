@@ -1,4 +1,5 @@
 local expression = require "esprit.types.expression"
+local team = require "team"
 
 require "esprit.resources.spell" "swap" {
 	name = "Swap",
@@ -32,8 +33,8 @@ require "esprit.resources.spell" "swap" {
 
 		user.sp = user.sp - spell.level
 
-		if not user:is_allied(target)
-			and spell:affinity(user):magnitude(spell.parameters.magnitude(user)) - target.stats.resistance <= 0
+		if not team.friendly(user, target)
+			and spell:affinity(user):magnitude(spell.parameters.magnitude(user.stats)) - target.stats.resistance <= 0
 		then
 			console:combat_log(
 				combat.format(user, target, "{target_Address} resisted {self_address}'s swap."),

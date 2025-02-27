@@ -161,7 +161,12 @@ impl<'texture> ServerHandle<'texture> {
 			return Ok(input_mode);
 		};
 
-		if !world.next_character().borrow().player_controlled {
+		if !world
+			.next_character()
+			.borrow()
+			.statuses
+			.contains_key("_:conscious")
+		{
 			return Ok(input_mode);
 		}
 		let result = match input::controllable_character(
@@ -272,15 +277,16 @@ impl<'texture> ServerHandle<'texture> {
 			let height = 320;
 			let mut camera = draw::Camera::default();
 			camera.update_size(width, height);
-			let focused_character = &world
+			if let Some(focused_character) = &world
 				.characters
 				.iter()
-				.find(|x| x.borrow().player_controlled)
-				.unwrap();
-			if let input::Mode::Cursor(input::Cursor { position, .. }) = &input_mode {
-				camera.focus_character_with_cursor(&focused_character.borrow(), *position);
-			} else {
-				camera.focus_character(&focused_character.borrow());
+				.find(|x| x.borrow().statuses.contains_key("_:conscious"))
+			{
+				if let input::Mode::Cursor(input::Cursor { position, .. }) = &input_mode {
+					camera.focus_character_with_cursor(&focused_character.borrow(), *position);
+				} else {
+					camera.focus_character(&focused_character.borrow());
+				}
 			}
 
 			let texture_creator = ctx.canvas.texture_creator();

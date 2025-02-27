@@ -9,7 +9,7 @@ functions("basic", require "basic")
 sheet "luvui" {
 	level = 1,
 	attacks = attacks,
-	spells = { "magic_missile", "swap", "crush", "debug/level_up", "debug/change_affinity" },
+	spells = { "magic_missile", "swap", "crush", "debug/level_up", "debug/change_affinity", "debug/possess" },
 	speed = 12,
 	icon = "luvui",
 

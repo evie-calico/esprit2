@@ -10,7 +10,7 @@
     )
 ))]
 pub enum Value {
-	Nil,
+	Unit,
 	Boolean(bool),
 	Integer(mlua::Integer),
 	Number(mlua::Number),
@@ -23,7 +23,10 @@ pub enum Value {
 impl Value {
 	pub fn as_lua(&self, lua: &mlua::Lua) -> mlua::Result<mlua::Value> {
 		Ok(match self {
-			Value::Nil => mlua::Value::Nil,
+			// This is distinct from nil: lightuserdata are considered truthy but have no other functionality (similar to `true`).
+			// A `nil` value would delete the key it's associated with when converted to lua,
+			// so mlua's NULL constant provides a workaround.
+			Value::Unit => mlua::Value::NULL,
 			Value::Boolean(i) => mlua::Value::Boolean(*i),
 			Value::Integer(i) => mlua::Value::Integer(*i),
 			Value::Number(i) => mlua::Value::Number(*i),
@@ -54,8 +57,10 @@ impl Value {
 
 impl mlua::FromLua for Value {
 	fn from_lua(value: mlua::Value, _lua: &mlua::Lua) -> mlua::Result<Self> {
+		// I can't match on mlua::Value::NULL directly so this is a reconstructed version of the LightUserData it wraps.
+		const NULL: mlua::LightUserData = mlua::LightUserData(std::ptr::null_mut());
 		match value {
-			mlua::Value::Nil => Ok(Value::Nil),
+			mlua::Value::Nil | mlua::Value::LightUserData(NULL) => Ok(Value::Unit),
 			mlua::Value::Boolean(i) => Ok(Value::Boolean(i)),
 			mlua::Value::Integer(i) => Ok(Value::Integer(i)),
 			mlua::Value::Number(i) => Ok(Value::Number(i)),
@@ -81,7 +86,7 @@ impl mlua::FromLua for Value {
 				}
 			}
 			_ => Err(mlua::Error::runtime(format!(
-				"type \"{}\" cannot be converted to `StaticLua`",
+				"type \"{}\" cannot be converted to an esprit Value",
 				value.type_name()
 			))),
 		}

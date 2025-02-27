@@ -55,22 +55,25 @@ impl Manager {
 		let mut party = Vec::new();
 		let mut characters = VecDeque::new();
 
-		let mut player_controlled = true;
-
 		for PartyReferenceBase {
 			sheet,
 			accent_color,
 		} in party_blueprint
 		{
 			let sheet = resources.sheets.get(&sheet)?;
-			let character = character::Ref::new(character::Piece {
-				player_controlled,
-				alliance: character::Alliance::Friendly,
-				..character::Piece::new((**sheet).clone())
-			});
+			let character = character::Ref::new(character::Piece::new((**sheet).clone()));
+			character.borrow_mut().statuses.insert(
+				"_:team".into(),
+				Value::OrderedTable([Value::String("_:players".into())].into()),
+			);
+			if characters.is_empty() {
+				character
+					.borrow_mut()
+					.statuses
+					.insert("_:conscious".into(), Value::Unit);
+			}
 			party.push(world::PartyReference::new(character.clone(), accent_color));
 			characters.push_front(character);
-			player_controlled = false;
 		}
 
 		Ok(Manager {
@@ -271,7 +274,7 @@ impl Manager {
 		console: impl console::Handle,
 	) -> Result<bool> {
 		let character = self.next_character();
-		if !character.borrow().player_controlled {
+		if !character.borrow().statuses.contains_key("_:conscious") {
 			let action = self.consider_action(resources, lua, character.clone())?;
 			self.perform_action(&console, resources, lua, action)?;
 			Ok(true)
@@ -334,7 +337,6 @@ impl Manager {
 					dijkstra.explore(x, y, |x, y, base| {
 						if let Some(character) = self.get_character_at(x, y)
 							&& character.as_ptr() != next_character.as_ptr()
-							&& character.borrow().alliance == next_character.borrow().alliance
 						{
 							return astar::IMPASSABLE;
 						}

@@ -63,32 +63,6 @@ fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> 
 	Ok(())
 }
 
-/// Initializes an effect with the given magnitude, or adds the magnitude to the effect if it already exists.
-fn inflict(
-	_lua: &mlua::Lua,
-	this: &Ref,
-	(key, value, update): (mlua::String, Value, Option<mlua::Function>),
-) -> mlua::Result<()> {
-	let key = key.to_str()?;
-	let key = key.as_ref();
-	let value = this
-		.borrow_mut()
-		.statuses
-		.entry(key.into())
-		.or_insert(value)
-		.clone();
-	if let Some(update) = update {
-		let result = update.call(value)?;
-		// It's a weird thing to do but an expect may panic here if the update function removes the status,
-		// so the status value only gets updated if it still exists.
-		// This also has to reborrow since `this` must be unlocked before `update` is called.
-		if let Some(value) = this.borrow_mut().statuses.get_mut(key) {
-			*value = result;
-		}
-	}
-	Ok(())
-}
-
 pub struct InlineRefCell;
 
 impl<F: rkyv::Archive> ArchiveWith<RefCell<F>> for InlineRefCell {
@@ -181,12 +155,12 @@ impl mlua::UserData for Ref {
 		fields.add_field_method_get("stats", |lua, this| {
 			this.borrow().stats(lua).map_err(mlua::Error::runtime)
 		});
-		fields.add_field_method_get("alliance", |_, this| Ok(this.borrow().alliance as u32));
 		get!(hp, sp, x, y);
 		set!(hp, sp, x, y);
 	}
 
 	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
+		methods.add_meta_method("__eq", |_, this, other: Ref| Ok(*this == other));
 		methods.add_function("attacks", |_, this: mlua::AnyUserData| {
 			Ok((
 				this.metatable()?.get::<mlua::Function>("__next_attack")?,
@@ -219,9 +193,6 @@ impl mlua::UserData for Ref {
 			}
 		});
 
-		methods.add_method("is_allied", |_, this, other: Ref| {
-			Ok(this.borrow().alliance == other.borrow().alliance)
-		});
 		methods.add_method("replace_nouns", |_, this, s: String| {
 			Ok(s.replace_nouns(&this.borrow().sheet.nouns))
 		});
@@ -237,24 +208,75 @@ impl mlua::UserData for Ref {
 			Ok(())
 		});
 		methods.add_method("force_affinity", force_affinity);
-		methods.add_method("inflict", inflict);
+		methods.add_method("attach", |lua, this, (status, value): (Box<str>, Value)| {
+			let resources = lua
+				.globals()
+				.get::<mlua::Table>("package")?
+				.get::<mlua::Table>("loaded")?
+				.get::<resource::Handle>("esprit.resources")?;
+			this.borrow_mut()
+				.attach(status, value, &resources, lua)
+				.map_err(mlua::Error::external)?;
+			Ok(())
+		});
+		methods.add_method("component", |lua, this, status: mlua::String| {
+			this.borrow_mut()
+				.statuses
+				.get(status.to_str()?.as_ref())
+				.map(|x| x.as_lua(lua))
+				.transpose()
+		});
+		methods.add_method("detach", |lua, this, status: mlua::String| {
+			let resources = lua
+				.globals()
+				.get::<mlua::Table>("package")?
+				.get::<mlua::Table>("loaded")?
+				.get::<resource::Handle>("esprit.resources")?;
+			this.borrow_mut()
+				.detach(status.to_str()?.as_ref(), &resources, lua)
+				.map_err(mlua::Error::external)
+		});
 	}
 }
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Piece {
+	/// Persistent information about the piece.
+	///
+	/// This represents fields which should be preserved even when the piece is not present on a board,
+	/// such as the resource manager, or a party member that is saved but not "in play".
 	pub sheet: Sheet,
-
-	pub hp: i32,
-	pub sp: i32,
-
-	pub statuses: HashMap<Box<str>, Value>,
 
 	pub x: i32,
 	pub y: i32,
+
+	/// How far the piece is from being in a "destroyed" state.
+	///
+	/// This doesn't imply removal from the board, and probably shouldn't!
+	/// Enemies might flee until they reach a destination and are removed from the board,
+	/// or turn into a corpse object that rots over time or can be destroyed/animated with magic.
+	///
+	/// For pieces which should not have any health, `sheet.stats().hp` should be 0.
+	/// Otherwise health is always displayed, even if `hp` is <= 0.
+	///
+	/// Should the component system get more mature,
+	/// HP and SP might be good candidates for removal from this structure,
+	/// though that would involve reconciling the existence of `sheet` too.
+	/// I think it's pretty safe to say that these are fundamental enough
+	/// that they deserve status as static fields.
+	pub hp: i32,
+	pub sp: i32,
+
+	/// Additional components of the piece with optional data.
+	// TODO: Should this go on sheet? Maybe Duration should detemrine that.
+	pub statuses: HashMap<Box<str>, Value>,
+
+	/// How much time has to pass until the piece is allowed to take an action.
+	///
+	/// This implies that every piece is able to take an action which may or may not be true,
+	/// but in the event that one shoudn't, a consideration script which always skips the
+	/// piece's turn should be sufficient.
 	pub action_delay: Aut,
-	pub player_controlled: bool,
-	pub alliance: Alliance,
 }
 
 impl expression::Variables for Piece {
@@ -281,8 +303,6 @@ impl Piece {
 			x: 0,
 			y: 0,
 			action_delay: 0,
-			player_controlled: false,
-			alliance: Alliance::default(),
 		}
 	}
 
@@ -310,14 +330,39 @@ impl Piece {
 			resources
 				.statuses
 				.get(k)
-				// It's not very practical to handle missing resources in this retain,
-				// nor should it ever happen in the first place,
-				// so missing statuses just get discarded.
 				.ok()
 				.map(|status| !matches!(status.duration, status::Duration::Rest))
 				.unwrap_or(false)
 		});
 		Ok(())
+	}
+
+	pub fn attach(
+		&mut self,
+		status: Box<str>,
+		value: Value,
+		_resources: &resource::Manager,
+		_lua: &mlua::Lua,
+	) -> Result<()> {
+		let is_new = !self.statuses.contains_key(&status);
+		self.statuses.insert(status, value);
+		if is_new {
+			// TODO: on_attach
+		} else {
+			// TODO: on_reattach
+		}
+		Ok(())
+	}
+
+	pub fn detach(
+		&mut self,
+		status: &str,
+		_resources: &resource::Manager,
+		_lua: &mlua::Lua,
+	) -> Result<Option<Value>> {
+		let value = self.statuses.remove(status);
+		// TODO: on_detach
+		Ok(value)
 	}
 }
 
@@ -340,8 +385,9 @@ impl Piece {
 			lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
 
 		for (status_id, value) in &self.statuses {
-			let status = resources.statuses.get(status_id.as_ref())?;
-			if let Some(on_debuff) = &status.on_debuff {
+			if let Ok(status) = resources.statuses.get(status_id.as_ref())
+				&& let Some(on_debuff) = &status.on_debuff
+			{
 				let debuff = on_debuff.call(value.as_lua(lua)?)?;
 				debuffs = debuffs + debuff;
 			}
@@ -377,16 +423,6 @@ pub enum Action {
 }
 
 impl mlua::UserData for Action {}
-
-#[derive(
-	Copy, PartialEq, Eq, Clone, Debug, Default, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
-)]
-#[repr(u32)]
-pub enum Alliance {
-	Friendly,
-	#[default]
-	Enemy,
-}
 
 fn growth_bonuses() -> Stats {
 	use rand::seq::SliceRandom;

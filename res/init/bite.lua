@@ -1,6 +1,8 @@
 local expression = require "esprit.types.expression"
+local attack = require "esprit.resources.attack"
+local team = require "team"
 
-require "esprit.resources.attack" "bite" {
+attack "bite" {
 	name = "Bite",
 	description = "Lowers your defense until your next turn.",
 	magnitude = expression "power + 8",
@@ -22,7 +24,7 @@ require "esprit.resources.attack" "bite" {
 		local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats) - target.stats.defense)
 
 		-- Biting requires you to get closer to the enemy, lowering your physical defense.
-		user:inflict("close_combat")
+		user:attach("close_combat")
 
 		target.hp = target.hp - damage
 
@@ -66,7 +68,7 @@ require "esprit.resources.attack" "bite" {
 		local attack = resources:attack(attack_id)
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
-			if not user:is_allied(character) then
+			if not team.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(
