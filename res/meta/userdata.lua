@@ -42,4 +42,4 @@
 ---@field average fun(self): boolean
 ---@field strong fun(self): boolean
 
----@class (exact) Status: userdata
+---@class (exact) Component: userdata

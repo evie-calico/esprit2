@@ -1,8 +1,24 @@
-local status = require "esprit.resources.status"
+local component = require "esprit.resources.component"
 local duration = require "esprit.types.duration"
 local stats = require "esprit.types.stats"
 
-status "bleed" {
+-- TODO: This should be an engine-internal resource (hence the _ namespace)
+-- TODO: This should be associated with a Value that denotes the owning player.
+component "_:conscious" {
+	name = "Conscious",
+	icon = "dummy",
+	duration = duration.rest, -- TODO duration.forever
+}
+
+-- TODO: This should be an engine-internal resource (hence the _ namespace)
+-- TODO: This should be associated with a Value that denotes the team's identifier. (eg, _:players, esprit:rats, etc.)
+component "_:team" {
+	name = "Teams",
+	icon = "dummy",
+	duration = duration.rest, -- TODO duration.forever
+}
+
+component "bleed" {
 	name = "Bleeding",
 	icon = "dummy",
 	duration = duration.rest,
@@ -19,25 +35,9 @@ status "bleed" {
 	end
 }
 
-status "close_combat" {
+component "close_combat" {
 	name = "Close Combat",
 	icon = "dummy",
 	duration = duration.turn,
 	on_debuff = function() return stats.defense(4) end
-}
-
--- TODO: This should be an engine-internal resource (hence the _ namespace)
--- TODO: This should be associated with a Value that denotes the owning player.
-status "_:conscious" {
-	name = "Conscious",
-	icon = "dummy",
-	duration = duration.rest, -- TODO duration.forever
-}
-
--- TODO: This should be an engine-internal resource (hence the _ namespace)
--- TODO: This should be associated with a Value that denotes the team's identifier. (eg, _:players, esprit:rats, etc.)
-status "_:team" {
-	name = "Teams",
-	icon = "dummy",
-	duration = duration.rest, -- TODO duration.forever
 }

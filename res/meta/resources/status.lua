@@ -1,15 +1,15 @@
----@meta esprit.resources.status
+---@meta esprit.resources.component
 
 ---@alias on_debuff fun(any): Stats
 
----@class StatusTable
+---@class ComponentTable
 ---@field name string
 ---@field icon string
 ---@field duration Duration
 ---@field on_debuff on_debuff?
 
 ---@param indentifier string
----@return fun(StatusTable): Status
-function status(indentifier) end
+---@return fun(ComponentTable): Component
+function component(indentifier) end
 
-return status
+return component

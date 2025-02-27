@@ -62,14 +62,14 @@ impl Manager {
 		{
 			let sheet = resources.sheets.get(&sheet)?;
 			let character = character::Ref::new(character::Piece::new((**sheet).clone()));
-			character.borrow_mut().statuses.insert(
+			character.borrow_mut().components.insert(
 				"_:team".into(),
 				Value::OrderedTable([Value::String("_:players".into())].into()),
 			);
 			if characters.is_empty() {
 				character
 					.borrow_mut()
-					.statuses
+					.components
 					.insert("_:conscious".into(), Value::Unit);
 			}
 			party.push(world::PartyReference::new(character.clone(), accent_color));
@@ -274,7 +274,7 @@ impl Manager {
 		console: impl console::Handle,
 	) -> Result<bool> {
 		let character = self.next_character();
-		if !character.borrow().statuses.contains_key("_:conscious") {
+		if !character.borrow().components.contains_key("_:conscious") {
 			let action = self.consider_action(resources, lua, character.clone())?;
 			self.perform_action(&console, resources, lua, action)?;
 			Ok(true)

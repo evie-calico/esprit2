@@ -343,7 +343,11 @@ async fn client_tick(
 			let next_character = server.world.next_character();
 			// TODO: Uuid-based piece ownership.
 			// TODO: What happens when a piece isn't owned by anyone (eg: by disconnect)?
-			if next_character.borrow().statuses.contains_key("_:conscious") {
+			if next_character
+				.borrow()
+				.components
+				.contains_key("_:conscious")
+			{
 				server
 					.world
 					.perform_action(console, &server.resources, lua, action)?;

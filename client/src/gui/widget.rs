@@ -534,25 +534,28 @@ fn character_buffs(
 	resources: &resource::Manager,
 	textures: &texture::Manager,
 ) {
-	let mut statuses = piece
-		.statuses
+	// TODO: Hide certain components by default
+	let components = piece
+		.components
 		.keys()
-		.filter_map(|x| resources.statuses.get(x).ok())
+		.filter_map(|x| resources.components.get(x).ok())
 		.peekable();
-	let statuses_copy = statuses.clone();
-	while statuses.peek().is_some() {
-		let textures_per_row = gui.rect.width() / (32 + 8);
-		gui.horizontal();
-		for _ in 0..textures_per_row {
-			if let Some(status) = statuses.next() {
-				gui.htexture(textures.get(&status.icon), 32);
-				gui.advance(8, 0);
+	{
+		let mut components = components.clone();
+		while components.peek().is_some() {
+			let textures_per_row = gui.rect.width() / (32 + 8);
+			gui.horizontal();
+			for _ in 0..textures_per_row {
+				if let Some(component) = components.next() {
+					gui.htexture(textures.get(&component.icon), 32);
+					gui.advance(8, 0);
+				}
 			}
+			gui.vertical();
+			gui.advance(8, 8);
 		}
-		gui.vertical();
-		gui.advance(8, 8);
 	}
-	for status in statuses_copy {
-		gui.label(&status.name);
+	for component in components {
+		gui.label(&component.name);
 	}
 }

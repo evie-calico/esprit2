@@ -48,7 +48,7 @@ pub struct Manager {
 	/// Unlike `Attack`s and `Spell`s, `character::Sheet`s are likely to be modified.
 	pub sheets: Resource<Rc<character::Sheet>>,
 	pub spells: Resource<Rc<spell::Spell>>,
-	pub statuses: Resource<Rc<status::Status>>,
+	pub components: Resource<Rc<component::Component>>,
 	pub vaults: Resource<Rc<vault::Vault>>,
 }
 
@@ -89,8 +89,8 @@ impl mlua::UserData for Handle {
 				.cloned()
 				.map_err(mlua::Error::external)
 		});
-		methods.add_method("status", |_lua, this, key: Box<str>| {
-			this.statuses
+		methods.add_method("component", |_lua, this, key: Box<str>| {
+			this.components
 				.get(&key)
 				.cloned()
 				.map_err(mlua::Error::external)
@@ -271,10 +271,10 @@ impl Manager {
 			lua.create_function(move |_, ()| Ok(spell_registrar.clone()))?,
 		)?;
 
-		let statuses = Rc::new(RefCell::new(Resource::<Rc<status::Status>>::default()));
-		let status_registrar =
-			lua.create_function(make_registrar(Rc::downgrade(&statuses), |table| {
-				Ok(status::Status {
+		let components = Rc::new(RefCell::new(Resource::<Rc<component::Component>>::default()));
+		let component_registrar =
+			lua.create_function(make_registrar(Rc::downgrade(&components), |table| {
+				Ok(component::Component {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
 					duration: table.get("duration")?,
@@ -282,8 +282,8 @@ impl Manager {
 				})
 			}))?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.status",
-			lua.create_function(move |_, ()| Ok(status_registrar.clone()))?,
+			"esprit.resources.component",
+			lua.create_function(move |_, ()| Ok(component_registrar.clone()))?,
 		)?;
 
 		let vaults = Rc::new(RefCell::new(Resource::<Rc<vault::Vault>>::default()));
@@ -352,7 +352,7 @@ impl Manager {
 		lua.unload("esprit.resources.function")?;
 		lua.unload("esprit.resources.sheet")?;
 		lua.unload("esprit.resources.spells")?;
-		lua.unload("esprit.resources.status")?;
+		lua.unload("esprit.resources.component")?;
 		lua.unload("esprit.resources.vault")?;
 
 		let attacks = Rc::into_inner(attacks)
@@ -367,8 +367,8 @@ impl Manager {
 		let spells = Rc::into_inner(spells)
 			.expect("spells must have only one strong reference")
 			.into_inner();
-		let statuses = Rc::into_inner(statuses)
-			.expect("statuses must have only one strong reference")
+		let components = Rc::into_inner(components)
+			.expect("components must have only one strong reference")
 			.into_inner();
 		let vaults = Rc::into_inner(vaults)
 			.expect("vaults must have only one strong reference")
@@ -379,7 +379,7 @@ impl Manager {
 			functions,
 			sheets,
 			spells,
-			statuses,
+			components,
 			vaults,
 		})
 	}

@@ -177,8 +177,8 @@ fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 
 fn duration(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let duration = lua.create_table()?;
-	duration.set("turn", status::Duration::Turn)?;
-	duration.set("rest", status::Duration::Rest)?;
+	duration.set("turn", component::Duration::Turn)?;
+	duration.set("rest", component::Duration::Rest)?;
 	Ok(duration)
 }
 

@@ -208,32 +208,35 @@ impl mlua::UserData for Ref {
 			Ok(())
 		});
 		methods.add_method("force_affinity", force_affinity);
-		methods.add_method("attach", |lua, this, (status, value): (Box<str>, Value)| {
-			let resources = lua
-				.globals()
-				.get::<mlua::Table>("package")?
-				.get::<mlua::Table>("loaded")?
-				.get::<resource::Handle>("esprit.resources")?;
+		methods.add_method(
+			"attach",
+			|lua, this, (component_id, value): (Box<str>, Value)| {
+				let resources = lua
+					.globals()
+					.get::<mlua::Table>("package")?
+					.get::<mlua::Table>("loaded")?
+					.get::<resource::Handle>("esprit.resources")?;
+				this.borrow_mut()
+					.attach(component_id, value, &resources, lua)
+					.map_err(mlua::Error::external)?;
+				Ok(())
+			},
+		);
+		methods.add_method("component", |lua, this, component_id: mlua::String| {
 			this.borrow_mut()
-				.attach(status, value, &resources, lua)
-				.map_err(mlua::Error::external)?;
-			Ok(())
-		});
-		methods.add_method("component", |lua, this, status: mlua::String| {
-			this.borrow_mut()
-				.statuses
-				.get(status.to_str()?.as_ref())
+				.components
+				.get(component_id.to_str()?.as_ref())
 				.map(|x| x.as_lua(lua))
 				.transpose()
 		});
-		methods.add_method("detach", |lua, this, status: mlua::String| {
+		methods.add_method("detach", |lua, this, component_id: mlua::String| {
 			let resources = lua
 				.globals()
 				.get::<mlua::Table>("package")?
 				.get::<mlua::Table>("loaded")?
 				.get::<resource::Handle>("esprit.resources")?;
 			this.borrow_mut()
-				.detach(status.to_str()?.as_ref(), &resources, lua)
+				.detach(component_id.to_str()?.as_ref(), &resources, lua)
 				.map_err(mlua::Error::external)
 		});
 	}
@@ -269,7 +272,7 @@ pub struct Piece {
 
 	/// Additional components of the piece with optional data.
 	// TODO: Should this go on sheet? Maybe Duration should detemrine that.
-	pub statuses: HashMap<Box<str>, Value>,
+	pub components: HashMap<Box<str>, Value>,
 
 	/// How much time has to pass until the piece is allowed to take an action.
 	///
@@ -299,7 +302,7 @@ impl Piece {
 			sheet,
 			hp,
 			sp,
-			statuses: HashMap::new(),
+			components: HashMap::new(),
 			x: 0,
 			y: 0,
 			action_delay: 0,
@@ -307,13 +310,13 @@ impl Piece {
 	}
 
 	pub fn new_turn(&mut self, resources: &resource::Manager) {
-		// Remove any status effects with the duration of one turn.
-		self.statuses.retain(|k, _| {
+		// Remove any components with a duration of one turn.
+		self.components.retain(|k, _| {
 			resources
-				.statuses
+				.components
 				.get(k)
 				.ok()
-				.map(|status| !matches!(status.duration, status::Duration::Turn))
+				.map(|x| !matches!(x.duration, component::Duration::Turn))
 				.unwrap_or(false)
 		});
 	}
@@ -325,13 +328,13 @@ impl Piece {
 			stats.heart as i32,
 		);
 		self.sp = i32::min(self.sp + (stats.soul as u32) as i32, stats.soul as i32);
-		// Remove any status effects lasting until the next rest.
-		self.statuses.retain(|k, _| {
+		// Remove any components lasting until the next rest.
+		self.components.retain(|k, _| {
 			resources
-				.statuses
+				.components
 				.get(k)
 				.ok()
-				.map(|status| !matches!(status.duration, status::Duration::Rest))
+				.map(|x| !matches!(x.duration, component::Duration::Rest))
 				.unwrap_or(false)
 		});
 		Ok(())
@@ -339,13 +342,13 @@ impl Piece {
 
 	pub fn attach(
 		&mut self,
-		status: Box<str>,
+		component_id: Box<str>,
 		value: Value,
 		_resources: &resource::Manager,
 		_lua: &mlua::Lua,
 	) -> Result<()> {
-		let is_new = !self.statuses.contains_key(&status);
-		self.statuses.insert(status, value);
+		let is_new = !self.components.contains_key(&component_id);
+		self.components.insert(component_id, value);
 		if is_new {
 			// TODO: on_attach
 		} else {
@@ -356,11 +359,11 @@ impl Piece {
 
 	pub fn detach(
 		&mut self,
-		status: &str,
+		component_id: &str,
 		_resources: &resource::Manager,
 		_lua: &mlua::Lua,
 	) -> Result<Option<Value>> {
-		let value = self.statuses.remove(status);
+		let value = self.components.remove(component_id);
 		// TODO: on_detach
 		Ok(value)
 	}
@@ -384,9 +387,9 @@ impl Piece {
 		let resources: resource::Handle =
 			lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
 
-		for (status_id, value) in &self.statuses {
-			if let Ok(status) = resources.statuses.get(status_id.as_ref())
-				&& let Some(on_debuff) = &status.on_debuff
+		for (component_id, value) in &self.components {
+			if let Ok(component) = resources.components.get(component_id.as_ref())
+				&& let Some(on_debuff) = &component.on_debuff
 			{
 				let debuff = on_debuff.call(value.as_lua(lua)?)?;
 				debuffs = debuffs + debuff;

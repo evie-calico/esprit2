@@ -164,7 +164,7 @@ impl<'texture> ServerHandle<'texture> {
 		if !world
 			.next_character()
 			.borrow()
-			.statuses
+			.components
 			.contains_key("_:conscious")
 		{
 			return Ok(input_mode);
@@ -280,7 +280,7 @@ impl<'texture> ServerHandle<'texture> {
 			if let Some(focused_character) = &world
 				.characters
 				.iter()
-				.find(|x| x.borrow().statuses.contains_key("_:conscious"))
+				.find(|x| x.borrow().components.contains_key("_:conscious"))
 			{
 				if let input::Mode::Cursor(input::Cursor { position, .. }) = &input_mode {
 					camera.focus_character_with_cursor(&focused_character.borrow(), *position);

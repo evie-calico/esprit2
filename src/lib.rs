@@ -22,7 +22,7 @@ pub mod nouns;
 pub mod resource;
 pub mod soul;
 pub mod spell;
-pub mod status;
+pub mod component;
 pub mod value;
 pub mod vault;
 pub mod world;
@@ -172,7 +172,7 @@ pub mod prelude {
 	pub use resource::Resource;
 	pub use soul::Soul;
 	pub use spell::Spell;
-	pub use status::Status;
+	pub use component::Component;
 	pub use vault::Vault;
 
 	// Export common traits

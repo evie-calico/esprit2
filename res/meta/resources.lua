@@ -3,8 +3,8 @@
 local resources = {}
 
 ---@param key string
----@return Status
-function resources:status(key) end
+---@return Component
+function resources:component(key) end
 
 ---@param key string
 ---@return Attack
