@@ -127,12 +127,33 @@ impl Manager {
 
 		console.print_unimportant("You take some time to rest...");
 		for i in &self.characters {
+			// This happens before anything else,
+			// but that's only because the latter half of this function would prefer a `borrow_mut`.
+			// Please change this order if it makes more sense elsewhere!
+			let original_components = i
+				.borrow()
+				.components
+				.keys()
+				.filter_map(|component_id| {
+					resources
+						.components
+						.get(component_id)
+						.map(|x| x.on_rest.clone())
+						.transpose()
+				})
+				.collect::<Result<Vec<mlua::Function>>>()?;
+			for on_rest in original_components {
+				on_rest.call::<()>(i.clone())?;
+			}
+
 			let mut i = i.borrow_mut();
 			// Reset positions
 			i.x = 0;
 			i.y = 0;
 			// Rest
-			i.rest(resources, lua)?;
+			let stats = i.stats(lua)?;
+			i.hp = i32::min(i.hp + (stats.heart as u32 / 2) as i32, stats.heart as i32);
+			i.sp = i32::min(i.sp + (stats.soul as u32) as i32, stats.soul as i32);
 			// Award experience
 			i.sheet.experience += 40;
 			while i.sheet.experience >= 100 {
@@ -319,8 +340,23 @@ impl Manager {
 			let action_delay = &mut i.borrow_mut().action_delay;
 			*action_delay = action_delay.saturating_sub(delay);
 		}
-		// Once an action has been provided, pending turn updates may run.
-		next_character.borrow_mut().new_turn(resources);
+		// Once an action has been provided, tell components that a turn has been taken.
+		// This has to be a copy because on_turn may mutate `next_character`.
+		let original_components = next_character
+			.borrow()
+			.components
+			.keys()
+			.filter_map(|component_id| {
+				resources
+					.components
+					.get(component_id)
+					.map(|x| x.on_turn.clone())
+					.transpose()
+			})
+			.collect::<Result<Vec<mlua::Function>>>()?;
+		for on_turn in original_components {
+			on_turn.call::<()>((next_character.clone(), delay))?;
+		}
 
 		let delay = match action {
 			character::Action::Wait(delay) => Some(delay),

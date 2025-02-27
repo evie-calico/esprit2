@@ -85,7 +85,6 @@ pub fn init() -> Result<Lua> {
 			lua.create_function(|_, (action, heuristics)| Ok(Consider { action, heuristics }))
 		})?,
 	)?;
-	lua.load_from_function::<mlua::Value>("esprit.types.duration", lua.create_function(duration)?)?;
 	lua.load_from_function::<mlua::Value>(
 		"esprit.types.expression",
 		lua.create_function(|lua, ()| {
@@ -173,14 +172,6 @@ fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 		F::wrap(|spell, args| Ok(character::Action::Cast(spell, args))),
 	)?;
 	Ok(action)
-}
-
-fn duration(lua: &Lua, _: ()) -> Result<mlua::Table> {
-	let duration = lua.create_table()?;
-	duration.set("turn", component::Duration::Turn)?;
-	duration.set("rest", component::Duration::Rest)?;
-	duration.set("forever", component::Duration::Forever)?;
-	Ok(duration)
 }
 
 fn heuristic(lua: &Lua, _: ()) -> Result<mlua::Table> {

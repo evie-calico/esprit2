@@ -1,5 +1,4 @@
 local component = require "esprit.resources.component"
-local duration = require "esprit.types.duration"
 local stats = require "esprit.types.stats"
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
@@ -19,7 +18,8 @@ component "_:team" {
 component "bleed" {
 	name = "Bleeding",
 	icon = "dummy",
-	duration = duration.rest,
+	---@param user
+	on_rest = function(user) user:detach("bleed") end,
 	---@param magnitude integer
 	---@return Stats
 	on_debuff = function(magnitude)
@@ -36,6 +36,7 @@ component "bleed" {
 component "close_combat" {
 	name = "Close Combat",
 	icon = "dummy",
-	duration = duration.turn,
+	---@param user
+	on_turn = function(user) user:detach("close_combat") end,
 	on_debuff = function() return stats.defense(4) end
 }

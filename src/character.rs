@@ -309,37 +309,6 @@ impl Piece {
 		}
 	}
 
-	pub fn new_turn(&mut self, resources: &resource::Manager) {
-		// Remove any components with a duration of one turn.
-		self.components.retain(|k, _| {
-			resources
-				.components
-				.get(k)
-				.ok()
-				.map(|x| !matches!(x.duration, component::Duration::Turn))
-				.unwrap_or(false)
-		});
-	}
-
-	pub fn rest(&mut self, resources: &resource::Manager, lua: &mlua::Lua) -> Result<()> {
-		let stats = self.stats(lua)?;
-		self.hp = i32::min(
-			self.hp + (stats.heart as u32 / 2) as i32,
-			stats.heart as i32,
-		);
-		self.sp = i32::min(self.sp + (stats.soul as u32) as i32, stats.soul as i32);
-		// Remove any components lasting until the next rest.
-		self.components.retain(|k, _| {
-			resources
-				.components
-				.get(k)
-				.ok()
-				.map(|x| !matches!(x.duration, component::Duration::Rest))
-				.unwrap_or(false)
-		});
-		Ok(())
-	}
-
 	pub fn attach(
 		&mut self,
 		component_id: Box<str>,
