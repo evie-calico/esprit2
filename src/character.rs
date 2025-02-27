@@ -424,38 +424,6 @@ pub enum Action {
 
 impl mlua::UserData for Action {}
 
-fn growth_bonuses() -> Stats {
-	use rand::seq::SliceRandom;
-	const BONUS_COUNT: usize = 10;
-
-	let mut bonuses = Stats::default();
-	let mut stats = [
-		&mut bonuses.heart,
-		&mut bonuses.soul,
-		&mut bonuses.power,
-		&mut bonuses.defense,
-		&mut bonuses.magic,
-		&mut bonuses.resistance,
-	];
-	let mut rng = rand::thread_rng();
-
-	for _ in 0..BONUS_COUNT {
-		let stat = stats
-			.choose_mut(&mut rng)
-			.expect("stats should not be empty");
-		// Prefer skipping stats that are already 0
-		if **stat == 0 {
-			**stats
-				.choose_mut(&mut rng)
-				.expect("stats should not be empty") += 1;
-		} else {
-			**stat += 1;
-		}
-	}
-
-	bonuses
-}
-
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Sheet {
 	pub icon: Box<str>,
