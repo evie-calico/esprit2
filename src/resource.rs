@@ -277,7 +277,9 @@ impl Manager {
 				Ok(component::Component {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
-					duration: table.get("duration")?,
+					duration: table
+						.get::<Option<component::Duration>>("duration")?
+						.unwrap_or_default(),
 					on_debuff: table.get("on_debuff")?,
 				})
 			}))?;

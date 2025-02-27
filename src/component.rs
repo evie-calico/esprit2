@@ -1,7 +1,9 @@
-#[derive(Clone, Debug, mlua::FromLua)]
+#[derive(Clone, Debug, Default, mlua::FromLua)]
 pub enum Duration {
 	Rest,
 	Turn,
+	#[default]
+	Forever,
 }
 
 impl mlua::UserData for Duration {}

@@ -7,7 +7,6 @@ local stats = require "esprit.types.stats"
 component "_:conscious" {
 	name = "Conscious",
 	icon = "dummy",
-	duration = duration.rest, -- TODO duration.forever
 }
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
@@ -15,7 +14,6 @@ component "_:conscious" {
 component "_:team" {
 	name = "Teams",
 	icon = "dummy",
-	duration = duration.rest, -- TODO duration.forever
 }
 
 component "bleed" {

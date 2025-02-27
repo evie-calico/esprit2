@@ -179,6 +179,7 @@ fn duration(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let duration = lua.create_table()?;
 	duration.set("turn", component::Duration::Turn)?;
 	duration.set("rest", component::Duration::Rest)?;
+	duration.set("forever", component::Duration::Forever)?;
 	Ok(duration)
 }
 
