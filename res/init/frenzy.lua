@@ -39,9 +39,9 @@ component "frenzy" {
 		if previous == nil then
 			user:attach("frenzy", {
 				time_left = user:component("frenzy"),
-				former_teams = user:component("_:team") or {},
+				former_teams = user:component(":teams") or {},
 			} --[[@as Frenzy]])
-			user:detach("_:team")
+			user:detach(":teams")
 		end
 	end,
 	---@param user Piece
@@ -49,7 +49,7 @@ component "frenzy" {
 	on_detach = function(user, previous)
 		-- Don't overwrite the current list, in case it changed.
 		for _, v in pairs(previous.former_teams) do
-			user:attach("_:team", v)
+			user:attach(":teams", v)
 		end
 	end,
 	---@param user Piece

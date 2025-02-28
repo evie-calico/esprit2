@@ -40,9 +40,9 @@ spell "debug/possess" {
 
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
-		if target:detach("_:conscious") == nil then
+		if target:detach(":conscious") == nil then
 			console:print(target:replace_nouns("{Address} has been possessed!"))
-			target:attach("_:conscious")
+			target:attach(":conscious")
 		else
 			console:print(target:replace_nouns("{Address} is thinking for {themself}."))
 		end

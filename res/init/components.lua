@@ -3,22 +3,22 @@ local stats = require "esprit.types.stats"
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
 -- TODO: This should be associated with a Value that denotes the owning player.
-component "_:conscious" {
+component ":conscious" {
 	name = "Conscious",
 }
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
--- TODO: This should be associated with a Value that denotes the team's identifier. (eg, _:players, esprit:rats, etc.)
-component "_:team" {
+-- TODO: This should be associated with a Value that denotes the team's identifier. (eg, :players, esprit:rats, etc.)
+component ":teams" {
 	name = "Teams",
 	---@param user Piece
 	---@param previous string[]?
 	on_attach = function(user, previous)
 		-- This function is questionable
 
-		local current = user:component("_:team")
+		local current = user:component(":teams")
 		if current ~= nil and #current == 0 then
-			user:detach("_:team")
+			user:detach(":teams")
 			return
 		end
 		if type(current) == "string" then
@@ -26,7 +26,7 @@ component "_:team" {
 			table.insert(previous, current)
 			-- This causes a recursive call!
 			-- Note that previous is not a `string`, which would cause a loop
-			user:attach("_:team", previous)
+			user:attach(":teams", previous)
 		end
 	end,
 	---@param user Piece
@@ -41,7 +41,7 @@ component "_:team" {
 				end
 			end
 			if #previous > 0 then
-				user:attach("_:team", previous)
+				user:attach(":teams", previous)
 			end
 		end
 	end,

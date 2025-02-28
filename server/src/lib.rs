@@ -346,7 +346,7 @@ async fn client_tick(
 			if next_character
 				.borrow()
 				.components
-				.contains_key("_:conscious")
+				.contains_key(":conscious")
 			{
 				server
 					.world
