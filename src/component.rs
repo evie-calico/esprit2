@@ -1,7 +1,9 @@
 #[derive(Clone, Debug)]
 pub struct Component {
 	pub name: String,
-	pub icon: String,
+	pub icon: Option<String>,
+	/// If `true`, the component should be displayed to the user on stat screens.
+	pub visible: bool,
 	/// Called any time the component is attached to a piece.
 	///
 	/// This function is called after the new component and value have been added,

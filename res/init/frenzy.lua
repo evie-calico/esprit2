@@ -31,7 +31,8 @@ spell "debug/frenzy" {
 
 component "frenzy" {
 	name = "Frenzied",
-	icon = "dummy",
+	visible = true,
+
 	---@param user Piece
 	---@param previous number|Frenzy?
 	on_attach = function(user, previous)

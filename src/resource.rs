@@ -277,6 +277,7 @@ impl Manager {
 				Ok(component::Component {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
+					visible: table.get::<Option<bool>>("visible")?.unwrap_or_default(),
 					on_attach: table.get("on_attach")?,
 					on_detach: table.get("on_detach")?,
 					on_turn: table.get("on_turn")?,

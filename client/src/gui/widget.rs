@@ -539,6 +539,7 @@ fn character_buffs(
 		.components
 		.keys()
 		.filter_map(|x| resources.components.get(x).ok())
+		.filter(|x| x.visible)
 		.peekable();
 	{
 		let mut components = components.clone();
@@ -546,8 +547,10 @@ fn character_buffs(
 			let textures_per_row = gui.rect.width() / (32 + 8);
 			gui.horizontal();
 			for _ in 0..textures_per_row {
-				if let Some(component) = components.next() {
-					gui.htexture(textures.get(&component.icon), 32);
+				if let Some(component) = components.next()
+					&& let Some(icon) = &component.icon
+				{
+					gui.htexture(textures.get(icon), 32);
 					gui.advance(8, 0);
 				}
 			}
