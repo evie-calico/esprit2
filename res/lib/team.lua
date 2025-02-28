@@ -12,11 +12,6 @@ function teams.friendly(user, character)
 	local user_teams = user:component("_:team")
 	local character_teams = character:component("_:team")
 
-	-- Two characters with no teams attached are probably not meant to fight each other.
-	-- This check is subjective -- maybe it's useful that they attack everything!
-	if user_teams == nil and character_teams == nil then
-		return true
-	end
 	-- But characters with teams should fight characters without them (nothing in common!)
 	if user_teams == nil or character_teams == nil then
 		return false

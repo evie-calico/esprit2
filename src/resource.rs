@@ -277,6 +277,8 @@ impl Manager {
 				Ok(component::Component {
 					name: table.get("name")?,
 					icon: table.get("icon")?,
+					on_attach: table.get("on_attach")?,
+					on_detach: table.get("on_detach")?,
 					on_turn: table.get("on_turn")?,
 					on_rest: table.get("on_rest")?,
 					on_debuff: table.get("on_debuff")?,

@@ -13,12 +13,46 @@ component "_:conscious" {
 component "_:team" {
 	name = "Teams",
 	icon = "dummy",
+	---@param user Piece
+	---@param previous string[]?
+	on_attach = function(user, previous)
+		-- This function is questionable
+
+		local current = user:component("_:team")
+		if current ~= nil and #current == 0 then
+			user:detach("_:team")
+			return
+		end
+		if type(current) == "string" then
+			previous = previous or {}
+			table.insert(previous, current)
+			-- This causes a recursive call!
+			-- Note that previous is not a `string`, which would cause a loop
+			user:attach("_:team", previous)
+		end
+	end,
+	---@param user Piece
+	---@param previous string[]
+	---@param annotation string
+	on_detach = function(user, previous, annotation)
+		if annotation ~= nil then
+			for i = 1, #previous do
+				if previous[i] == annotation then
+					table.remove(previous, i)
+					break
+				end
+			end
+			if #previous > 0 then
+				user:attach("_:team", previous)
+			end
+		end
+	end,
 }
 
 component "bleed" {
 	name = "Bleeding",
 	icon = "dummy",
-	---@param user
+	---@param user Piece
 	on_rest = function(user) user:detach("bleed") end,
 	---@param magnitude integer
 	---@return Stats
@@ -36,7 +70,7 @@ component "bleed" {
 component "close_combat" {
 	name = "Close Combat",
 	icon = "dummy",
-	---@param user
+	---@param user Piece
 	on_turn = function(user) user:detach("close_combat") end,
 	on_debuff = function() return stats.defense(4) end
 }

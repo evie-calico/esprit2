@@ -216,9 +216,14 @@ impl mlua::UserData for Ref {
 					.get::<mlua::Table>("package")?
 					.get::<mlua::Table>("loaded")?
 					.get::<resource::Handle>("esprit.resources")?;
-				this.borrow_mut()
-					.attach(component_id, value, &resources, lua)
+				let component = resources
+					.components
+					.get(&component_id)
 					.map_err(mlua::Error::external)?;
+				let previous = this.borrow_mut().components.insert(component_id, value);
+				if let Some(on_attach) = &component.on_attach {
+					on_attach.call::<()>((this.clone(), previous))?;
+				}
 				Ok(())
 			},
 		);
@@ -229,16 +234,26 @@ impl mlua::UserData for Ref {
 				.map(|x| x.as_lua(lua))
 				.transpose()
 		});
-		methods.add_method("detach", |lua, this, component_id: mlua::String| {
-			let resources = lua
-				.globals()
-				.get::<mlua::Table>("package")?
-				.get::<mlua::Table>("loaded")?
-				.get::<resource::Handle>("esprit.resources")?;
-			this.borrow_mut()
-				.detach(component_id.to_str()?.as_ref(), &resources, lua)
-				.map_err(mlua::Error::external)
-		});
+		methods.add_method(
+			"detach",
+			|lua, this, (component_id, annotation): (mlua::String, mlua::Value)| {
+				let resources = lua
+					.globals()
+					.get::<mlua::Table>("package")?
+					.get::<mlua::Table>("loaded")?
+					.get::<resource::Handle>("esprit.resources")?;
+				let component_id = component_id.to_str()?;
+				let component = resources
+					.components
+					.get(component_id.as_ref())
+					.map_err(mlua::Error::external)?;
+				let previous = this.borrow_mut().components.remove(component_id.as_ref());
+				if let Some(on_detach) = &component.on_detach {
+					on_detach.call::<()>((this.clone(), previous, annotation))?;
+				}
+				Ok(())
+			},
+		)
 	}
 }
 
@@ -292,6 +307,8 @@ impl expression::Variables for Piece {
 	}
 }
 
+// Don't add stupid methods to this!
+// Anything useful should be operating on a Ref!!!
 impl Piece {
 	pub fn new(sheet: Sheet) -> Self {
 		let stats = sheet.stats();
@@ -307,34 +324,6 @@ impl Piece {
 			y: 0,
 			action_delay: 0,
 		}
-	}
-
-	pub fn attach(
-		&mut self,
-		component_id: Box<str>,
-		value: Value,
-		_resources: &resource::Manager,
-		_lua: &mlua::Lua,
-	) -> Result<()> {
-		let is_new = !self.components.contains_key(&component_id);
-		self.components.insert(component_id, value);
-		if is_new {
-			// TODO: on_attach
-		} else {
-			// TODO: on_reattach
-		}
-		Ok(())
-	}
-
-	pub fn detach(
-		&mut self,
-		component_id: &str,
-		_resources: &resource::Manager,
-		_lua: &mlua::Lua,
-	) -> Result<Option<Value>> {
-		let value = self.components.remove(component_id);
-		// TODO: on_detach
-		Ok(value)
 	}
 }
 
