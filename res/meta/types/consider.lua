@@ -1,4 +1,4 @@
----@meta esprit.types.consider
+---@meta engine.types.consider
 
 ---@alias ConsiderNext fun(self, value: integer?): integer?, Heuristic
 

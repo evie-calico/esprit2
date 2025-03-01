@@ -1,4 +1,4 @@
----@meta esprit.combat
+---@meta engine.combat
 
 ---@class combat
 local combat = {}

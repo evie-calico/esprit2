@@ -1,4 +1,4 @@
----@meta esprit.types.duration
+---@meta engine.types.duration
 
 ---@class Duration: userdata
 

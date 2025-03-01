@@ -1,4 +1,4 @@
----@meta esprit.types.action
+---@meta engine.types.action
 
 ---@alias Value nil|boolean|integer|number|string|table<Value, Value>
 

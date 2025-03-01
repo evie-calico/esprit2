@@ -1,7 +1,11 @@
-local expression = require "esprit.types.expression"
+local combat = require "engine.combat"
+local console = require "runtime.console"
+local world = require "engine.world"
+local expression = require "engine.types.expression"
+local log = require "engine.types.log"
 local team = require "team"
 
-require "esprit.resources.spell" "swap" {
+require "init.resources.spell" "swap" {
 	name = "Swap",
 	description = "Swaps the caster's position with the target. For non-allied targets, the spell must have a magnitude greater than the target's resistance.",
 	-- TODO: Swap icon
@@ -23,11 +27,6 @@ require "esprit.resources.spell" "swap" {
 	},
 
 	on_cast = function(user, spell, args)
-		local combat = require "esprit.combat"
-		local console = require "esprit.console"
-		local world = require "esprit.world"
-		local log = require "esprit.types.log"
-
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 

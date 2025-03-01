@@ -54,13 +54,13 @@ impl<'texture> ServerHandle<'texture> {
 
 		let handle = resources.clone();
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources",
+			"runtime.resources",
 			lua.create_function(move |_, ()| Ok(handle.clone()))
 				.into_error()?,
 		)
 		.into_error()?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.console",
+			"runtime.console",
 			lua.create_function(move |_, ()| Ok(console::LuaHandle(console_impl::Dummy)))
 				.into_error()?,
 		)
@@ -78,7 +78,7 @@ impl<'texture> ServerHandle<'texture> {
 		let make_direction =
 			mlua::Function::wrap(|message| Ok(input::Request::Direction { message }));
 		lua.load_from_function::<mlua::Value>(
-			"esprit.input",
+			"engine.input",
 			lua.load(mlua::chunk! {
 				return {
 					cursor = function(x, y, range, radius)

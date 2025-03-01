@@ -227,12 +227,12 @@ pub fn instance(
 
 	let resources = server.resources.clone();
 	lua.load_from_function::<mlua::Value>(
-		"esprit.resources",
+		"runtime.resources",
 		lua.create_function(move |_, ()| Ok(resources.clone()))?,
 	)?;
 	let console_handle = console.clone();
 	lua.load_from_function::<mlua::Value>(
-		"esprit.console",
+		"runtime.console",
 		lua.create_function(move |_, ()| Ok(console::LuaHandle(console_handle.clone())))?,
 	)?;
 

@@ -1,6 +1,6 @@
-local functions = require "esprit.resources.function"
-local sheet = require "esprit.resources.sheet"
-local skillset = require "esprit.types.skillset"
+local functions = require "init.resources.function"
+local sheet = require "init.resources.sheet"
+local skillset = require "engine.types.skillset"
 
 local attacks = { "scratch", "bite" }
 

@@ -1,4 +1,4 @@
----@meta esprit.types.heuristic
+---@meta engine.types.heuristic
 
 ---@class Heuristic: userdata
 ---@field damage fun(self): boolean

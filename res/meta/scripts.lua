@@ -1,4 +1,4 @@
----@meta esprit.scripts
+---@meta engine.scripts
 
 ---@type table<string, function>
 local scripts

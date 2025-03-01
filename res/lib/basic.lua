@@ -3,7 +3,7 @@ local team = require "team"
 
 ---@param user Piece
 return function(user)
-	local resources = require "esprit.resources"
+	local resources = require "runtime.resources"
 
 	---@type [Consider]
 	local considerations = {}

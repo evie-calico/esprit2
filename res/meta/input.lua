@@ -1,4 +1,4 @@
----@meta esprit.input
+---@meta engine.input
 
 local input = {}
 

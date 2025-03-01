@@ -1,7 +1,7 @@
-local expression = require "esprit.types.expression"
+local expression = require "engine.types.expression"
 local team = require "team"
 
-require "esprit.resources.spell" "magic_missile" {
+require "init.resources.spell" "magic_missile" {
 	name = "Magic Missile",
 	icon = "magic_missile",
 	description = "Constructs a searing ray of magical energy that can be fired at a target.",
@@ -19,10 +19,10 @@ require "esprit.resources.spell" "magic_missile" {
 	},
 
 	on_cast = function(user, spell, args)
-		local combat = require "esprit.combat"
-		local console = require "esprit.console"
-		local world = require "esprit.world"
-		local log = require "esprit.types.log"
+		local combat = require "engine.combat"
+		local console = require "runtime.console"
+		local world = require "engine.world"
+		local log = require "engine.types.log"
 
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
@@ -85,11 +85,11 @@ require "esprit.resources.spell" "magic_missile" {
 		return spell.parameters.cast_time
 	end,
 	on_consider = function(user, spell_id, considerations)
-		local resources = require "esprit.resources"
-		local world = require "esprit.world"
-		local action = require "esprit.types.action"
-		local consider = require "esprit.types.consider"
-		local heuristic = require "esprit.types.heuristic"
+		local resources = require "runtime.resources"
+		local world = require "engine.world"
+		local action = require "engine.types.action"
+		local consider = require "engine.types.consider"
+		local heuristic = require "engine.types.heuristic"
 
 		local spell = resources:spell(spell_id)
 

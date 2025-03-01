@@ -1,4 +1,4 @@
----@meta esprit.types.log
+---@meta engine.types.log
 
 ---@class (exact) Log: userdata
 

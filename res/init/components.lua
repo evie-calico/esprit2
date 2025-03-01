@@ -1,5 +1,5 @@
-local component = require "esprit.resources.component"
-local stats = require "esprit.types.stats"
+local component = require "init.resources.component"
+local stats = require "engine.types.stats"
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
 -- TODO: This should be associated with a Value that denotes the owning player.

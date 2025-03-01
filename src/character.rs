@@ -215,7 +215,7 @@ impl mlua::UserData for Ref {
 					.globals()
 					.get::<mlua::Table>("package")?
 					.get::<mlua::Table>("loaded")?
-					.get::<resource::Handle>("esprit.resources")?;
+					.get::<resource::Handle>("runtime.resources")?;
 				let component = resources
 					.components
 					.get(&component_id)
@@ -241,7 +241,7 @@ impl mlua::UserData for Ref {
 					.globals()
 					.get::<mlua::Table>("package")?
 					.get::<mlua::Table>("loaded")?
-					.get::<resource::Handle>("esprit.resources")?;
+					.get::<resource::Handle>("runtime.resources")?;
 				let component_id = component_id.to_str()?;
 				let component = resources
 					.components
@@ -343,7 +343,7 @@ impl Piece {
 		let buffs = Stats::default();
 		let mut debuffs = Stats::default();
 		let resources: resource::Handle =
-			lua.load(mlua::chunk!(require "esprit.resources")).eval()?;
+			lua.load(mlua::chunk!(require "runtime.resources")).eval()?;
 
 		for (component_id, value) in &self.components {
 			if let Ok(component) = resources.components.get(component_id.as_ref())

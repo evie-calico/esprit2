@@ -1,17 +1,24 @@
-local expression = require "esprit.types.expression"
+local attack = require "init.resources.attack"
+
+local combat = require "engine.combat"
+local world = require "engine.world"
+
+local action = require "engine.types.action"
+local consider = require "engine.types.consider"
+local expression = require "engine.types.expression"
+local heuristic = require "engine.types.heuristic"
+local log = require "engine.types.log"
+
 local team = require "team"
 
-require "esprit.resources.attack" "scratch" {
+attack "scratch" {
 	name = "Scratch",
 	description = "Causes a small amount of bleeding damage, which reduces defense.",
 	magnitude = expression "power + 4",
 	use_time = 12,
 
 	on_use = function(user, attack, args)
-		local console = require "esprit.console"
-		local combat = require "esprit.combat"
-		local world = require "esprit.world"
-		local log = require "esprit.types.log"
+		local console = require "runtime.console"
 
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
@@ -63,11 +70,7 @@ require "esprit.resources.attack" "scratch" {
 		return attack.use_time
 	end,
 	on_consider = function(user, attack_id, considerations)
-		local resources = require "esprit.resources"
-		local world = require "esprit.world"
-		local action = require "esprit.types.action"
-		local consider = require "esprit.types.consider"
-		local heuristic = require "esprit.types.heuristic"
+		local resources = require "runtime.resources"
 
 		local attack = resources:attack(attack_id)
 

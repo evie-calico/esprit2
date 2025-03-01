@@ -195,7 +195,7 @@ impl Manager {
 				})
 			}))?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.attack",
+			"init.resources.attack",
 			lua.create_function(move |_, ()| Ok(attack_registrar.clone()))?,
 		)?;
 
@@ -210,7 +210,7 @@ impl Manager {
 				Ok(())
 			})?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.function",
+			"init.resources.function",
 			lua.create_function(move |_, ()| Ok(function_registrar.clone()))?,
 		)?;
 
@@ -246,7 +246,7 @@ impl Manager {
 				})
 			}))?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.sheet",
+			"init.resources.sheet",
 			lua.create_function(move |_, ()| Ok(sheet_registrar.clone()))?,
 		)?;
 
@@ -267,7 +267,7 @@ impl Manager {
 				})
 			}))?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.spell",
+			"init.resources.spell",
 			lua.create_function(move |_, ()| Ok(spell_registrar.clone()))?,
 		)?;
 
@@ -286,7 +286,7 @@ impl Manager {
 				})
 			}))?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.component",
+			"init.resources.component",
 			lua.create_function(move |_, ()| Ok(component_registrar.clone()))?,
 		)?;
 
@@ -333,7 +333,7 @@ impl Manager {
 			})?,
 		)?;
 		lua.load_from_function::<mlua::Value>(
-			"esprit.resources.vault",
+			"init.resources.vault",
 			lua.create_function(move |_, ()| Ok(vault.clone()))?,
 		)?;
 
@@ -352,12 +352,12 @@ impl Manager {
 			.get::<mlua::Table>("package")?
 			.set("path", "")?;
 
-		lua.unload("esprit.resources.attack")?;
-		lua.unload("esprit.resources.function")?;
-		lua.unload("esprit.resources.sheet")?;
-		lua.unload("esprit.resources.spells")?;
-		lua.unload("esprit.resources.component")?;
-		lua.unload("esprit.resources.vault")?;
+		lua.unload("init.resources.attack")?;
+		lua.unload("init.resources.function")?;
+		lua.unload("init.resources.sheet")?;
+		lua.unload("init.resources.spells")?;
+		lua.unload("init.resources.component")?;
+		lua.unload("init.resources.vault")?;
 
 		let attacks = Rc::into_inner(attacks)
 			.expect("attacks must have only one strong reference")

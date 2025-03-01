@@ -1,4 +1,4 @@
----@meta esprit.resources.component
+---@meta init.resources.component
 
 ---@alias on_debuff fun(any): Stats
 

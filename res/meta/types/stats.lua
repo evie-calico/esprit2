@@ -1,4 +1,4 @@
----@meta esprit.types.stats
+---@meta engine.types.stats
 
 ---@class (exact) Stats: userdata
 ---@field heart integer

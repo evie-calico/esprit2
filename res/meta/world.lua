@@ -1,4 +1,4 @@
----@meta esprit.world
+---@meta engine.world
 
 ---@class (exact) Tile: userdata
 ---@field floor fun(self): boolean

@@ -1,4 +1,4 @@
----@meta esprit.resources
+---@meta runtime.resources
 
 local resources = {}
 

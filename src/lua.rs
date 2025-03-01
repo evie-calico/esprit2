@@ -74,30 +74,30 @@ impl mlua::UserData for Nouns {
 pub fn init() -> Result<Lua> {
 	let lua = Lua::new();
 	// Libraries
-	lua.load_from_function::<mlua::Value>("esprit.combat", lua.create_function(combat)?)?;
-	lua.load_from_function::<mlua::Value>("esprit.world", lua.load(world()).into_function()?)?;
+	lua.load_from_function::<mlua::Value>("engine.combat", lua.create_function(combat)?)?;
+	lua.load_from_function::<mlua::Value>("engine.world", lua.load(world()).into_function()?)?;
 
 	// Constructors
-	lua.load_from_function::<mlua::Value>("esprit.types.action", lua.create_function(action)?)?;
+	lua.load_from_function::<mlua::Value>("engine.types.action", lua.create_function(action)?)?;
 	lua.load_from_function::<mlua::Value>(
-		"esprit.types.consider",
+		"engine.types.consider",
 		lua.create_function(move |lua, ()| {
 			lua.create_function(|_, (action, heuristics)| Ok(Consider { action, heuristics }))
 		})?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
-		"esprit.types.expression",
+		"engine.types.expression",
 		lua.create_function(|lua, ()| {
 			lua.create_function(|_, s: String| Expression::try_from(s).map_err(Error::external))
 		})?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
-		"esprit.types.heuristic",
+		"engine.types.heuristic",
 		lua.create_function(heuristic)?,
 	)?;
-	lua.load_from_function::<mlua::Value>("esprit.types.log", lua.create_function(log)?)?;
-	lua.load_from_function::<mlua::Value>("esprit.types.skillset", lua.create_function(skillset)?)?;
-	lua.load_from_function::<mlua::Value>("esprit.types.stats", lua.create_function(stats)?)?;
+	lua.load_from_function::<mlua::Value>("engine.types.log", lua.create_function(log)?)?;
+	lua.load_from_function::<mlua::Value>("engine.types.skillset", lua.create_function(skillset)?)?;
+	lua.load_from_function::<mlua::Value>("engine.types.stats", lua.create_function(stats)?)?;
 	Ok(lua)
 }
 

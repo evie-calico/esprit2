@@ -1,4 +1,4 @@
----@meta esprit.console
+---@meta runtime.console
 
 local console = {}
 

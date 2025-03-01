@@ -1,5 +1,7 @@
-local component = require "esprit.resources.component"
-local spell = require "esprit.resources.spell"
+local component = require "init.resources.component"
+local spell = require "init.resources.spell"
+local console = require "runtime.console"
+local world = require "engine.world"
 
 spell "debug/frenzy" {
 	name = "(DEBUG) Frenzy",
@@ -12,9 +14,6 @@ spell "debug/frenzy" {
 	level = 0,
 
 	on_cast = function(_, _, args)
-		local console = require "esprit.console"
-		local world = require "esprit.world"
-
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 		console:print(target:replace_nouns("{Address} has been frenzied!"))
@@ -55,7 +54,6 @@ component "frenzy" {
 	---@param user Piece
 	---@param time number
 	on_turn = function(user, time)
-		local console = require "esprit.console"
 		---@type Frenzy
 		local frenzy = user:component("frenzy")
 		frenzy.time_left = frenzy.time_left - time

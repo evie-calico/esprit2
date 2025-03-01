@@ -1,4 +1,4 @@
-local vault = require "esprit.resources.vault"
+local vault = require "init.resources.vault"
 
 vault "example" {
     a = vault.character("luvui"),
