@@ -1,12 +1,6 @@
 local resources = require "res:resources"
 local stats = require "engine.types.stats"
 
--- TODO: This should be an engine-internal resource (hence the _ namespace)
--- TODO: This should be associated with a Value that denotes the owning player.
-resources.component ":conscious" {
-	name = "Conscious",
-}
-
 resources.component "teams" {
 	name = "Teams",
 	---@param user Piece

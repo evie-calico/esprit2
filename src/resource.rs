@@ -379,8 +379,26 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 			}
 		})
 		.collect::<Vec<PreliminaryModule>>();
+
 	// TODO: dependency directory.
+
 	let mut manager = Manager::default();
+	// Inject hard-coded engine resources here.
+	manager.component.0.insert(
+		":conscious".into(),
+		Component {
+			name: "Concious".into(),
+			icon: None,
+			visible: false,
+			on_attach: None,
+			on_detach: None,
+			on_turn: None,
+			on_rest: None,
+			on_debuff: None,
+		}
+		.into(),
+	);
+
 	if let Ok(package) = lua.globals().get::<mlua::Table>("package") {
 		if let Ok(loaders) = lua.create_sequence_from(
 			preliminary_modules
