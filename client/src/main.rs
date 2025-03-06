@@ -15,6 +15,7 @@ use esprit2::prelude::*;
 use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
 use esprit2_server::Client;
 use rkyv::rancor::{self, ResultExt};
+use sdl2::image::LoadTexture;
 use sdl2::rect::Rect;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::process::exit;
@@ -130,11 +131,14 @@ pub(crate) async fn main() {
 
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
-	// textures used by the client even when no modules are loaded (for menus).
-	let menu_textures = texture::Manager::new(&texture_creator);
-	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> = Some(Box::new(
-		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
-	));
+	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> =
+		Some(Box::new(menu::login::State::new(
+			cli.username.as_deref(),
+			cli.host.as_deref(),
+			texture_creator
+				.load_texture_bytes(include_bytes!("res/missing_texture.png"))
+				.expect("missing texture should not fail to load"),
+		)));
 	let mut server: Option<(input::Mode, ServerHandle)> = None;
 	let mut internal_server = None;
 
@@ -253,7 +257,7 @@ pub(crate) async fn main() {
 			let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
 
 			if let Some(menu) = &menu {
-				menu.draw(&mut gui, &menu_textures);
+				menu.draw(&mut gui);
 			}
 			if let Some((input_mode, world)) = &server {
 				world.draw(input_mode, &mut gui, &lua, &options);

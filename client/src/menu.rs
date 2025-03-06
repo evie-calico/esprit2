@@ -4,10 +4,12 @@ use sdl2::event::Event;
 
 pub(crate) trait Menu<T> {
 	fn event(&mut self, event: &Event, options: &Options) -> Signal<T>;
-	fn draw(&self, gui: &mut gui::Context, textures: &texture::Manager);
+	fn draw(&self, gui: &mut gui::Context);
 }
 
 pub(crate) mod login {
+	use sdl2::render::Texture;
+
 	use super::Menu;
 	use crate::input::{LineInput, Radio, RadioBacker, Signal};
 	use crate::prelude::*;
@@ -45,16 +47,23 @@ pub(crate) mod login {
 		}
 	}
 
-	#[derive(Default)]
-	pub(crate) struct State {
+	pub(crate) struct State<'texture> {
+		pub(crate) cursor: Texture<'texture>,
+
 		pub(crate) username: LineInput,
 		pub(crate) root_menu: Radio<RootMenu>,
 		pub(crate) url: LineInput,
 	}
 
-	impl State {
-		pub(crate) fn new(username: Option<&str>, url: Option<&str>) -> Self {
+	impl<'texture> State<'texture> {
+		pub(crate) fn new(
+			username: Option<&str>,
+			url: Option<&str>,
+			cursor: Texture<'texture>,
+		) -> Self {
 			Self {
+				cursor,
+
 				username: LineInput {
 					line: username.unwrap_or("").to_string(),
 					submitted: username.is_some(),
@@ -75,7 +84,7 @@ pub(crate) mod login {
 		}
 	}
 
-	impl Menu<RootMenuResponse> for State {
+	impl Menu<RootMenuResponse> for State<'_> {
 		fn event(
 			&mut self,
 			event: &sdl2::event::Event,
@@ -99,7 +108,7 @@ pub(crate) mod login {
 			})
 		}
 
-		fn draw(&self, gui: &mut gui::Context, textures: &texture::Manager) {
+		fn draw(&self, gui: &mut gui::Context) {
 			if !self.username.submitted {
 				gui.horizontal();
 				gui.label("Enter your name: ");
@@ -112,7 +121,7 @@ pub(crate) mod login {
 				gui.vertical();
 
 				gui.menu(
-					Some((self.root_menu.backer.index(), textures.get("null"))),
+					Some((self.root_menu.backer.index(), &self.cursor)),
 					["Singleplayer", "Multiplayer"],
 				);
 
