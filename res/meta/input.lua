@@ -1,4 +1,4 @@
----@meta engine.input
+---@meta runtime.input
 
 local input = {}
 

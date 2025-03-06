@@ -6,7 +6,16 @@ default-members = ["client"]
 
 [workspace.dependencies]
 rkyv = "0.8.8"
-mlua = { version = "0.10.1", features = ["luajit", "macros", "error-send", "userdata-wrappers"] }
+
+[workspace.dependencies.mlua]
+version = "0.10.1"
+features = [
+  "luajit52", # jit for performance, 5.2 for __ipairs
+  "vendored", # necessary to ensure luajit is cocmpiled with the 5.2 flag.
+  "macros",
+  "error-send",
+  "userdata-wrappers", # for Rc, etc.
+]
 
 [workspace.lints]
 clippy.module_name_repetitions = "warn"

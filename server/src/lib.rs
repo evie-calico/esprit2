@@ -21,7 +21,7 @@ use rkyv::rancor;
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
 use std::io;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::exit;
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
@@ -103,25 +103,28 @@ pub(crate) struct Server {
 }
 
 impl Server {
-	pub(crate) fn new(resource_directory: PathBuf, lua: &mlua::Lua) -> esprit2::Result<Self> {
-		// Game initialization.
-		let resources = match resource::Manager::open(&resource_directory, lua) {
-			Ok(resources) => resource::Handle::new(resources.into()),
-			Err(msg) => {
-				error!("failed to open resource directory: {msg}");
-				// TODO: I think these are out-of-date and should be moved to the caller.
-				exit(1);
-			}
-		};
+	pub(crate) fn new(
+		resource_directory: impl AsRef<Path>,
+		lua: &mlua::Lua,
+	) -> esprit2::Result<Self> {
+		let (resources, errors) =
+			resource::open(lua, Some(resource_directory.as_ref()), |_, _, init| init());
+		let resources = resource::Handle::new(resources.into());
+		for (module, error) in errors
+			.into_iter()
+			.flat_map(|x| <Box<[_]> as IntoIterator>::into_iter(x.errors).map(move |e| (x.name, e)))
+		{
+			error!(module, "{error}");
+		}
 
 		// Create a piece for the player, and register it with the world manager.
 		let party_blueprint = [
 			world::PartyReferenceBase {
-				sheet: "luvui".into(),
+				sheet: "res:luvui".into(),
 				accent_color: (0xDA, 0x2D, 0x5C, 0xFF),
 			},
 			world::PartyReferenceBase {
-				sheet: "aris".into(),
+				sheet: "res:aris".into(),
 				accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 			},
 		];
@@ -133,7 +136,7 @@ impl Server {
 		world.generate_floor(
 			"default seed",
 			&vault::Set {
-				vaults: vec!["example".into()],
+				vaults: vec!["res:example".into()],
 				density: 4,
 				hall_ratio: 1,
 			},
@@ -216,7 +219,7 @@ impl std::ops::DerefMut for ClientParty {
 /// Returns an error if the instance cannot be initialized.
 pub fn instance(
 	mut router: mpsc::Receiver<(Client, ReceiverStream<AlignedVec>)>,
-	res: PathBuf,
+	res: impl AsRef<Path>,
 ) -> esprit2::Result<()> {
 	let lua = esprit2::lua::init()?;
 

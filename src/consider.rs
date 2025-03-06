@@ -77,7 +77,7 @@ pub struct Consider {
 
 impl mlua::UserData for Consider {
 	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
-		methods.add_function("ipairs", |_, this: mlua::AnyUserData| {
+		methods.add_meta_function("__ipairs", |_, this: mlua::AnyUserData| {
 			Ok((
 				this.metatable()?.get::<mlua::Function>("__next")?,
 				this,

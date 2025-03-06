@@ -60,10 +60,10 @@ impl Manager {
 			accent_color,
 		} in party_blueprint
 		{
-			let sheet = resources.sheets.get(&sheet)?;
+			let sheet = resources.sheet.get(&sheet)?;
 			let character = character::Ref::new(character::Piece::new((**sheet).clone()));
 			character.borrow_mut().components.insert(
-				":teams".into(),
+				"res:teams".into(),
 				Value::OrderedTable([Value::String(":players".into())].into()),
 			);
 			if characters.is_empty() {
@@ -136,7 +136,7 @@ impl Manager {
 				.keys()
 				.filter_map(|component_id| {
 					resources
-						.components
+						.component
 						.get(component_id)
 						.map(|x| x.on_rest.clone())
 						.transpose()
@@ -216,7 +216,7 @@ impl Manager {
 					warn!("set has no vaults");
 					break 'placement;
 				};
-				let vault = resources.vaults.get(vault)?;
+				let vault = resources.vault.get(vault)?;
 				// for every possible edge of the vault (shuffled), check if it fits.
 				let mut potential_edges = vault.edges.clone();
 				potential_edges.shuffle(&mut rng);
@@ -276,7 +276,7 @@ impl Manager {
 			let piece = character::Piece {
 				x: x + xoff,
 				y: y + yoff,
-				..character::Piece::new((**resources.sheets.get(sheet)?).clone())
+				..character::Piece::new((**resources.sheet.get(sheet)?).clone())
 			};
 			self.characters.push_front(character::Ref::new(piece));
 		}
@@ -296,7 +296,7 @@ impl Manager {
 	) -> Result<bool> {
 		let character = self.next_character();
 		if !character.borrow().components.contains_key(":conscious") {
-			let action = self.consider_action(resources, lua, character.clone())?;
+			let action = self.consider_action(lua, character.clone())?;
 			self.perform_action(&console, resources, lua, action)?;
 			Ok(true)
 		} else {
@@ -306,16 +306,19 @@ impl Manager {
 
 	pub fn consider_action(
 		&self,
-		resources: &resource::Manager,
 		lua: &mlua::Lua,
 		character: character::Ref,
 	) -> Result<character::Action> {
-		let thread = lua.create_thread(
-			resources
-				.functions
-				.get(&character.borrow().sheet.on_consider)?
-				.clone(),
-		)?;
+		let on_consider = {
+			let character = character.borrow();
+			let on_consider = character.sheet.on_consider.as_ref();
+			lua.load(mlua::chunk! {
+				return require($on_consider)(...)
+			})
+			.set_name(format!("={on_consider}"))
+			.into_function()?
+		};
+		let thread = lua.create_thread(on_consider)?;
 		Ok(self
 			.poll::<Option<Consider>>(lua, thread, character)?
 			.map(|x| x.action)
@@ -348,7 +351,7 @@ impl Manager {
 			.keys()
 			.filter_map(|component_id| {
 				resources
-					.components
+					.component
 					.get(component_id)
 					.map(|x| x.on_turn.clone())
 					.transpose()
@@ -390,12 +393,12 @@ impl Manager {
 			}
 			character::Action::Attack(attack, arguments) => self.attack(
 				lua,
-				resources.attacks.get(&attack)?.clone(),
+				resources.attack.get(&attack)?.clone(),
 				next_character,
 				arguments,
 			)?,
 			character::Action::Cast(spell, arguments) => self.cast(
-				resources.spells.get(&spell)?.clone(),
+				resources.spell.get(&spell)?.clone(),
 				next_character,
 				lua,
 				arguments,

@@ -19,7 +19,7 @@ pub(crate) struct SoulJar<'texture> {
 }
 
 impl<'texture> SoulJar<'texture> {
-	pub(crate) fn new(textures: &'texture texture::Manager) -> Result<Self> {
+	pub(crate) fn new(textures: &texture::Manager<'texture>) -> Result<Self> {
 		let mut rng = rand::thread_rng();
 		let souls = (0..=9)
 			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
@@ -162,7 +162,7 @@ pub(crate) fn spell_menu(
 		.sheet
 		.spells
 		.iter()
-		.map(|k| resources.spells.get(k))
+		.map(|k| resources.spell.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(spell) = spell else {
@@ -190,7 +190,7 @@ pub(crate) fn attack_menu(
 		.sheet
 		.attacks
 		.iter()
-		.map(|k| resources.attacks.get(k))
+		.map(|k| resources.attack.get(k))
 		.zip('a'..='z')
 	{
 		let Ok(attack) = attack else {
@@ -538,7 +538,7 @@ fn character_buffs(
 	let components = piece
 		.components
 		.keys()
-		.filter_map(|x| resources.components.get(x).ok())
+		.filter_map(|x| resources.component.get(x).ok())
 		.filter(|x| x.visible)
 		.peekable();
 	{

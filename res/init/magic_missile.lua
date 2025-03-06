@@ -1,9 +1,10 @@
 local expression = require "engine.types.expression"
-local team = require "team"
+local team = require "res:team"
+local resources = require "res:resources"
 
-require "init.resources.spell" "magic_missile" {
+resources.spell "magic_missile" {
 	name = "Magic Missile",
-	icon = "magic_missile",
+	icon = resources.texture "magic_missile.png",
 	description = "Constructs a searing ray of magical energy that can be fired at a target.",
 
 	energy = "negative",
@@ -116,5 +117,5 @@ require "init.resources.spell" "magic_missile" {
 			end
 		end
 	end,
-	on_input = require "input.single_target",
+	on_input = require "res:input/single_target",
 }

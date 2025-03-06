@@ -3,12 +3,13 @@ use sdl2::image::LoadTexture;
 use sdl2::render::{Texture, TextureCreator};
 use sdl2::video::WindowContext;
 use std::cell::{Cell, OnceCell};
+use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Handles lazy loading of textures into memory and video memory.
 #[derive(Default)]
-struct TextureInfo<'texture> {
+pub struct TextureInfo<'texture> {
 	path: PathBuf,
 
 	/// This is populated upon calling `get_texture`.
@@ -26,35 +27,25 @@ struct TextureInfo<'texture> {
 
 pub(crate) struct Manager<'texture> {
 	texture_creator: &'texture TextureCreator<WindowContext>,
-	textures: Resource<TextureInfo<'texture>>,
+	textures: HashMap<Box<str>, TextureInfo<'texture>>,
 	missing_texture: Texture<'texture>,
 }
 
 impl<'texture> Manager<'texture> {
-	pub(crate) fn new(
-		path: impl AsRef<Path>,
-		texture_creator: &'texture TextureCreator<WindowContext>,
-	) -> Result<Self> {
-		let textures = resource::register(path.as_ref(), |path| {
-			Ok(TextureInfo {
-				path: path.to_path_buf(),
-				..Default::default()
-			})
-		})?;
-
-		Ok(Self {
-			textures,
+	pub(crate) fn new(texture_creator: &'texture TextureCreator<WindowContext>) -> Self {
+		Self {
+			textures: HashMap::new(),
 			texture_creator,
 			missing_texture: texture_creator
 				.load_texture_bytes(include_bytes!("res/missing_texture.png"))
-				.map_err(crate::Error::Sdl)?,
-		})
+				.expect("missing texture should never fail to load"),
+		}
 	}
 
 	/// Return the given texture.
 	/// If the texture cannot be found, returns the missing texture placeholder.
 	pub(crate) fn get(&self, key: &str) -> &Texture {
-		let Ok(texture_info) = self.textures.get(key) else {
+		let Some(texture_info) = self.textures.get(key) else {
 			return &self.missing_texture;
 		};
 		texture_info
@@ -62,7 +53,7 @@ impl<'texture> Manager<'texture> {
 			.get_or_try_init(|| self.texture_creator.load_texture(&texture_info.path))
 			.unwrap_or_else(|msg| {
 				if !texture_info.had_error.get() {
-					eprintln!(
+					error!(
 						"failed to load {key} ({}): {msg}",
 						texture_info.path.display()
 					);
@@ -74,7 +65,7 @@ impl<'texture> Manager<'texture> {
 
 	/// `Manager` *must* be immutable to function,
 	/// but sometimes sdl expects you to have ownership over a texture.
-	/// In these situations, `get_owned_texture` can be used to create an owned instance of a texture.
+	/// In these situations, `get_owned_texture` can be used.
 	/// This *does* allocate more VRAM every time it's called.
 	/// It should *not* be called in a loop or on every frame.
 	///
@@ -85,8 +76,11 @@ impl<'texture> Manager<'texture> {
 	/// # Errors
 	///
 	/// Returns an error if the texture could not be found, loaded, or parsed.
-	pub(crate) fn open(&self, key: &str) -> Result<Texture> {
-		let texture_info = self.textures.get(key)?;
+	pub(crate) fn open(&self, key: &str) -> Result<Texture<'texture>> {
+		let texture_info = self
+			.textures
+			.get(key)
+			.ok_or_else(|| resource::Error::NotFound(key.into()))?;
 
 		let image = texture_info
 			.image

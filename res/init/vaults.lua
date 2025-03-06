@@ -1,13 +1,12 @@
-local vault = require "init.resources.vault"
+local resources = require "res:resources"
 
-vault "example" {
-    a = vault.character("luvui"),
+resources.vault "example" {
     [[
     E
    x.x
   x...x
  x.....x
-E...a...E
+E.......E
  x.....x
   x...x
    x.x

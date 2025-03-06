@@ -1,19 +1,16 @@
-local functions = require "init.resources.function"
-local sheet = require "init.resources.sheet"
 local skillset = require "engine.types.skillset"
+local resources = require "res:resources"
 
-local attacks = { "scratch", "bite" }
+local attacks = { "res:scratch", "res:bite" }
 
-functions("basic", require "basic")
-
-sheet "luvui" {
+resources.sheet "luvui" {
 	level = 1,
 	attacks = attacks,
-	spells = { "magic_missile", "swap", "crush", "debug/level_up", "debug/change_affinity", "debug/possess", "debug/frenzy" },
+	spells = { "res:magic_missile", "res:swap", "res:crush", "res:debug/level_up", "res:debug/change_affinity", "res:debug/possess", "res:debug/frenzy" },
 	speed = 12,
-	icon = "luvui",
+	icon = resources.texture "luvui.png",
 
-	on_consider = "basic",
+	on_consider = "res:basic",
 	nouns = {
 		name = "Luvui",
 		proper_name = true,
@@ -38,13 +35,13 @@ sheet "luvui" {
 	skillset = skillset("chaos", "positive"),
 }
 
-sheet "aris" {
+resources.sheet "aris" {
 	level = 1,
 	attacks = attacks,
 	speed = 12,
-	icon = "aris",
+	icon = resources.texture "aris.png",
 
-	on_consider = "basic",
+	on_consider = "res:basic",
 	nouns = {
 		name = "Aris",
 		proper_name = true,

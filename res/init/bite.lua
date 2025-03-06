@@ -1,8 +1,8 @@
 local expression = require "engine.types.expression"
-local attack = require "init.resources.attack"
-local team = require "team"
+local resources = require "res:resources"
+local team = require "res:team"
 
-attack "bite" {
+resources.attack "bite" {
 	name = "Bite",
 	description = "Lowers your defense until your next turn.",
 	magnitude = expression "power + 8",
@@ -89,5 +89,5 @@ attack "bite" {
 			end
 		end
 	end,
-	on_input = require "input.melee",
+	on_input = require "res:input/melee",
 }

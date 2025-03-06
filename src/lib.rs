@@ -12,6 +12,7 @@ pub mod astar;
 pub mod attack;
 pub mod character;
 pub mod combat;
+pub mod component;
 pub mod consider;
 pub mod console;
 pub mod expression;
@@ -22,7 +23,6 @@ pub mod nouns;
 pub mod resource;
 pub mod soul;
 pub mod spell;
-pub mod component;
 pub mod value;
 pub mod vault;
 pub mod world;
@@ -164,15 +164,14 @@ pub mod prelude {
 
 	// Import redundant module::Struct names.
 	pub use attack::Attack;
+	pub use component::Component;
 	pub use consider::Consider;
 	pub use expression::Expression;
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
-	pub use resource::Resource;
 	pub use soul::Soul;
 	pub use spell::Spell;
-	pub use component::Component;
 	pub use vault::Vault;
 
 	// Export common traits

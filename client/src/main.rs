@@ -128,19 +128,10 @@ pub(crate) async fn main() {
 		exit(1);
 	});
 
-	let textures = match texture::Manager::new(
-		options::resource_directory().join("textures/"),
-		&texture_creator,
-	) {
-		Ok(resources) => resources,
-		Err(msg) => {
-			error!("failed to open resource directory: {msg}");
-			exit(1);
-		}
-	};
-
 	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
+	// textures used by the client even when no modules are loaded (for menus).
+	let menu_textures = texture::Manager::new(&texture_creator);
 	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> = Some(Box::new(
 		menu::login::State::new(cli.username.as_deref(), cli.host.as_deref()),
 	));
@@ -190,7 +181,7 @@ pub(crate) async fn main() {
 										ClientAuthentication { username },
 										None,
 										&lua,
-										&textures,
+										texture::Manager::new(&texture_creator),
 									)
 									.await
 									.unwrap(),
@@ -211,7 +202,7 @@ pub(crate) async fn main() {
 										ClientAuthentication { username },
 										client_routing,
 										&lua,
-										&textures,
+										texture::Manager::new(&texture_creator),
 									)
 									.await
 									.unwrap(),
@@ -230,41 +221,46 @@ pub(crate) async fn main() {
 			}
 		}
 
-		// This is the only place where delta time should be used.
-		let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
+		// tick
+		{
+			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
 
-		fps_timer += delta;
-		if fps_timer > 0.3 {
-			fps_timer = 0.0;
-			fps = (fps + 1.0 / delta) / 2.0;
-		}
+			fps_timer += delta;
+			if fps_timer > 0.3 {
+				fps_timer = 0.0;
+				fps = (fps + 1.0 / delta) / 2.0;
+			}
 
-		if let Some((input_mode, server)) = &mut server {
-			server.tick(delta, input_mode).await.unwrap();
-			if let Some(world) = &mut server.world {
-				// TODO: Avoid ticking more than once when too late in the frame.
-				world
-					.tick(&server.resources, &lua, &server.console)
-					.unwrap();
+			if let Some((input_mode, server)) = &mut server {
+				server.tick(delta, input_mode).await.unwrap();
+				if let Some(world) = &mut server.world {
+					// TODO: Avoid ticking more than once when too late in the frame.
+					world
+						.tick(&server.resources, &lua, &server.console)
+						.unwrap();
+				}
 			}
 		}
 
-		let canvas_size = canvas.window().size();
-		let viewport = Rect::new(0, 0, canvas_size.0, canvas_size.1);
-		canvas.set_draw_color((20, 20, 20));
-		canvas.clear();
-		canvas.set_viewport(viewport);
+		// draw
+		{
+			let canvas_size = canvas.window().size();
+			let viewport = Rect::new(0, 0, canvas_size.0, canvas_size.1);
+			canvas.set_draw_color((20, 20, 20));
+			canvas.clear();
+			canvas.set_viewport(viewport);
 
-		let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
+			let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
 
-		if let Some(menu) = &menu {
-			menu.draw(&mut gui, &textures);
+			if let Some(menu) = &menu {
+				menu.draw(&mut gui, &menu_textures);
+			}
+			if let Some((input_mode, world)) = &server {
+				world.draw(input_mode, &mut gui, &lua, &options);
+			}
+
+			canvas.present();
 		}
-		if let Some((input_mode, world)) = &server {
-			world.draw(input_mode, &mut gui, &lua, &textures, &options);
-		}
-
-		canvas.present();
 	}
 
 	if let Some(internal_server) = internal_server {
@@ -292,7 +288,11 @@ impl InternalServer {
 		let instance = thread::Builder::new()
 			.name(String::from("instance"))
 			.spawn(move || {
-				esprit2_server::instance(reciever, options::resource_directory().clone())
+				let result = esprit2_server::instance(reciever, options::resource_directory());
+				if let Err(e) = &result {
+					error!("server instance returned an error: {e}");
+				}
+				result
 			})
 			.into_trace("while spawning instance thread")?;
 		let router = task::spawn(

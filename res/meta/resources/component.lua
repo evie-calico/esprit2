@@ -10,6 +10,6 @@
 
 ---@param indentifier string
 ---@return fun(ComponentTable): Component
-function component(indentifier) end
+local function component(indentifier) end
 
 return component

@@ -1,5 +1,5 @@
-local movement = require "movement"
-local team = require "team"
+local movement = require "res:movement"
+local team = require "res:team"
 
 ---@param user Piece
 return function(user)
@@ -59,7 +59,7 @@ return function(user)
 	local function sum_heuristics(consider, weight)
 		if weight == nil then weight = 1 end
 		local score = 0
-		for _, heuristic in consider:ipairs() do
+		for _, heuristic in ipairs(consider) do
 			if heuristic:damage() then
 				score = score + damage_score(heuristic --[[@as DamageHeuristic]]) * weight
 			elseif heuristic:debuff() then

@@ -1,15 +1,15 @@
 local combat = require "engine.combat"
-local console = require "runtime.console"
 local world = require "engine.world"
 local expression = require "engine.types.expression"
 local log = require "engine.types.log"
-local team = require "team"
+local team = require "res:team"
+local resources = require "res:resources"
 
-require "init.resources.spell" "swap" {
+resources.spell "swap" {
 	name = "Swap",
 	description = "Swaps the caster's position with the target. For non-allied targets, the spell must have a magnitude greater than the target's resistance.",
 	-- TODO: Swap icon
-	icon = "magic_missile",
+	icon = resources.texture "magic_missile.png",
 
 	-- This perfectly matches Luvui's affinity, making it a good early game spell for her.
 	energy = "positive",
@@ -27,6 +27,7 @@ require "init.resources.spell" "swap" {
 	},
 
 	on_cast = function(user, spell, args)
+		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 
@@ -55,5 +56,5 @@ require "init.resources.spell" "swap" {
 		return spell.parameters.cast_time
 	end,
 	-- TODO: Allow movement heuristics to apply to characters other than the considerer, allowing for an on_consider script
-	on_input = require "input.single_target",
+	on_input = require "res:input/single_target",
 }

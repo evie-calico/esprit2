@@ -1,12 +1,10 @@
-local spell = require "init.resources.spell"
-local console = require "runtime.console"
-local input = require "engine.input"
 local world = require "engine.world"
+local resources = require "res:resources"
 
-spell "debug/level_up" {
+resources.spell "debug/level_up" {
 	name = "(DEBUG) Level Up",
 	description = "Causes the targeted character to gain a level.",
-	icon = "dummy",
+	icon = resources.texture "dummy.png",
 
 	energy = "positive",
 	harmony = "order",
@@ -14,20 +12,21 @@ spell "debug/level_up" {
 	level = 0,
 
 	on_cast = function(_, _, args)
+		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 		target:force_level();
 		console:print(target:replace_nouns("{Address}'s level increased to " .. target.level))
 	end,
-	on_input = require "input.single_target",
+	on_input = require "res:input/single_target",
 
 	parameters = { range = 5 },
 }
 
-spell "debug/possess" {
+resources.spell "debug/possess" {
 	name = "(DEBUG) Possess",
 	description = "Makes the targetted piece controllable by the user of this spell. Removes consciousness if it's already present.",
-	icon = "dummy",
+	icon = resources.texture "dummy.png",
 
 	energy = "positive",
 	harmony = "order",
@@ -35,6 +34,7 @@ spell "debug/possess" {
 	level = 0,
 
 	on_cast = function(_, _, args)
+		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 		if target:detach(":conscious") == nil then
@@ -44,15 +44,15 @@ spell "debug/possess" {
 			console:print(target:replace_nouns("{Address} is thinking for {themself}."))
 		end
 	end,
-	on_input = require "input.single_target",
+	on_input = require "res:input/single_target",
 
 	parameters = { range = 5 },
 }
 
-spell "debug/change_affinity" {
+resources.spell "debug/change_affinity" {
 	name = "(DEBUG) Change Affinity",
 	description = "Changes the target's magical affinity",
-	icon = "dummy",
+	icon = resources.texture "dummy.png",
 
 	energy = "positive",
 	harmony = "order",
@@ -60,6 +60,7 @@ spell "debug/change_affinity" {
 	level = 0,
 
 	on_cast = function(_, _, args)
+		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 
@@ -67,6 +68,7 @@ spell "debug/change_affinity" {
 		console:print(target:replace_nouns("{Address}'s affinity is now " .. args.name))
 	end,
 	on_input = function(user, this)
+		local input = require "runtime.input"
 		local names = {
 			"Positive",
 			"Positive Chaos",

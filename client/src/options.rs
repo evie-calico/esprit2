@@ -1,32 +1,32 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use sdl2::keyboard::Keycode;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::OnceLock;
 use std::{fs, io};
 
-pub(crate) fn user_directory() -> &'static PathBuf {
-	static USER_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+pub(crate) fn user_directory() -> &'static Path {
+	static USER_DIRECTORY: OnceLock<&'static Path> = OnceLock::new();
 	USER_DIRECTORY.get_or_init(find_user_directory)
 }
 
-pub(crate) fn resource_directory() -> &'static PathBuf {
-	static RESOURCE_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+pub(crate) fn resource_directory() -> &'static Path {
+	static RESOURCE_DIRECTORY: OnceLock<&'static Path> = OnceLock::new();
 	RESOURCE_DIRECTORY.get_or_init(find_resource_directory)
 }
 
 // In the future, this should be a little smarter.
 // Things to check:
 // - ~/.local/share/esprit2 (XDG_DATA_HOME)
-fn find_user_directory() -> PathBuf {
-	PathBuf::from("user/")
+fn find_user_directory() -> &'static Path {
+	Path::new("user/")
 }
 
 // I think `local/share` is still the answer here,
 // but we need to check /usr/local/share/esprit2 if this program is installed system-wide.
 // This isn't the case for `find_user_directory` since /usr/local/share might not be writable.
-fn find_resource_directory() -> PathBuf {
-	PathBuf::from("res/")
+fn find_resource_directory() -> &'static Path {
+	Path::new("res/")
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]

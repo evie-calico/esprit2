@@ -1,24 +1,22 @@
-local component = require "init.resources.component"
+local resources = require "res:resources"
 local stats = require "engine.types.stats"
 
 -- TODO: This should be an engine-internal resource (hence the _ namespace)
 -- TODO: This should be associated with a Value that denotes the owning player.
-component ":conscious" {
+resources.component ":conscious" {
 	name = "Conscious",
 }
 
--- TODO: This should be an engine-internal resource (hence the _ namespace)
--- TODO: This should be associated with a Value that denotes the team's identifier. (eg, :players, esprit:rats, etc.)
-component ":teams" {
+resources.component "teams" {
 	name = "Teams",
 	---@param user Piece
 	---@param previous string[]?
 	on_attach = function(user, previous)
 		-- This function is questionable
 
-		local current = user:component(":teams")
+		local current = user:component("res:teams")
 		if current ~= nil and #current == 0 then
-			user:detach(":teams")
+			user:detach("res:teams")
 			return
 		end
 		if type(current) == "string" then
@@ -26,7 +24,7 @@ component ":teams" {
 			table.insert(previous, current)
 			-- This causes a recursive call!
 			-- Note that previous is not a `string`, which would cause a loop
-			user:attach(":teams", previous)
+			user:attach("res:teams", previous)
 		end
 	end,
 	---@param user Piece
@@ -41,13 +39,13 @@ component ":teams" {
 				end
 			end
 			if #previous > 0 then
-				user:attach(":teams", previous)
+				user:attach("res:teams", previous)
 			end
 		end
 	end,
 }
 
-component "bleed" {
+resources.component "bleed" {
 	name = "Bleeding",
 	visible = true,
 
@@ -66,7 +64,7 @@ component "bleed" {
 	end
 }
 
-component "close_combat" {
+resources.component "close_combat" {
 	name = "Close Combat",
 	visible = true,
 

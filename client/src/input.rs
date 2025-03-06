@@ -353,8 +353,7 @@ pub(crate) fn controllable_character(
 			}
 
 			if options.controls.autocombat.contains(keycode) {
-				let action =
-					world.consider_action(resources, lua, world.next_character().clone())?;
+				let action = world.consider_action(lua, world.next_character().clone())?;
 				Ok((Mode::Normal, Some(Response::Act(action))))
 			} else {
 				Ok((Mode::Normal, None))
@@ -504,7 +503,7 @@ fn gather_attack_inputs(
 	attack_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
-	let attack = resources.attacks.get(&attack_id)?;
+	let attack = resources.attack.get(&attack_id)?;
 	let thread = lua.create_thread(attack.on_input.clone())?;
 	PartialAction::Attack(attack_id, next_character.clone(), thread)
 		.resolve(lua, (next_character, attack.clone()))
@@ -516,7 +515,7 @@ fn gather_spell_inputs(
 	spell_id: Box<str>,
 	next_character: character::Ref,
 ) -> Result<Response, Error> {
-	let spell = resources.spells.get(&spell_id)?;
+	let spell = resources.spell.get(&spell_id)?;
 	let thread = lua.create_thread(spell.on_input.clone())?;
 	PartialAction::Spell(spell_id, next_character.clone(), thread)
 		.resolve(lua, (next_character, spell.clone()))

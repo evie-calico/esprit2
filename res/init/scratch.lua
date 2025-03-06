@@ -1,5 +1,3 @@
-local attack = require "init.resources.attack"
-
 local combat = require "engine.combat"
 local world = require "engine.world"
 
@@ -9,9 +7,10 @@ local expression = require "engine.types.expression"
 local heuristic = require "engine.types.heuristic"
 local log = require "engine.types.log"
 
-local team = require "team"
+local resources = require "res:resources"
+local team = require "res:team"
 
-attack "scratch" {
+resources.attack "scratch" {
 	name = "Scratch",
 	description = "Causes a small amount of bleeding damage, which reduces defense.",
 	magnitude = expression "power + 4",
@@ -95,5 +94,5 @@ attack "scratch" {
 			end
 		end
 	end,
-	on_input = require "input.melee",
+	on_input = require "res:input/melee",
 }

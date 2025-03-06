@@ -1,14 +1,13 @@
 local combat = require "engine.combat"
-local console = require "runtime.console"
-local input = require "engine.input"
 local world = require "engine.world"
 local expression = require "engine.types.expression"
 local log = require "engine.types.log"
+local resources = require "res:resources"
 
-require "init.resources.spell" "crush" {
+resources.spell "crush" {
 	name = "Crush",
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
-	icon = "magic_missile",
+	icon = resources.texture "magic_missile.png",
 
 	-- This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
 	energy = "negative",
@@ -27,6 +26,7 @@ require "init.resources.spell" "crush" {
 	},
 
 	on_cast = function(user, spell, args)
+		local console = require "runtime.console"
 		-- It would be nice to all some filters for *requesting* a list of characters,
 		-- (sort of like yielding a Cursor ActionRequest) with some sort of query language
 		-- to filter entries on the rust side.
@@ -117,6 +117,7 @@ require "init.resources.spell" "crush" {
 	end,
 	-- TODO: on_consider
 	on_input = function(user, spell)
+		local input = require "runtime.input"
 		return {
 			target = input.cursor(user.x, user.y, spell.parameters.range, spell.parameters.radius),
 			direction = input.direction("Crush in which direction?"),

@@ -217,7 +217,7 @@ impl mlua::UserData for Ref {
 					.get::<mlua::Table>("loaded")?
 					.get::<resource::Handle>("runtime.resources")?;
 				let component = resources
-					.components
+					.component
 					.get(&component_id)
 					.map_err(mlua::Error::external)?;
 				let previous = this.borrow_mut().components.insert(component_id, value);
@@ -244,7 +244,7 @@ impl mlua::UserData for Ref {
 					.get::<resource::Handle>("runtime.resources")?;
 				let component_id = component_id.to_str()?;
 				let component = resources
-					.components
+					.component
 					.get(component_id.as_ref())
 					.map_err(mlua::Error::external)?;
 				let previous = this.borrow_mut().components.remove(component_id.as_ref());
@@ -346,7 +346,7 @@ impl Piece {
 			lua.load(mlua::chunk!(require "runtime.resources")).eval()?;
 
 		for (component_id, value) in &self.components {
-			if let Ok(component) = resources.components.get(component_id.as_ref())
+			if let Ok(component) = resources.component.get(component_id.as_ref())
 				&& let Some(on_debuff) = &component.on_debuff
 			{
 				let debuff = on_debuff.call(value.as_lua(lua)?)?;

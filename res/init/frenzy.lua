@@ -1,12 +1,10 @@
-local component = require "init.resources.component"
-local spell = require "init.resources.spell"
-local console = require "runtime.console"
 local world = require "engine.world"
+local resources = require "res:resources"
 
-spell "debug/frenzy" {
+resources.spell "debug/frenzy" {
 	name = "(DEBUG) Frenzy",
 	description = "Applies frenzy",
-	icon = "dummy",
+	icon = resources.texture "dummy.png",
 
 	energy = "positive",
 	harmony = "order",
@@ -14,12 +12,13 @@ spell "debug/frenzy" {
 	level = 0,
 
 	on_cast = function(_, _, args)
+		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 		console:print(target:replace_nouns("{Address} has been frenzied!"))
 		target:attach("frenzy", 2 * 12)
 	end,
-	on_input = require "input.single_target",
+	on_input = require "res:input/single_target",
 
 	parameters = { range = 5 },
 }
@@ -28,7 +27,7 @@ spell "debug/frenzy" {
 ---@field time_left number
 ---@field former_teams string[]
 
-component "frenzy" {
+resources.component "frenzy" {
 	name = "Frenzied",
 	visible = true,
 
@@ -38,9 +37,9 @@ component "frenzy" {
 		if previous == nil then
 			user:attach("frenzy", {
 				time_left = user:component("frenzy"),
-				former_teams = user:component(":teams") or {},
+				former_teams = user:component("res:teams") or {},
 			} --[[@as Frenzy]])
-			user:detach(":teams")
+			user:detach("res:teams")
 		end
 	end,
 	---@param user Piece
@@ -48,12 +47,13 @@ component "frenzy" {
 	on_detach = function(user, previous)
 		-- Don't overwrite the current list, in case it changed.
 		for _, v in pairs(previous.former_teams) do
-			user:attach(":teams", v)
+			user:attach("res:teams", v)
 		end
 	end,
 	---@param user Piece
 	---@param time number
 	on_turn = function(user, time)
+		local console = require "runtime.console"
 		---@type Frenzy
 		local frenzy = user:component("frenzy")
 		frenzy.time_left = frenzy.time_left - time
