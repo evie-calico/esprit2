@@ -1,6 +1,6 @@
 local expression = require "engine.types.expression"
-local team = require "res:team"
-local resources = require "res:resources"
+local team = require "esprit:team"
+local resources = require "esprit:resources"
 
 resources.spell "magic_missile" {
 	name = "Magic Missile",
@@ -117,5 +117,5 @@ resources.spell "magic_missile" {
 			end
 		end
 	end,
-	on_input = require "res:input/single_target",
+	on_input = require "esprit:input/single_target",
 }

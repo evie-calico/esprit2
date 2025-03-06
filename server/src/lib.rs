@@ -107,8 +107,20 @@ impl Server {
 		resource_directory: impl AsRef<Path>,
 		lua: &mlua::Lua,
 	) -> esprit2::Result<Self> {
+		let modules = resource_directory
+			.as_ref()
+			.read_dir()?
+			.filter_map(|x| {
+				let x = x.ok()?;
+				if x.metadata().ok()?.is_dir() {
+					Some(x.path().into_boxed_path())
+				} else {
+					None
+				}
+			})
+			.collect::<Box<[Box<Path>]>>();
 		let (resources, errors) =
-			resource::open(lua, Some(resource_directory.as_ref()), |_, _, init| init());
+			resource::open(lua, modules.iter().map(|x| x.as_ref()), |_, _, init| init());
 		let resources = resource::Handle::new(resources.into());
 		for (module, error) in errors
 			.into_iter()
@@ -120,11 +132,11 @@ impl Server {
 		// Create a piece for the player, and register it with the world manager.
 		let party_blueprint = [
 			world::PartyReferenceBase {
-				sheet: "res:luvui".into(),
+				sheet: "esprit:luvui".into(),
 				accent_color: (0xDA, 0x2D, 0x5C, 0xFF),
 			},
 			world::PartyReferenceBase {
-				sheet: "res:aris".into(),
+				sheet: "esprit:aris".into(),
 				accent_color: (0x0C, 0x94, 0xFF, 0xFF),
 			},
 		];
@@ -136,7 +148,7 @@ impl Server {
 		world.generate_floor(
 			"default seed",
 			&vault::Set {
-				vaults: vec!["res:example".into()],
+				vaults: vec!["esprit:example".into()],
 				density: 4,
 				hall_ratio: 1,
 			},

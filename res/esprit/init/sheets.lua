@@ -1,16 +1,24 @@
 local skillset = require "engine.types.skillset"
-local resources = require "res:resources"
+local resources = require "esprit:resources"
 
-local attacks = { "res:scratch", "res:bite" }
+local attacks = { "esprit:scratch", "esprit:bite" }
 
 resources.sheet "luvui" {
 	level = 1,
 	attacks = attacks,
-	spells = { "res:magic_missile", "res:swap", "res:crush", "res:debug/level_up", "res:debug/change_affinity", "res:debug/possess", "res:debug/frenzy" },
+	spells = {
+		"esprit:magic_missile",
+		"esprit:swap",
+		"esprit:crush",
+		"esprit:debug/level_up",
+		"esprit:debug/change_affinity",
+		"esprit:debug/possess",
+		"esprit:debug/frenzy"
+	},
 	speed = 12,
 	icon = resources.texture "luvui.png",
 
-	on_consider = "res:basic",
+	on_consider = "esprit:basic",
 	nouns = {
 		name = "Luvui",
 		proper_name = true,
@@ -41,7 +49,7 @@ resources.sheet "aris" {
 	speed = 12,
 	icon = resources.texture "aris.png",
 
-	on_consider = "res:basic",
+	on_consider = "esprit:basic",
 	nouns = {
 		name = "Aris",
 		proper_name = true,

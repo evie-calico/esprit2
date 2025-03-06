@@ -1,5 +1,5 @@
 local world = require "engine.world"
-local resources = require "res:resources"
+local resources = require "esprit:resources"
 
 resources.spell "debug/frenzy" {
 	name = "(DEBUG) Frenzy",
@@ -16,9 +16,9 @@ resources.spell "debug/frenzy" {
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 		console:print(target:replace_nouns("{Address} has been frenzied!"))
-		target:attach("frenzy", 2 * 12)
+		target:attach("esprit:frenzy", 2 * 12)
 	end,
-	on_input = require "res:input/single_target",
+	on_input = require "esprit:input/single_target",
 
 	parameters = { range = 5 },
 }
@@ -35,11 +35,11 @@ resources.component "frenzy" {
 	---@param previous number|Frenzy?
 	on_attach = function(user, previous)
 		if previous == nil then
-			user:attach("frenzy", {
-				time_left = user:component("frenzy"),
-				former_teams = user:component("res:teams") or {},
+			user:attach("esprit:frenzy", {
+				time_left = user:component("esprit:frenzy"),
+				former_teams = user:component("esprit:teams") or {},
 			} --[[@as Frenzy]])
-			user:detach("res:teams")
+			user:detach("esprit:teams")
 		end
 	end,
 	---@param user Piece
@@ -47,7 +47,7 @@ resources.component "frenzy" {
 	on_detach = function(user, previous)
 		-- Don't overwrite the current list, in case it changed.
 		for _, v in pairs(previous.former_teams) do
-			user:attach("res:teams", v)
+			user:attach("esprit:teams", v)
 		end
 	end,
 	---@param user Piece
@@ -55,13 +55,13 @@ resources.component "frenzy" {
 	on_turn = function(user, time)
 		local console = require "runtime.console"
 		---@type Frenzy
-		local frenzy = user:component("frenzy")
+		local frenzy = user:component("esprit:frenzy")
 		frenzy.time_left = frenzy.time_left - time
 		if frenzy.time_left <= 0 then
-			user:detach("frenzy")
+			user:detach("esprit:frenzy")
 			console:print(user:replace_nouns("{Address} snapped out of {their} frenzy."))
 		else
-			user:attach("frenzy", frenzy)
+			user:attach("esprit:frenzy", frenzy)
 		end
 	end
 }

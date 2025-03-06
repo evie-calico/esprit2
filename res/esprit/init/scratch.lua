@@ -7,8 +7,8 @@ local expression = require "engine.types.expression"
 local heuristic = require "engine.types.heuristic"
 local log = require "engine.types.log"
 
-local resources = require "res:resources"
-local team = require "res:team"
+local resources = require "esprit:resources"
+local team = require "esprit:team"
 
 resources.attack "scratch" {
 	name = "Scratch",
@@ -33,8 +33,8 @@ resources.attack "scratch" {
 			-- to help weaker characters overcome their glancing blows
 			-- Bleed scales up with damage because small defense losses will matter less to strong melee fighters.
 			local new_magnitude = 5 + damage
-			local old_magnitude = target:component("bleed") or 0
-			target:attach("bleed", old_magnitude + new_magnitude)
+			local old_magnitude = target:component("esprit:bleed") or 0
+			target:attach("esprit:bleed", old_magnitude + new_magnitude)
 		end
 
 		local damage_messages = {
@@ -94,5 +94,5 @@ resources.attack "scratch" {
 			end
 		end
 	end,
-	on_input = require "res:input/melee",
+	on_input = require "esprit:input/melee",
 }

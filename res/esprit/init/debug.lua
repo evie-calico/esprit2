@@ -1,5 +1,5 @@
 local world = require "engine.world"
-local resources = require "res:resources"
+local resources = require "esprit:resources"
 
 resources.spell "debug/level_up" {
 	name = "(DEBUG) Level Up",
@@ -18,7 +18,7 @@ resources.spell "debug/level_up" {
 		target:force_level();
 		console:print(target:replace_nouns("{Address}'s level increased to " .. target.level))
 	end,
-	on_input = require "res:input/single_target",
+	on_input = require "esprit:input/single_target",
 
 	parameters = { range = 5 },
 }
@@ -44,7 +44,7 @@ resources.spell "debug/possess" {
 			console:print(target:replace_nouns("{Address} is thinking for {themself}."))
 		end
 	end,
-	on_input = require "res:input/single_target",
+	on_input = require "esprit:input/single_target",
 
 	parameters = { range = 5 },
 }

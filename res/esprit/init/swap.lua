@@ -2,8 +2,8 @@ local combat = require "engine.combat"
 local world = require "engine.world"
 local expression = require "engine.types.expression"
 local log = require "engine.types.log"
-local team = require "res:team"
-local resources = require "res:resources"
+local team = require "esprit:team"
+local resources = require "esprit:resources"
 
 resources.spell "swap" {
 	name = "Swap",
@@ -56,5 +56,5 @@ resources.spell "swap" {
 		return spell.parameters.cast_time
 	end,
 	-- TODO: Allow movement heuristics to apply to characters other than the considerer, allowing for an on_consider script
-	on_input = require "res:input/single_target",
+	on_input = require "esprit:input/single_target",
 }

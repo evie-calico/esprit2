@@ -1,4 +1,4 @@
-local resources = require "res:resources"
+local resources = require "esprit:resources"
 local stats = require "engine.types.stats"
 
 resources.component "teams" {
@@ -8,9 +8,9 @@ resources.component "teams" {
 	on_attach = function(user, previous)
 		-- This function is questionable
 
-		local current = user:component("res:teams")
+		local current = user:component("esprit:teams")
 		if current ~= nil and #current == 0 then
-			user:detach("res:teams")
+			user:detach("esprit:teams")
 			return
 		end
 		if type(current) == "string" then
@@ -18,7 +18,7 @@ resources.component "teams" {
 			table.insert(previous, current)
 			-- This causes a recursive call!
 			-- Note that previous is not a `string`, which would cause a loop
-			user:attach("res:teams", previous)
+			user:attach("esprit:teams", previous)
 		end
 	end,
 	---@param user Piece
@@ -33,7 +33,7 @@ resources.component "teams" {
 				end
 			end
 			if #previous > 0 then
-				user:attach("res:teams", previous)
+				user:attach("esprit:teams", previous)
 			end
 		end
 	end,
@@ -44,7 +44,7 @@ resources.component "bleed" {
 	visible = true,
 
 	---@param user Piece
-	on_rest = function(user) user:detach("bleed") end,
+	on_rest = function(user) user:detach("esprit:bleed") end,
 	---@param magnitude integer
 	---@return Stats
 	on_debuff = function(magnitude)
@@ -63,6 +63,6 @@ resources.component "close_combat" {
 	visible = true,
 
 	---@param user Piece
-	on_turn = function(user) user:detach("close_combat") end,
+	on_turn = function(user) user:detach("esprit:close_combat") end,
 	on_debuff = function() return stats.defense(4) end
 }

@@ -9,8 +9,8 @@ function teams.friendly(user, character)
 	-- You're always nice to yourself.
 	if user == character then return true end
 
-	local user_teams = user:component("res:teams")
-	local character_teams = character:component("res:teams")
+	local user_teams = user:component("esprit:teams")
+	local character_teams = character:component("esprit:teams")
 
 	-- But characters with teams should fight characters without them (nothing in common!)
 	if user_teams == nil or character_teams == nil then

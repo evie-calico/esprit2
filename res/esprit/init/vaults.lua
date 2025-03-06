@@ -1,4 +1,4 @@
-local resources = require "res:resources"
+local resources = require "esprit:resources"
 
 resources.vault "example" {
     [[

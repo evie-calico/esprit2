@@ -63,7 +63,7 @@ impl Manager {
 			let sheet = resources.sheet.get(&sheet)?;
 			let character = character::Ref::new(character::Piece::new((**sheet).clone()));
 			character.borrow_mut().components.insert(
-				"res:teams".into(),
+				"esprit:teams".into(),
 				Value::OrderedTable([Value::String(":players".into())].into()),
 			);
 			if characters.is_empty() {

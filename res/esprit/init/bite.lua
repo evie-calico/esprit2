@@ -1,6 +1,6 @@
 local expression = require "engine.types.expression"
-local resources = require "res:resources"
-local team = require "res:team"
+local resources = require "esprit:resources"
+local team = require "esprit:team"
 
 resources.attack "bite" {
 	name = "Bite",
@@ -24,7 +24,7 @@ resources.attack "bite" {
 		local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats) - target.stats.defense)
 
 		-- Biting requires you to get closer to the enemy, lowering your physical defense.
-		user:attach("close_combat")
+		user:attach("esprit:close_combat")
 
 		target.hp = target.hp - damage
 
@@ -89,5 +89,5 @@ resources.attack "bite" {
 			end
 		end
 	end,
-	on_input = require "res:input/melee",
+	on_input = require "esprit:input/melee",
 }

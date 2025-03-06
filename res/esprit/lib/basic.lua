@@ -1,5 +1,5 @@
-local movement = require "res:movement"
-local team = require "res:team"
+local movement = require "esprit:movement"
+local team = require "esprit:team"
 
 ---@param user Piece
 return function(user)
