@@ -3,8 +3,9 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
+use sdl2::image::LoadTexture;
 use sdl2::rect::{Point, Rect};
-use sdl2::render::Texture;
+use sdl2::render::{Texture, TextureCreator};
 use std::cell::RefCell;
 
 #[derive(Clone, Default, Debug)]
@@ -19,15 +20,19 @@ pub(crate) struct SoulJar<'texture> {
 }
 
 impl<'texture> SoulJar<'texture> {
-	pub(crate) fn new(textures: &texture::Manager<'texture>) -> Result<Self> {
+	pub(crate) fn new<T>(texture_creator: &'texture TextureCreator<T>) -> Self {
 		let mut rng = rand::thread_rng();
 		let souls = (0..=9)
 			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
 			.collect();
-		Ok(Self {
+		Self {
 			souls,
-			light_texture: RefCell::new(textures.open("light")?),
-		})
+			light_texture: RefCell::new(
+				texture_creator
+					.load_texture_bytes(include_bytes!("light.png"))
+					.expect("light texture should not fail to load"),
+			),
+		}
 	}
 
 	pub(crate) fn tick(&mut self, delta: f32) {

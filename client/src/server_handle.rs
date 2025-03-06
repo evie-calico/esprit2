@@ -48,8 +48,7 @@ impl<'texture> ServerHandle<'texture> {
 			error!(module, "{error}");
 		}
 
-		let mut soul_jar =
-			gui::widget::SoulJar::new(&textures).into_trace("while initializing soul jar")?;
+		let mut soul_jar = gui::widget::SoulJar::new(textures.texture_creator);
 		// This disperses the souls enough to cause them to fly in from the sides
 		// the same effect can be seen if a computer is put to sleep and then woken up.
 		soul_jar.tick(5.0);

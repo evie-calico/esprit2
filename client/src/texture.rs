@@ -26,9 +26,9 @@ pub struct TextureInfo<'texture> {
 }
 
 pub(crate) struct Manager<'texture> {
-	texture_creator: &'texture TextureCreator<WindowContext>,
-	textures: HashMap<Box<str>, TextureInfo<'texture>>,
-	missing_texture: Texture<'texture>,
+	pub(crate) texture_creator: &'texture TextureCreator<WindowContext>,
+	pub(crate) textures: HashMap<Box<str>, TextureInfo<'texture>>,
+	pub(crate) missing_texture: Texture<'texture>,
 }
 
 impl<'texture> Manager<'texture> {
