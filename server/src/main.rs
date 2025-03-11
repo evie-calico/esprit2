@@ -1,9 +1,4 @@
-#![feature(
-	maybe_uninit_uninit_array,
-	maybe_uninit_fill,
-	core_io_borrowed_buf,
-	read_buf
-)]
+#![feature(maybe_uninit_fill, core_io_borrowed_buf, read_buf)]
 #![expect(clippy::unwrap_used)]
 
 use clap::Parser;

@@ -293,16 +293,8 @@ fn init<Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 			])
 		})?,
 	)?;
-	lua.globals().get::<mlua::Table>("package")?.set(
-		"loaders",
-		lua.create_sequence_from([lib_searcher(lua, name.into(), directory.into())?])?,
-	)?;
-	let init = directory.join("init/");
-	let init = || recurse(&init, lua);
+	let init = || recurse(&directory.join("init/"), lua);
 	let result = load(name, directory, &init);
-	lua.globals()
-		.get::<mlua::Table>("package")?
-		.set("loaders", lua.create_table()?)?;
 	lua.unload("init.resources")?;
 	result?; // defer errors to hopefully unload init.resources?
 
@@ -361,33 +353,12 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 	modules: impl IntoIterator<Item = &'a Path>,
 	load: Load,
 ) -> (Manager, Vec<FailedModule<'a>>) {
-	// These resources are still formatted as inert lua tables.
-	// In the next step they'll be augmented as needed
-	let preliminary_modules = modules
-		.into_iter()
-		.map(|path| {
-			let name = path
-				.file_name()
-				.and_then(OsStr::to_str)
-				.unwrap_or("<missing name>");
-			PreliminaryModule {
-				name,
-				path,
-				prototypes: init(lua, name, path, &load)
-					.map(|table| produce(&table).map(|x| (table, x)))
-					.unwrap_or_else(|e| Err(vec![e])),
-			}
-		})
-		.collect::<Vec<PreliminaryModule>>();
-
-	// TODO: dependency directory.
-
 	let mut manager = Manager::default();
 	// Inject hard-coded engine resources here.
 	manager.component.0.insert(
 		":conscious".into(),
 		Component {
-			name: "Concious".into(),
+			name: "Conscious".into(),
 			icon: None,
 			visible: false,
 			on_attach: None,
@@ -399,15 +370,43 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 		.into(),
 	);
 
-	if let Ok(package) = lua.globals().get::<mlua::Table>("package") {
-		if let Ok(loaders) = lua.create_sequence_from(
-			preliminary_modules
-				.iter()
-				.filter_map(|x| lib_searcher(lua, x.name.into(), x.path.into()).ok()),
-		) {
-			let _ = package.set("loaders", loaders);
-		}
+	let mut preliminary_modules = modules
+		.into_iter()
+		.filter_map(|path| {
+			path.file_name().and_then(OsStr::to_str).map(|name| {
+				PreliminaryModule {
+					name,
+					path,
+					// This value should go unused until being replaced after libraries are loaded.
+					prototypes: Err(Vec::new()),
+				}
+			})
+		})
+		.collect::<Vec<PreliminaryModule>>();
+
+	// Register modules with lua's `require` function.
+	mlua::Result::<()>::expect(
+		try {
+			let package = lua.globals().get::<mlua::Table>("package")?;
+			let loaders = lua.create_sequence_from(
+				preliminary_modules
+					.iter()
+					.filter_map(|x| lib_searcher(lua, x.name.into(), x.path.into()).ok()),
+			)?;
+			package.set("loaders", loaders)?;
+		},
+		"package loaders must not fail to load",
+	);
+
+	// Fill out dummy prototype fields.
+	for module in &mut preliminary_modules {
+		module.prototypes = init(lua, module.name, module.path, &load)
+			.map(|table| produce(&table).map(|x| (table, x)))
+			.unwrap_or_else(|e| Err(vec![e]));
 	}
+
+	// TODO: dependency directory.
+
 	let errors = preliminary_modules
 		.into_iter()
 		.filter_map(|preliminary_module| match preliminary_module {
@@ -416,7 +415,7 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 				path: _,
 				prototypes: Ok((_, prototypes)),
 			} => {
-				macro_rules! combine{
+				macro_rules! combine {
 						($type:ident) => {
 							for (id, value) in prototypes.$type.0.into_iter() {
 								manager.$type.0.insert(format!("{name}:{id}").into_boxed_str(), value);

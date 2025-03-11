@@ -1,11 +1,12 @@
 #![feature(
-	ascii_char,
-	path_file_prefix,
-	let_chains,
-	once_cell_try,
-	maybe_uninit_fill,
 	anonymous_lifetime_in_impl_trait,
-	int_roundings
+	ascii_char,
+	int_roundings,
+	let_chains,
+	maybe_uninit_fill,
+	once_cell_try,
+	path_file_prefix,
+	try_blocks
 )]
 
 pub mod astar;
