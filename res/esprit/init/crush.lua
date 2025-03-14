@@ -46,7 +46,6 @@ resources.spell "crush" {
 		-- Shown when damage <= 0
 		local failure_messages = {
 			"{Address} resisted being squished",
-			-- This will be correct for all pronouns except "it", which will appear as "itsself".
 			"{Address} gently braces {themself} against the wall",
 			"{Address} slides down the wall, hitting the ground unscatched",
 		}
