@@ -47,7 +47,7 @@ resources.spell "crush" {
 		local failure_messages = {
 			"{Address} resisted being squished",
 			"{Address} gently braces {themself} against the wall",
-			"{Address} slides down the wall, hitting the ground unscatched",
+			"{Address} slides down the wall, hitting the ground unscathed",
 		}
 
 		console:combat_log(user:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
