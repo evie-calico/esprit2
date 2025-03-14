@@ -1,5 +1,5 @@
 local world = require "engine.world"
-local resources = require "esprit:resources"
+local resources = require "std:resources"
 
 resources.spell "debug/frenzy" {
 	name = "(DEBUG) Frenzy",
@@ -37,9 +37,9 @@ resources.component "frenzy" {
 		if previous == nil then
 			user:attach("esprit:frenzy", {
 				time_left = user:component("esprit:frenzy"),
-				former_teams = user:component("esprit:teams") or {},
+				former_teams = user:component("std:teams") or {},
 			} --[[@as Frenzy]])
-			user:detach("esprit:teams")
+			user:detach("std:teams")
 		end
 	end,
 	---@param user Piece
@@ -47,7 +47,7 @@ resources.component "frenzy" {
 	on_detach = function(user, previous)
 		-- Don't overwrite the current list, in case it changed.
 		for _, v in pairs(previous.former_teams) do
-			user:attach("esprit:teams", v)
+			user:attach("std:teams", v)
 		end
 	end,
 	---@param user Piece

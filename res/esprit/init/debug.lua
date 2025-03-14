@@ -1,5 +1,5 @@
 local world = require "engine.world"
-local resources = require "esprit:resources"
+local resources = require "std:resources"
 
 resources.spell "debug/level_up" {
 	name = "(DEBUG) Level Up",
@@ -37,11 +37,12 @@ resources.spell "debug/possess" {
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
-		if target:detach(":conscious") == nil then
+		if target:component(":conscious") == nil then
 			console:print(target:replace_nouns("{Address} has been possessed!"))
 			target:attach(":conscious")
 		else
 			console:print(target:replace_nouns("{Address} is thinking for {themself}."))
+			target:detach(":conscious")
 		end
 	end,
 	on_input = require "esprit:input/single_target",

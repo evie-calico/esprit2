@@ -1,5 +1,5 @@
 local skillset = require "engine.types.skillset"
-local resources = require "esprit:resources"
+local resources = require "std:resources"
 
 local attacks = { "esprit:scratch", "esprit:bite" }
 
@@ -18,7 +18,7 @@ resources.sheet "luvui" {
 	speed = 12,
 	icon = resources.texture "luvui.png",
 
-	on_consider = "esprit:basic",
+	on_consider = "std:basic",
 	nouns = {
 		name = "Luvui",
 		proper_name = true,
@@ -49,7 +49,7 @@ resources.sheet "aris" {
 	speed = 12,
 	icon = resources.texture "aris.png",
 
-	on_consider = "esprit:basic",
+	on_consider = "std:basic",
 	nouns = {
 		name = "Aris",
 		proper_name = true,

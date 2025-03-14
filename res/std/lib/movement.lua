@@ -2,7 +2,7 @@ local world = require "engine.world"
 local action = require "engine.types.action"
 local consider = require "engine.types.consider"
 local heuristic = require "engine.types.heuristic"
-local team = require "esprit:team"
+local team = require "std:team"
 
 ---@param user Piece
 ---@param considerations [Consider]

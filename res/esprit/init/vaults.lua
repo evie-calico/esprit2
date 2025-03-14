@@ -1,4 +1,4 @@
-local resources = require "esprit:resources"
+local resources = require "std:resources"
 
 resources.vault "example" {
     [[

@@ -1,6 +1,6 @@
 local expression = require "engine.types.expression"
-local team = require "esprit:team"
-local resources = require "esprit:resources"
+local team = require "std:team"
+local resources = require "std:resources"
 
 resources.spell "magic_missile" {
 	name = "Magic Missile",

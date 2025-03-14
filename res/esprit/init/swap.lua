@@ -2,8 +2,8 @@ local combat = require "engine.combat"
 local world = require "engine.world"
 local expression = require "engine.types.expression"
 local log = require "engine.types.log"
-local team = require "esprit:team"
-local resources = require "esprit:resources"
+local team = require "std:team"
+local resources = require "std:resources"
 
 resources.spell "swap" {
 	name = "Swap",

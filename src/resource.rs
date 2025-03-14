@@ -293,7 +293,8 @@ fn init<Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 			])
 		})?,
 	)?;
-	let init = || recurse(&directory.join("init/"), lua);
+	let init = directory.join("init/");
+	let init = || recurse(&init, lua);
 	let result = load(name, directory, &init);
 	lua.unload("init.resources")?;
 	result?; // defer errors to hopefully unload init.resources?
@@ -415,7 +416,7 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 				path: _,
 				prototypes: Ok((_, prototypes)),
 			} => {
-				macro_rules! combine {
+				macro_rules! combine{
 						($type:ident) => {
 							for (id, value) in prototypes.$type.0.into_iter() {
 								manager.$type.0.insert(format!("{name}:{id}").into_boxed_str(), value);

@@ -2,7 +2,7 @@ local combat = require "engine.combat"
 local world = require "engine.world"
 local expression = require "engine.types.expression"
 local log = require "engine.types.log"
-local resources = require "esprit:resources"
+local resources = require "std:resources"
 
 resources.spell "crush" {
 	name = "Crush",
@@ -47,7 +47,7 @@ resources.spell "crush" {
 		local failure_messages = {
 			"{Address} resisted being squished",
 			-- This will be correct for all pronouns except "it", which will appear as "itsself".
-			"{Address} gently braces {self} against the wall",
+			"{Address} gently braces {themself} against the wall",
 			"{Address} slides down the wall, hitting the ground unscatched",
 		}
 

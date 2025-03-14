@@ -7,8 +7,8 @@ local expression = require "engine.types.expression"
 local heuristic = require "engine.types.heuristic"
 local log = require "engine.types.log"
 
-local resources = require "esprit:resources"
-local team = require "esprit:team"
+local resources = require "std:resources"
+local team = require "std:team"
 
 resources.attack "scratch" {
 	name = "Scratch",
