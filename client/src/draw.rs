@@ -3,7 +3,6 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
-use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::pixels::Color;
 use sdl2::rect::{Point, Rect};
 use sdl2::render::Canvas;
@@ -252,12 +251,16 @@ impl CloudState {
 			};
 			let percent = self.timer % 1.0;
 			let radius = last_radius as f64 * (1.0 - percent) + next_radius as f64 * (percent);
+			canvas.set_draw_color(color);
 			canvas
-				.filled_circle(
-					bx + x * spacing,
-					by + y * spacing,
-					(radius * weight) as i16,
-					color,
+				.draw_rect(
+					(
+						(bx + x * spacing) as i32,
+						(by + y * spacing) as i32,
+						(radius * weight * 2.0) as u32,
+						(radius * weight * 2.0) as u32,
+					)
+						.into(),
 				)
 				.unwrap();
 			last_random = xorshift(last_random);
@@ -283,7 +286,18 @@ impl CloudState {
 				rect.bottom() as i16 - radius / 3,
 			),
 		] {
-			canvas.filled_circle(x, y, radius / 2, color).unwrap();
+			canvas.set_draw_color(color);
+			canvas
+				.draw_rect(
+					(
+						x as i32,
+						y as i32,
+						radius as u32, // intentionally not *2; this used to be /2
+						radius as u32, // intentionally not *2; this used to be /2
+					)
+						.into(),
+				)
+				.unwrap();
 		}
 	}
 }
@@ -319,8 +333,17 @@ impl CloudTrail {
 			let scale = (weight * PI).sin();
 			let x = (from.x as f64 * (1.0 - weight) + to.x as f64 * weight) as i16;
 			let y = (from.y as f64 * (1.0 - weight) + to.y as f64 * weight) as i16;
+			canvas.set_draw_color(color);
 			canvas
-				.filled_circle(x, y, (radius * scale) as i16, color)
+				.draw_rect(
+					(
+						x as i32,
+						y as i32,
+						(radius * scale * 2.0) as u32,
+						(radius * scale * 2.0) as u32,
+					)
+						.into(),
+				)
 				.unwrap();
 		}
 	}
@@ -345,8 +368,9 @@ impl CloudyWave {
 			let superwave = (i as f64 / 8.0 + self.timer).sin();
 			let x = x + wave * 20.0 - superwave * radius as f64;
 
+			canvas.set_draw_color(color);
 			canvas
-				.filled_circle(x as i16, y as i16, radius, color)
+				.draw_rect((x as i32, y, radius as u32 * 2, radius as u32 * 2).into())
 				.unwrap();
 			canvas.set_draw_color(color);
 			let rect = Rect::new(

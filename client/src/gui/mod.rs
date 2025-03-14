@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use esprit2::prelude::*;
-use sdl2::gfx::primitives::DrawRenderer;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureQuery};
 use sdl2::ttf::Font;
@@ -445,14 +444,16 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 					let (font_texture, text_width, height) = text(speaker, (0, 0, 0, 255));
 					let width = text_width.max(MINIMUM_NAMEPLATE_WIDTH);
 					let margin = ((width - text_width) / 2) as i32;
+					canvas.set_draw_color(colors.normal);
 					canvas
-						.rounded_box(
-							rect.x as i16,
-							cursor as i16,
-							(rect.x + (width as i32)) as i16,
-							(cursor - (height as i32) + 2) as i16,
-							5,
-							colors.normal,
+						.draw_rect(
+							(
+								rect.x,
+								cursor,
+								(rect.x + (width as i32)) as u32,
+								(cursor - (height as i32) + 2) as u32,
+							)
+								.into(),
 						)
 						.unwrap();
 					cursor -= height as i32;
