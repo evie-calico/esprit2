@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
-use sdl2::keyboard::Keycode;
+use sdl3::keyboard::Keycode;
 use std::path::Path;
 use std::sync::OnceLock;
 use std::{fs, io};

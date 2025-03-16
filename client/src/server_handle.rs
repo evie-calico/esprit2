@@ -7,7 +7,7 @@ use protocol::{
 };
 use rkyv::rancor::{self, ResultExt};
 use rkyv::util::AlignedVec;
-use sdl2::rect::Rect;
+use sdl3::rect::Rect;
 use tokio::net::TcpStream;
 
 pub(crate) struct ServerHandle<'texture> {
@@ -165,11 +165,11 @@ impl<'texture> ServerHandle<'texture> {
 	pub(crate) async fn event(
 		&mut self,
 		input_mode: input::Mode,
-		event: sdl2::event::Event,
+		event: sdl3::event::Event,
 		lua: &mlua::Lua,
 		options: &Options,
 	) -> Result<input::Mode, rancor::BoxedError> {
-		let sdl2::event::Event::KeyDown {
+		let sdl3::event::Event::KeyDown {
 			keycode: Some(keycode),
 			..
 		} = event
@@ -319,8 +319,7 @@ impl<'texture> ServerHandle<'texture> {
 					draw::tilemap(canvas, world, &camera);
 					draw::characters(canvas, world, &self.textures, &camera);
 					draw::cursor(canvas, input_mode, &self.textures, &camera);
-				})
-				.unwrap();
+				});
 
 			ctx.canvas
 				.copy(

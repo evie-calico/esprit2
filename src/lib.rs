@@ -38,9 +38,6 @@ pub enum Error {
 	#[error("lua function requested user input when it was unavailable")]
 	IllegalActionRequest,
 
-	#[error("{0}")]
-	Sdl(String),
-
 	#[error(transparent)]
 	Vault(#[from] vault::Error),
 	#[error(transparent)]

@@ -2,10 +2,10 @@
 
 use crate::prelude::*;
 use esprit2::prelude::*;
-use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, TextureQuery};
-use sdl2::ttf::Font;
-use sdl2::video::Window;
+use sdl3::rect::Rect;
+use sdl3::render::{Canvas, FRect, Texture, TextureQuery};
+use sdl3::ttf::Font;
+use sdl3::video::Window;
 use std::ops::Range;
 
 pub(crate) mod widget;
@@ -385,7 +385,12 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 			.copy(
 				texture,
 				None,
-				Some(Rect::new(self.x, self.y, width, height)),
+				Some(FRect::new(
+					self.x as f32,
+					self.y as f32,
+					width as f32,
+					height as f32,
+				)),
 			)
 			.unwrap();
 		self.advance(width, height)
@@ -446,15 +451,12 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 					let margin = ((width - text_width) / 2) as i32;
 					canvas.set_draw_color(colors.normal);
 					canvas
-						.draw_rect(
-							(
-								rect.x,
-								cursor,
-								(rect.x + (width as i32)) as u32,
-								(cursor - (height as i32) + 2) as u32,
-							)
-								.into(),
-						)
+						.draw_rect(FRect::new(
+							rect.x as f32,
+							cursor as f32,
+							(rect.x + (width as i32)) as f32,
+							(cursor - (height as i32) + 2) as f32,
+						))
 						.unwrap();
 					cursor -= height as i32;
 					canvas

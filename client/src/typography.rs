@@ -1,6 +1,7 @@
 use crate::options::resource_directory;
 use crate::Color;
-use sdl2::{rwops::RWops, ttf::Font};
+use sdl3::iostream::IOStream;
+use sdl3::ttf::Font;
 use std::path::PathBuf;
 use tracing::error;
 
@@ -17,10 +18,10 @@ impl<'ttf_module> Typography<'ttf_module, '_> {
 	/// Returns an error if the font file could not be read.
 	pub(crate) fn new(
 		options: &Options,
-		ttf_context: &'ttf_module sdl2::ttf::Sdl2TtfContext,
+		ttf_context: &'ttf_module sdl3::ttf::Sdl3TtfContext,
 	) -> Self {
 		let point_size = options.font_size;
-		let annotation_size = options.font_size.saturating_sub(2);
+		let annotation_size = f32::max(0.0, options.font_size - 2.0);
 
 		let default_font_bytes = include_bytes!("res/FantasqueSansMNerdFontPropo-Regular.ttf");
 		let open_font = |path: Option<&PathBuf>, size| {
@@ -33,7 +34,10 @@ impl<'ttf_module> Typography<'ttf_module, '_> {
 			.unwrap_or_else(|| {
 				#[allow(clippy::unwrap_used, reason = "SDL")]
 				ttf_context
-					.load_font_from_rwops(RWops::from_bytes(default_font_bytes).unwrap(), size)
+					.load_font_from_iostream(
+						IOStream::from_bytes(default_font_bytes).unwrap(),
+						size,
+					)
 					.unwrap()
 			})
 		};
@@ -49,7 +53,7 @@ impl<'ttf_module> Typography<'ttf_module, '_> {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Options {
 	pub(crate) font: Option<PathBuf>,
-	pub(crate) font_size: u16,
+	pub(crate) font_size: f32,
 	pub(crate) font_color: Color,
 }
 
@@ -57,7 +61,7 @@ impl Default for Options {
 	fn default() -> Self {
 		Self {
 			font: None,
-			font_size: 18,
+			font_size: 18.0,
 			font_color: (255, 255, 255, 255),
 		}
 	}

@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use mlua::FromLua;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use sdl3::event::Event;
+use sdl3::keyboard::Keycode;
 
 pub(crate) enum Signal<T> {
 	None,
@@ -47,7 +47,7 @@ impl LineInput {
 			match event {
 				Event::TextInput { text, .. } => self.line.push_str(text),
 				Event::KeyDown {
-					keycode: Some(Keycode::BACKSPACE),
+					keycode: Some(Keycode::Backspace),
 					..
 				} => {
 					self.line.pop();
@@ -258,7 +258,7 @@ pub(crate) enum Response {
 }
 
 pub(crate) fn controllable_character(
-	keycode: sdl2::keyboard::Keycode,
+	keycode: sdl3::keyboard::Keycode,
 	world: &world::Manager,
 	console: impl console::Handle,
 	resources: &resource::Manager,
@@ -362,7 +362,7 @@ pub(crate) fn controllable_character(
 		Mode::Select => {
 			let candidates = select::assign_indicies(world);
 			// TODO: just make an array of keys in the options file or something.
-			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			let selected_index = (u32::from(keycode)) - (u32::from(Keycode::A));
 			if (0..=26).contains(&selected_index)
 				&& let Some(candidate) = candidates.into_iter().nth(selected_index as usize)
 			{
@@ -377,7 +377,7 @@ pub(crate) fn controllable_character(
 			}
 
 			// TODO: just make an array of keys in the options file or something.
-			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			let selected_index = (u32::from(keycode)) - (u32::from(Keycode::A));
 			let attack_id = world
 				.next_character()
 				.borrow()
@@ -407,7 +407,7 @@ pub(crate) fn controllable_character(
 			}
 
 			// TODO: just make an array of keys in the options file or something.
-			let selected_index = (keycode.into_i32()) - (Keycode::A.into_i32());
+			let selected_index = (u32::from(keycode)) - (u32::from(Keycode::A));
 			let spell_id = world
 				.next_character()
 				.borrow()

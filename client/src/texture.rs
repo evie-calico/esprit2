@@ -1,7 +1,8 @@
 use esprit2::prelude::*;
-use sdl2::image::LoadTexture;
-use sdl2::render::{Texture, TextureCreator};
-use sdl2::video::WindowContext;
+use rkyv::rancor::{self, ResultExt};
+use sdl3::image::LoadTexture;
+use sdl3::render::{Texture, TextureCreator};
+use sdl3::video::WindowContext;
 use std::cell::{Cell, OnceCell};
 use std::collections::HashMap;
 use std::fs;
@@ -76,17 +77,17 @@ impl<'texture> Manager<'texture> {
 	/// # Errors
 	///
 	/// Returns an error if the texture could not be found, loaded, or parsed.
-	pub(crate) fn open(&self, key: &str) -> Result<Texture<'texture>> {
+	pub(crate) fn open(&self, key: &str) -> Result<Texture<'texture>, rancor::BoxedError> {
 		let texture_info = self
 			.textures
 			.get(key)
-			.ok_or_else(|| resource::Error::NotFound(key.into()))?;
+			.ok_or_else(|| resource::Error::NotFound(key.into()))
+			.into_error()?;
 
 		let image = texture_info
 			.image
-			.get_or_try_init(|| fs::read(&texture_info.path))?;
-		self.texture_creator
-			.load_texture_bytes(image)
-			.map_err(crate::Error::Sdl)
+			.get_or_try_init(|| fs::read(&texture_info.path))
+			.into_error()?;
+		self.texture_creator.load_texture_bytes(image).into_error()
 	}
 }

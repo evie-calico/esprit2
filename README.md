@@ -11,13 +11,12 @@ This is a sequel to Esprit for the Game Boy.
 
 ## Dependencies
 
-The `mlua` and `sdl2` libraries provide bindings to their respective C libraries.
+The `mlua` and `sdl3` libraries provide bindings to their respective C libraries.
 These libraries and the tools required to link them must be installed to build esprit2.
 
-- sdl2
-- sdl2_image
-- sdl2_ttf
-- sdl2_gfx
+- sdl3
+- sdl3_image
+- sdl3_ttf
 - luajit
 
 In addition, the following tools *may* be required to link these programs:
