@@ -34,7 +34,6 @@ pub(crate) mod menu;
 pub(crate) mod options;
 pub(crate) mod select;
 pub(crate) mod texture;
-pub(crate) mod typography;
 
 pub(crate) mod prelude {
 	pub(crate) use super::*;
@@ -43,7 +42,6 @@ pub(crate) mod prelude {
 pub(crate) use console_impl::Console;
 pub(crate) use options::Options;
 pub(crate) use server_handle::ServerHandle;
-pub(crate) use typography::Typography;
 
 fn update_delta(
 	last_time: &mut f64,
@@ -78,7 +76,6 @@ pub(crate) async fn main() {
 	let cli = Cli::parse();
 	// SDL initialization.
 	let sdl_context = sdl2::init().unwrap();
-	let ttf_context = sdl2::ttf::init().unwrap();
 	let video_subsystem = sdl_context.video().unwrap();
 	let timer_subsystem = sdl_context.timer().unwrap();
 	let window = video_subsystem
@@ -128,8 +125,6 @@ pub(crate) async fn main() {
 		error!("failed to initialize lua runtime: {e}");
 		exit(1);
 	});
-
-	let typography = Typography::new(&options.ui.typography, &ttf_context);
 
 	let mut menu: Option<Box<dyn menu::Menu<RootMenuResponse>>> =
 		Some(Box::new(menu::login::State::new(
@@ -254,7 +249,7 @@ pub(crate) async fn main() {
 			canvas.clear();
 			canvas.set_viewport(viewport);
 
-			let mut gui = gui::Context::new(&mut canvas, &typography, viewport);
+			let mut gui = gui::Context::new(&mut canvas, viewport);
 
 			if let Some(menu) = &menu {
 				menu.draw(&mut gui);

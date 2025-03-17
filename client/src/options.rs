@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use esprit2::prelude::*;
 use sdl2::keyboard::Keycode;
 use std::path::Path;
@@ -72,7 +71,6 @@ impl Default for Board {
 #[serde(default, deny_unknown_fields)]
 pub(crate) struct UserInterface {
 	pub(crate) colors: Colors,
-	pub(crate) typography: typography::Options,
 
 	pub(crate) pamphlet_width: u32,
 	pub(crate) console_height: u32,
@@ -82,7 +80,6 @@ impl Default for UserInterface {
 	fn default() -> Self {
 		Self {
 			colors: Colors::default(),
-			typography: typography::Options::default(),
 
 			pamphlet_width: 400,
 			console_height: 200,

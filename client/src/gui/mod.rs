@@ -4,7 +4,6 @@ use crate::prelude::*;
 use esprit2::prelude::*;
 use sdl2::rect::Rect;
 use sdl2::render::{Canvas, Texture, TextureQuery};
-use sdl2::ttf::Font;
 use sdl2::video::Window;
 use std::ops::Range;
 
@@ -12,9 +11,8 @@ pub(crate) mod widget;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
 
-pub(crate) struct Context<'canvas, 'ttf_module, 'rwops> {
+pub(crate) struct Context<'canvas> {
 	pub(crate) canvas: &'canvas mut Canvas<Window>,
-	pub(crate) typography: &'ttf_module Typography<'ttf_module, 'rwops>,
 	pub(crate) rect: Rect,
 	/// These values control the position of the cursor.
 	pub(crate) x: i32,
@@ -35,15 +33,10 @@ enum Orientation {
 	Horizontal { height: i32 },
 }
 
-impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
-	pub(crate) fn new(
-		canvas: &'canvas mut Canvas<Window>,
-		typography: &'ttf_module Typography<'ttf_module, 'rwops>,
-		rect: Rect,
-	) -> Self {
+impl<'canvas> Context<'canvas> {
+	pub(crate) fn new(canvas: &'canvas mut Canvas<Window>, rect: Rect) -> Self {
 		Self {
 			canvas,
-			typography,
 			rect,
 			y: rect.y,
 			x: rect.x,
@@ -54,7 +47,6 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 	pub(crate) fn view(&mut self, x: i32, y: i32, width: u32, height: u32) -> Context {
 		Context::new(
 			self.canvas,
-			self.typography,
 			Rect::new(self.x + x, self.y + y, width, height),
 		)
 	}
@@ -102,7 +94,6 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		{
 			let mut child = Context::new(
 				self.canvas,
-				self.typography,
 				Rect::new(
 					self.x + (self.rect.width() as i32) / (view_count as i32) * i as i32,
 					self.y,
@@ -136,63 +127,7 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		}
 	}
 
-	pub(crate) fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {
-		let font = &self.typography.normal;
-		let color = self.typography.color;
-		let texture_creator = self.canvas.texture_creator();
-		let mut largest_margin = 0;
-		let mut cursor = 0;
-		for (margin, content) in list
-			.into_iter()
-			.map(|(margin, content)| {
-				let margin = font
-					.render(margin)
-					.blended(color)
-					.unwrap()
-					.as_texture(&texture_creator)
-					.unwrap();
-				let content = font
-					.render(content)
-					.blended(color)
-					.unwrap()
-					.as_texture(&texture_creator)
-					.unwrap();
-				largest_margin = margin.query().width.max(largest_margin);
-
-				(margin, content)
-			})
-			// This is silly looking but necessary to calculate the longest margin's width.
-			.collect::<Box<[_]>>()
-		{
-			let margin_q = margin.query();
-			self.canvas
-				.copy(
-					&margin,
-					None,
-					Rect::new(
-						self.x + largest_margin as i32 - margin_q.width as i32,
-						self.y + cursor,
-						margin_q.width,
-						margin_q.height,
-					),
-				)
-				.unwrap();
-			let content_q = content.query();
-			self.canvas
-				.copy(
-					&content,
-					None,
-					Rect::new(
-						self.x + largest_margin as i32,
-						self.y + cursor,
-						content_q.width,
-						content_q.height,
-					),
-				)
-				.unwrap();
-			cursor += margin_q.height.max(content_q.height) as i32;
-		}
-	}
+	pub(crate) fn margin_list(&mut self, list: impl IntoIterator<Item = (&str, &str)>) {}
 
 	pub(crate) fn progress_bar(
 		&mut self,
@@ -223,160 +158,9 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		self.advance(self.rect.width(), height);
 	}
 
-	pub(crate) fn label(&mut self, s: &str) {
-		self.label_color(s, self.typography.color)
-	}
+	pub(crate) fn label(&mut self, s: &str) {}
 
-	pub(crate) fn label_color(&mut self, s: &str, color: Color) {
-		self.label_custom(s, color, &self.typography.normal, Justification::Left);
-	}
-
-	pub(crate) fn label_styled(&mut self, s: &str, color: Color, font: &Font) {
-		self.label_custom(s, color, font, Justification::Left);
-	}
-
-	pub(crate) fn label_custom(
-		&mut self,
-		s: &str,
-		color: Color,
-		font: &Font,
-		justification: Justification,
-	) {
-		if s.is_empty() {
-			return;
-		}
-		let texture_creator = self.canvas.texture_creator();
-		let font_texture = font
-			.render(s)
-			.blended(color)
-			.unwrap()
-			.as_texture(&texture_creator)
-			.unwrap();
-		let TextureQuery { width, height, .. } = font_texture.query();
-		self.canvas
-			.copy(
-				&font_texture,
-				None,
-				Rect::new(
-					match justification {
-						Justification::Left => self.x,
-						Justification::Right => self.rect.right() - width as i32,
-					},
-					self.y,
-					width,
-					height,
-				),
-			)
-			.unwrap();
-		// I feel like this drop is kinda silly?
-		drop(font_texture);
-
-		self.advance(width, height);
-	}
-
-	pub(crate) fn opposing_labels(&mut self, s1: &str, s2: &str, color: Color, font: &Font) {
-		let texture_creator = self.canvas.texture_creator();
-		let font_texture = font
-			.render(s1)
-			.blended(color)
-			.unwrap()
-			.as_texture(&texture_creator)
-			.unwrap();
-		let TextureQuery { width, height, .. } = font_texture.query();
-		self.canvas
-			.copy(
-				&font_texture,
-				None,
-				Rect::new(self.x, self.y, width, height),
-			)
-			.unwrap();
-		drop(font_texture);
-		let font_texture = font
-			.render(s2)
-			.blended(color)
-			.unwrap()
-			.as_texture(&texture_creator)
-			.unwrap();
-		let TextureQuery { width, height, .. } = font_texture.query();
-		self.canvas
-			.copy(
-				&font_texture,
-				None,
-				Rect::new((self.rect.width() - width) as i32, self.y, width, height),
-			)
-			.unwrap();
-		drop(font_texture);
-
-		self.advance(self.rect.width(), height);
-	}
-
-	#[expect(unused)]
-	pub(crate) fn expression<Colors: VariableColors>(
-		&mut self,
-		expression: &Expression,
-		font: &Font,
-	) {
-		fn enter_op(
-			op: &expression::Operation,
-			expression: &Expression,
-			spans: &mut Vec<Range<usize>>,
-		) {
-			match op {
-				expression::Operation::Variable(start, end) => spans.push(*start..*end),
-
-				expression::Operation::Add(a, b)
-				| expression::Operation::Sub(a, b)
-				| expression::Operation::Mul(a, b)
-				| expression::Operation::Div(a, b) => {
-					enter_op(&expression.leaves[*a], expression, spans);
-					enter_op(&expression.leaves[*b], expression, spans);
-				}
-				expression::Operation::AddC(x, _)
-				| expression::Operation::SubC(x, _)
-				| expression::Operation::MulC(x, _)
-				| expression::Operation::DivC(x, _) => enter_op(&expression.leaves[*x], expression, spans),
-
-				expression::Operation::Integer(_) | expression::Operation::Roll(_, _) => {}
-			}
-		}
-
-		let was_horizontal = matches!(self.orientation, Orientation::Horizontal { .. });
-		if was_horizontal {
-			self.horizontal();
-		}
-
-		// This is implicitly sorted
-		let mut variable_spans = Vec::new();
-		enter_op(&expression.root, expression, &mut variable_spans);
-
-		let mut last_char = 0;
-
-		for span in &variable_spans {
-			let uncolored_range = last_char..span.start;
-			if !uncolored_range.is_empty() {
-				self.label_styled(
-					&expression.source[uncolored_range],
-					self.typography.color,
-					font,
-				);
-			}
-			let colored_range = span.start..span.end;
-			if !colored_range.is_empty() {
-				let var = &expression.source[colored_range];
-				let color = Colors::get(var).unwrap_or((255, 0, 0, 255));
-				self.label_styled(var, color, font);
-			}
-			last_char = span.end;
-		}
-
-		if last_char != expression.source.len() {
-			self.label_styled(&expression.source[last_char..], self.typography.color, font);
-		}
-
-		if was_horizontal {
-			self.vertical();
-		}
-	}
+	pub(crate) fn label_color(&mut self, s: &str, color: Color) {}
 
 	pub(crate) fn htexture(&mut self, texture: &Texture, width: u32) {
 		let query = texture.query();
@@ -403,118 +187,6 @@ impl<'canvas, 'ttf_module, 'rwops> Context<'canvas, 'ttf_module, 'rwops> {
 		canvas.set_clip_rect(rect);
 
 		let mut cursor = rect.y + (rect.height() as i32);
-
-		let text = |message, color: Color| {
-			let texture = self
-				.typography
-				.normal
-				.render(message)
-				.blended(color)
-				.unwrap()
-				.as_texture(&font_texture_creator)
-				.unwrap();
-			let TextureQuery { width, height, .. } = texture.query();
-			(texture, width, height)
-		};
-		for message in console.history.iter().rev() {
-			match &message.printer {
-				console::MessagePrinter::Console(color) => {
-					let (font_texture, width, height) = text(
-						&message.text,
-						match color {
-							console::Color::Normal => colors.normal,
-							console::Color::System => colors.system,
-							console::Color::Unimportant => colors.unimportant,
-							console::Color::Defeat => colors.defeat,
-							console::Color::Danger => colors.danger,
-							console::Color::Important => colors.important,
-							console::Color::Special => colors.special,
-						},
-					);
-					cursor -= height as i32;
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x, cursor, width, height),
-						)
-						.unwrap();
-				}
-				console::MessagePrinter::Dialogue { speaker, progress } => {
-					let (font_texture, text_width, height) = text(speaker, (0, 0, 0, 255));
-					let width = text_width.max(MINIMUM_NAMEPLATE_WIDTH);
-					let margin = ((width - text_width) / 2) as i32;
-					canvas.set_draw_color(colors.normal);
-					canvas
-						.draw_rect(
-							(
-								rect.x,
-								cursor,
-								(rect.x + (width as i32)) as u32,
-								(cursor - (height as i32) + 2) as u32,
-							)
-								.into(),
-						)
-						.unwrap();
-					cursor -= height as i32;
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x + margin, cursor, text_width, height),
-						)
-						.unwrap();
-
-					// Save width of nameplate.
-					let last_width = width as i32;
-
-					let shown_characters = message.text.len().min((*progress as usize) + 1);
-					let (font_texture, width, height) =
-						text(&message.text[0..shown_characters], colors.normal);
-					canvas
-						.copy(
-							&font_texture,
-							None,
-							Rect::new(rect.x + last_width + 10, cursor, width, height),
-						)
-						.unwrap();
-				}
-				console::MessagePrinter::Combat(log) => {
-					let color = if log.is_weak() {
-						colors.unimportant
-					} else {
-						colors.normal
-					};
-					let (texture, width, height) = text(&message.text, color);
-					cursor -= height as i32;
-					canvas
-						.copy(&texture, None, Rect::new(rect.x, cursor, width, height))
-						.unwrap();
-					let last_width = width as i32;
-					let info = format!("({log})");
-					let texture = self
-						.typography
-						.annotation
-						.render(&info)
-						.blended(colors.combat)
-						.unwrap()
-						.as_texture(&font_texture_creator)
-						.unwrap();
-					let TextureQuery { width, height, .. } = texture.query();
-					canvas
-						.copy(
-							&texture,
-							None,
-							Rect::new(rect.x + last_width + 10, cursor, width, height),
-						)
-						.unwrap();
-				}
-			}
-
-			if cursor < rect.y {
-				break;
-			}
-		}
 
 		canvas.set_clip_rect(None);
 	}

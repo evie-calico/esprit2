@@ -77,42 +77,22 @@ pub(crate) fn menu(
 
 	match input_mode {
 		input::Mode::Normal => {
-			menu.label_styled(
-				"Normal",
-				options.ui.colors.normal_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Normal");
 			menu.console(console, &options.ui.colors.console);
 		}
-		input::Mode::Select => menu.label_styled(
-			"Select",
-			options.ui.colors.select_mode,
-			&menu.typography.annotation,
-		),
+		input::Mode::Select => menu.label("Select"),
 		input::Mode::Attack => {
-			menu.label_styled(
-				"Attack",
-				options.ui.colors.select_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Attack");
 			attack_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
 		input::Mode::Cast => {
-			menu.label_styled(
-				"Cast",
-				options.ui.colors.select_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Cast");
 			spell_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
 		input::Mode::Cursor(input::Cursor {
 			position: (x, y), ..
 		}) => {
-			menu.label_styled(
-				"Cursor",
-				options.ui.colors.prompt_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Cursor");
 			if let Some(selected_character) = world_manager.get_character_at(*x, *y) {
 				let mut character_fn = |menu: &mut gui::Context| {
 					character_info(menu, &selected_character.borrow(), lua);
@@ -129,11 +109,7 @@ pub(crate) fn menu(
 			}
 		}
 		input::Mode::Prompt(input::Prompt { message, .. }) => {
-			menu.label_styled(
-				"Prompt",
-				options.ui.colors.prompt_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Prompt");
 			menu.label(message);
 			menu.margin_list([
 				("Yes: ", options.controls.yes.to_string().as_str()),
@@ -142,11 +118,7 @@ pub(crate) fn menu(
 			]);
 		}
 		input::Mode::DirectionPrompt(input::DirectionPrompt { message, .. }) => {
-			menu.label_styled(
-				"Direction Prompt",
-				options.ui.colors.prompt_mode,
-				&menu.typography.annotation,
-			);
+			menu.label("Direction Prompt");
 			menu.label(message);
 			menu.margin_list([
 				("Left: ", options.controls.left.to_string().as_str()),
@@ -175,7 +147,7 @@ pub(crate) fn spell_menu(
 			continue;
 		};
 		let color = match spell.castable_by(character) {
-			spell::Castable::Yes => gui.typography.color,
+			spell::Castable::Yes => (255, 255, 255, 255),
 			spell::Castable::NotEnoughSP => (255, 0, 0, 255),
 			spell::Castable::UncastableAffinity => (128, 128, 128, 255),
 		};
@@ -352,7 +324,7 @@ impl Default for Pamphlet {
 fn character_thinking(
 	draw_state: &PartyReferenceDrawState,
 	accent_color: Color,
-	player_window: &mut gui::Context<'_, '_, '_>,
+	player_window: &mut gui::Context<'_>,
 	texture: &Texture,
 	flipped: bool,
 	f: impl FnOnce(&mut gui::Context),
@@ -391,7 +363,7 @@ pub(crate) fn on_cloud(
 	cloud: &draw::CloudState,
 	radius: u32,
 	color: Color,
-	gui: &mut gui::Context<'_, '_, '_>,
+	gui: &mut gui::Context<'_>,
 	f: impl FnOnce(&mut gui::Context),
 ) {
 	let width = gui.rect.width();
@@ -409,7 +381,6 @@ pub(crate) fn on_cloud(
 			canvas.clear();
 			let mut gui = gui::Context::new(
 				canvas,
-				gui.typography,
 				Rect::new(0, 0, width - radius * 2, height - radius * 2),
 			);
 			f(&mut gui);
@@ -434,11 +405,7 @@ pub(crate) fn on_cloud(
 	gui.advance(width, height_used + radius * 2);
 }
 
-fn character_info(
-	player_window: &mut gui::Context<'_, '_, '_>,
-	piece: &character::Piece,
-	lua: &mlua::Lua,
-) {
+fn character_info(player_window: &mut gui::Context<'_>, piece: &character::Piece, lua: &mlua::Lua) {
 	let character::Piece {
 		sheet: character::Sheet { nouns, level, .. },
 		hp,
@@ -463,7 +430,6 @@ fn character_info(
 		return;
 	};
 
-	let font = &player_window.typography.normal;
 	let get_color = |buff, debuff| {
 		if buff > debuff {
 			(0, 0, 255, 255)
@@ -474,12 +440,6 @@ fn character_info(
 		}
 	};
 
-	player_window.opposing_labels(
-		name,
-		&format!("Level {level}"),
-		player_window.typography.color,
-		font,
-	);
 	player_window.label(&format!("HP: {hp}/{heart}"));
 	player_window.progress_bar(
 		(*hp as f32) / (heart as f32),
