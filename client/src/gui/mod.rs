@@ -2,9 +2,9 @@
 
 use crate::prelude::*;
 use esprit2::prelude::*;
-use sdl2::rect::Rect;
-use sdl2::render::{Canvas, Texture, TextureQuery};
-use sdl2::video::Window;
+use sdl3::rect::Rect;
+use sdl3::render::{Canvas, FRect, Texture, TextureQuery};
+use sdl3::video::Window;
 use std::ops::Range;
 
 pub(crate) mod widget;
@@ -169,7 +169,12 @@ impl<'canvas> Context<'canvas> {
 			.copy(
 				texture,
 				None,
-				Some(Rect::new(self.x, self.y, width, height)),
+				Some(FRect::new(
+					self.x as f32,
+					self.y as f32,
+					width as f32,
+					height as f32,
+				)),
 			)
 			.unwrap();
 		self.advance(width, height)

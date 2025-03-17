@@ -15,8 +15,9 @@ use esprit2::prelude::*;
 use esprit2_server::protocol::{self, ClientAuthentication, ClientRouting};
 use esprit2_server::Client;
 use rkyv::rancor::{self, ResultExt};
-use sdl2::image::LoadTexture;
-use sdl2::rect::Rect;
+use sdl3::image::LoadTexture;
+use sdl3::rect::Rect;
+use sdl3::timer;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::process::exit;
 use std::{fs, io, thread};
@@ -43,15 +44,11 @@ pub(crate) use console_impl::Console;
 pub(crate) use options::Options;
 pub(crate) use server_handle::ServerHandle;
 
-fn update_delta(
-	last_time: &mut f64,
-	current_time: &mut f64,
-	timer_subsystem: &sdl2::TimerSubsystem,
-) -> f64 {
+fn update_delta(last_time: &mut f64, current_time: &mut f64) -> f64 {
 	*last_time = *current_time;
-	*current_time = timer_subsystem.performance_counter() as f64;
+	*current_time = timer::performance_counter() as f64;
 	((*current_time - *last_time) * 1000.0
-		/ (timer_subsystem.performance_frequency() as f64))
+		/ (timer::performance_frequency() as f64))
 		// Convert milliseconds to seconds.
 		/ 1000.0
 }
@@ -75,25 +72,19 @@ struct Cli {
 pub(crate) async fn main() {
 	let cli = Cli::parse();
 	// SDL initialization.
-	let sdl_context = sdl2::init().unwrap();
+	let sdl_context = sdl3::init().unwrap();
 	let video_subsystem = sdl_context.video().unwrap();
-	let timer_subsystem = sdl_context.timer().unwrap();
 	let window = video_subsystem
 		.window("Esprit 2", 1280, 720)
 		.resizable()
 		.position_centered()
 		.build()
 		.unwrap();
-	let mut canvas = window
-		.into_canvas()
-		.accelerated()
-		.present_vsync()
-		.build()
-		.unwrap();
+	let mut canvas = window.clone().into_canvas();
 	let texture_creator = canvas.texture_creator();
 	let mut event_pump = sdl_context.event_pump().unwrap();
 
-	let mut current_time = timer_subsystem.performance_counter() as f64;
+	let mut current_time = timer::performance_counter() as f64;
 	let mut last_time = current_time;
 
 	// Logging initialization.
@@ -138,26 +129,26 @@ pub(crate) async fn main() {
 	let mut internal_server = None;
 
 	let text_input = video_subsystem.text_input();
-	text_input.start();
+	text_input.start(&window);
 
 	let mut fps = 60.0;
 	let mut fps_timer = 0.0;
 	'game: loop {
 		for event in event_pump.poll_iter() {
-			use sdl2::event::Event;
+			use sdl3::event::Event;
 			match event {
 				Event::Quit { .. } => break 'game,
 				Event::KeyDown {
 					keycode: Some(keycode),
 					..
 				} if options.controls.fullscreen.contains(keycode) => {
-					use sdl2::video::FullscreenType;
+					use sdl3::video::FullscreenType;
 					match canvas.window().fullscreen_state() {
 						FullscreenType::Off => {
-							let _ = canvas.window_mut().set_fullscreen(FullscreenType::Desktop);
+							let _ = canvas.window_mut().set_fullscreen(true);
 						}
 						FullscreenType::True | FullscreenType::Desktop => {
-							let _ = canvas.window_mut().set_fullscreen(FullscreenType::Off);
+							let _ = canvas.window_mut().set_fullscreen(false);
 						}
 					}
 				}
@@ -222,7 +213,7 @@ pub(crate) async fn main() {
 
 		// tick
 		{
-			let delta = update_delta(&mut last_time, &mut current_time, &timer_subsystem);
+			let delta = update_delta(&mut last_time, &mut current_time);
 
 			fps_timer += delta;
 			if fps_timer > 0.3 {

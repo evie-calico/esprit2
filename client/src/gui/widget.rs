@@ -3,9 +3,9 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
-use sdl2::image::LoadTexture;
-use sdl2::rect::{Point, Rect};
-use sdl2::render::{Texture, TextureCreator};
+use sdl3::image::LoadTexture;
+use sdl3::rect::{Point, Rect};
+use sdl3::render::{Texture, TextureCreator};
 use std::cell::RefCell;
 
 #[derive(Clone, Default, Debug)]
@@ -58,9 +58,9 @@ pub(crate) fn menu(
 		.enumerate()
 	{
 		menu.canvas.set_draw_color(color);
-		menu.canvas
-			.fill_rect(menu.rect.top_shifted(i as i32 * -10))
-			.unwrap();
+		let mut rect = menu.rect;
+		rect.reposition((menu.rect.x, i as i32 * -10));
+		menu.canvas.fill_rect(rect).unwrap();
 	}
 	menu.advance(0, 30);
 	// Paint scanlines on the rest of the terminal
@@ -386,8 +386,7 @@ pub(crate) fn on_cloud(
 			f(&mut gui);
 			gui.advance(0, 4);
 			height_used = gui.y as u32;
-		})
-		.unwrap();
+		});
 	let target = Rect::new(
 		gui.x + radius as i32,
 		gui.y + radius as i32,

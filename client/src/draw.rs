@@ -3,10 +3,10 @@
 use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
-use sdl2::pixels::Color;
-use sdl2::rect::{Point, Rect};
-use sdl2::render::Canvas;
-use sdl2::video::Window;
+use sdl3::pixels::Color;
+use sdl3::rect::{Point, Rect};
+use sdl3::render::{Canvas, FPoint, FRect};
+use sdl3::video::Window;
 use std::f64::consts::{PI, TAU};
 
 const TILE_SIZE: u32 = 12;
@@ -63,11 +63,11 @@ pub(crate) fn tilemap(
 				))
 				.unwrap(),
 			floor::Tile::Exit => canvas
-				.draw_rect(Rect::new(
-					x * ITILE_SIZE + 2 - camera.x,
-					y * ITILE_SIZE + 2 - camera.y,
-					TILE_SIZE - 4,
-					TILE_SIZE - 4,
+				.draw_rect(FRect::new(
+					(x * ITILE_SIZE + 2 - camera.x) as f32,
+					(y * ITILE_SIZE + 2 - camera.y) as f32,
+					(TILE_SIZE - 4) as f32,
+					(TILE_SIZE - 4) as f32,
 				))
 				.unwrap(),
 		}
@@ -98,21 +98,21 @@ pub(crate) fn cursor(
 
 		canvas.set_draw_color(Color::RED);
 		canvas
-			.draw_rect(Rect::new(
-				(origin.0 - range as i32) * ITILE_SIZE - camera.x,
-				(origin.1 - range as i32) * ITILE_SIZE - camera.y,
-				(range * 2 + 1) * TILE_SIZE,
-				(range * 2 + 1) * TILE_SIZE,
+			.draw_rect(FRect::new(
+				((origin.0 - range as i32) * ITILE_SIZE - camera.x) as f32,
+				((origin.1 - range as i32) * ITILE_SIZE - camera.y) as f32,
+				((range * 2 + 1) * TILE_SIZE) as f32,
+				((range * 2 + 1) * TILE_SIZE) as f32,
 			))
 			.unwrap();
 		if let Some(radius) = radius {
 			canvas.set_draw_color(Color::YELLOW);
 			canvas
-				.draw_rect(Rect::new(
-					(x - radius as i32) * ITILE_SIZE - camera.x,
-					(y - radius as i32) * ITILE_SIZE - camera.y,
-					(radius * 2 + 1) * TILE_SIZE,
-					(radius * 2 + 1) * TILE_SIZE,
+				.draw_rect(FRect::new(
+					((x - radius as i32) * ITILE_SIZE - camera.x) as f32,
+					((y - radius as i32) * ITILE_SIZE - camera.y) as f32,
+					((radius * 2 + 1) * TILE_SIZE) as f32,
+					((radius * 2 + 1) * TILE_SIZE) as f32,
 				))
 				.unwrap();
 		}
@@ -146,14 +146,14 @@ pub(crate) fn cursor(
 				Side::BottomLeft | Side::BottomRight => true,
 			};
 
-			let rect = Rect::new(
-				x * ITILE_SIZE + x_off - camera.x,
-				y * ITILE_SIZE + y_off - camera.y,
-				cursor_width,
-				cursor_height,
+			let rect = FRect::new(
+				(x * ITILE_SIZE + x_off - camera.x) as f32,
+				(y * ITILE_SIZE + y_off - camera.y) as f32,
+				(cursor_width) as f32,
+				(cursor_height) as f32,
 			);
 			canvas
-				.copy_ex(cursor, None, Some(rect), 0.0, None, hflip, vflip)
+				.copy_ex(cursor, None, rect, 0.0, None, hflip, vflip)
 				.unwrap();
 		}
 	}
@@ -169,12 +169,12 @@ pub(crate) fn characters(
 		canvas
 			.copy(
 				textures.get(&character.sheet.icon),
-				Some(Rect::new(0, 0, PIECE_SIZE, PIECE_SIZE)),
-				Some(Rect::new(
-					character.x * ITILE_SIZE - camera.x - (IPIECE_SIZE - ITILE_SIZE) / 2,
-					character.y * ITILE_SIZE - camera.y - (IPIECE_SIZE - ITILE_SIZE),
-					PIECE_SIZE,
-					PIECE_SIZE,
+				FRect::new(0.0, 0.0, PIECE_SIZE as f32, PIECE_SIZE as f32),
+				Some(FRect::new(
+					(character.x * ITILE_SIZE - camera.x - (IPIECE_SIZE - ITILE_SIZE) / 2) as f32,
+					(character.y * ITILE_SIZE - camera.y - (IPIECE_SIZE - ITILE_SIZE)) as f32,
+					PIECE_SIZE as f32,
+					PIECE_SIZE as f32,
 				)),
 			)
 			.unwrap();
@@ -253,15 +253,12 @@ impl CloudState {
 			let radius = last_radius as f64 * (1.0 - percent) + next_radius as f64 * (percent);
 			canvas.set_draw_color(color);
 			canvas
-				.draw_rect(
-					(
-						(bx + x * spacing) as i32,
-						(by + y * spacing) as i32,
-						(radius * weight * 2.0) as u32,
-						(radius * weight * 2.0) as u32,
-					)
-						.into(),
-				)
+				.draw_rect(FRect::new(
+					(bx + x * spacing) as f32,
+					(by + y * spacing) as f32,
+					(radius * weight * 2.0) as f32,
+					(radius * weight * 2.0) as f32,
+				))
 				.unwrap();
 			last_random = xorshift(last_random);
 			next_random = xorshift(next_random);
@@ -288,15 +285,12 @@ impl CloudState {
 		] {
 			canvas.set_draw_color(color);
 			canvas
-				.draw_rect(
-					(
-						x as i32,
-						y as i32,
-						radius as u32, // intentionally not *2; this used to be /2
-						radius as u32, // intentionally not *2; this used to be /2
-					)
-						.into(),
-				)
+				.draw_rect(FRect::new(
+					x as f32,
+					y as f32,
+					radius as f32, // intentionally not *2; this used to be /2
+					radius as f32, // intentionally not *2; this used to be /2
+				))
 				.unwrap();
 		}
 	}
@@ -335,15 +329,12 @@ impl CloudTrail {
 			let y = (from.y as f64 * (1.0 - weight) + to.y as f64 * weight) as i16;
 			canvas.set_draw_color(color);
 			canvas
-				.draw_rect(
-					(
-						x as i32,
-						y as i32,
-						(radius * scale * 2.0) as u32,
-						(radius * scale * 2.0) as u32,
-					)
-						.into(),
-				)
+				.draw_rect(FRect::new(
+					x as f32,
+					y as f32,
+					(radius * scale * 2.0) as f32,
+					(radius * scale * 2.0) as f32,
+				))
 				.unwrap();
 		}
 	}
@@ -370,7 +361,12 @@ impl CloudyWave {
 
 			canvas.set_draw_color(color);
 			canvas
-				.draw_rect((x as i32, y, radius as u32 * 2, radius as u32 * 2).into())
+				.draw_rect(FRect::new(
+					x as f32,
+					y as f32,
+					radius as f32 * 2.0,
+					radius as f32 * 2.0,
+				))
 				.unwrap();
 			canvas.set_draw_color(color);
 			let rect = Rect::new(
@@ -390,17 +386,17 @@ impl CloudyWave {
 			if twinkle {
 				continue;
 			}
-			let x = rect.x
-				+ radius as i32
-				+ (rect.width() as f64 * (seed & 0xFFFF) as f64 / u16::MAX as f64) as i32;
-			let y = rect.y + (rect.height() as f64 * (seed >> 16) as f64 / u16::MAX as f64) as i32;
-			let color = match y % 3 {
+			let x = rect.x as f32
+				+ radius as f32
+				+ (rect.width() as f32 * (seed & 0xFFFF) as f32 / u16::MAX as f32);
+			let y = rect.y as f32 + (rect.height() as f32 * (seed >> 16) as f32 / u16::MAX as f32);
+			let color = match y as u32 % 3 {
 				0 => Color::RED,
 				1 => Color::GREEN,
 				_ => Color::BLUE,
 			};
 			canvas.set_draw_color(color);
-			canvas.draw_point((x, y)).unwrap();
+			canvas.draw_point(FPoint::new(x, y)).unwrap();
 		}
 	}
 }

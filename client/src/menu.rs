@@ -1,6 +1,6 @@
 use crate::input::Signal;
 use crate::prelude::*;
-use sdl2::event::Event;
+use sdl3::event::Event;
 
 pub(crate) trait Menu<T> {
 	fn event(&mut self, event: &Event, options: &Options) -> Signal<T>;
@@ -8,7 +8,7 @@ pub(crate) trait Menu<T> {
 }
 
 pub(crate) mod login {
-	use sdl2::render::Texture;
+	use sdl3::render::Texture;
 
 	use super::Menu;
 	use crate::input::{LineInput, Radio, RadioBacker, Signal};
@@ -87,7 +87,7 @@ pub(crate) mod login {
 	impl Menu<RootMenuResponse> for State<'_> {
 		fn event(
 			&mut self,
-			event: &sdl2::event::Event,
+			event: &sdl3::event::Event,
 			options: &crate::Options,
 		) -> Signal<RootMenuResponse> {
 			self.username.dispatch(event, options, |username| {
