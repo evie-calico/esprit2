@@ -81,6 +81,7 @@ pub(crate) async fn main() {
 		.build()
 		.unwrap();
 	let mut canvas = window.clone().into_canvas();
+	canvas.set_blend_mode(sdl3::render::BlendMode::Blend);
 	let texture_creator = canvas.texture_creator();
 	let mut event_pump = sdl_context.event_pump().unwrap();
 
@@ -89,7 +90,7 @@ pub(crate) async fn main() {
 
 	// Logging initialization.
 	tracing_subscriber::fmt()
-		.with_max_level(tracing::Level::TRACE)
+		.with_max_level(tracing::Level::DEBUG)
 		.init();
 	let options_path = options::user_directory().join("options.toml");
 	let options = Options::open(&options_path).unwrap_or_else(|msg| {

@@ -347,6 +347,7 @@ dependencies = [
  "esprit2",
  "esprit2-server",
  "mlua",
+ "parking_lot",
  "rand",
  "rkyv",
  "sdl3",

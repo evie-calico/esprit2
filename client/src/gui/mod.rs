@@ -1,15 +1,28 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
 use crate::prelude::*;
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, SwashCache};
 use esprit2::prelude::*;
+use parking_lot::RwLock;
 use sdl3::rect::Rect;
-use sdl3::render::{Canvas, FRect, Texture, TextureQuery};
+use sdl3::render::FPoint;
+use sdl3::render::{Canvas, FRect, Texture};
 use sdl3::video::Window;
-use std::ops::Range;
+use std::sync::OnceLock;
 
 pub(crate) mod widget;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
+
+fn font_system() -> &'static RwLock<FontSystem> {
+	static CACHE: OnceLock<RwLock<FontSystem>> = OnceLock::new();
+	CACHE.get_or_init(|| RwLock::new(FontSystem::new()))
+}
+
+fn swash_cache() -> &'static RwLock<SwashCache> {
+	static CACHE: OnceLock<RwLock<SwashCache>> = OnceLock::new();
+	CACHE.get_or_init(|| RwLock::new(SwashCache::new()))
+}
 
 pub(crate) struct Context<'canvas> {
 	pub(crate) canvas: &'canvas mut Canvas<Window>,
@@ -158,9 +171,38 @@ impl<'canvas> Context<'canvas> {
 		self.advance(self.rect.width(), height);
 	}
 
-	pub(crate) fn label(&mut self, s: &str) {}
+	pub(crate) fn label(&mut self, s: &str) {
+		self.label_color(s, (255, 255, 255, 255));
+	}
 
-	pub(crate) fn label_color(&mut self, s: &str, color: Color) {}
+	pub(crate) fn label_color(&mut self, s: &str, color: Color) {
+		let mut font_system = font_system().write();
+		let mut buffer = Buffer::new(&mut font_system, Metrics::new(18.0, 20.0));
+		let mut buffer = buffer.borrow_with(&mut font_system);
+		buffer.set_text(s, Attrs::new(), cosmic_text::Shaping::Advanced);
+		buffer.shape_until_scroll(true);
+		let mut swash_cache = swash_cache().write();
+		let mut advancement = (0, 0);
+		buffer.draw(
+			&mut swash_cache,
+			cosmic_text::Color::rgba(color.0, color.1, color.2, color.3),
+			|x, y, w, h, c| {
+				if c.a() == 0 {
+					return;
+				}
+				advancement = (
+					advancement.0.max(x.try_into().unwrap_or(0) + w),
+					advancement.1.max(y.try_into().unwrap_or(0) + h),
+				);
+				let x = self.x + x;
+				let y = self.y + y;
+
+				self.canvas.set_draw_color(c.as_rgba_tuple());
+				let _ = self.canvas.draw_point(FPoint::new(x as f32, y as f32));
+			},
+		);
+		self.advance(advancement.0, advancement.1);
+	}
 
 	pub(crate) fn htexture(&mut self, texture: &Texture, width: u32) {
 		let query = texture.query();
