@@ -27,25 +27,12 @@ pub mod value;
 pub mod vault;
 pub mod world;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error(transparent)]
-	Io(#[from] std::io::Error),
-	#[error(transparent)]
-	Lua(#[from] mlua::Error),
-
-	#[error("lua function requested user input when it was unavailable")]
-	IllegalActionRequest,
-
-	#[error(transparent)]
-	Vault(#[from] vault::Error),
-	#[error(transparent)]
-	Resource(#[from] resource::Error),
-	#[error(transparent)]
-	Expression(#[from] expression::Error),
-}
-
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+// Deferring to anyhow feels unfortunate, but it's also usually *correct*.
+// Most areas of the engine have to mix a few error types together,
+// and want to provide a context trace for why an error occured.
+// The only errors worth introspecting on (lua and resources) heavily benefit from a context trace,
+// any anyhow lets you downcast if you really need to anyways.
+pub use anyhow;
 
 pub use value::Value;
 /// Arbitrary Unit of Time.

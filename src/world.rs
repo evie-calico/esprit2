@@ -1,3 +1,5 @@
+use anyhow::Context;
+
 use crate::prelude::*;
 use std::{collections::VecDeque, rc::Rc};
 
@@ -50,7 +52,7 @@ impl Manager {
 	pub fn new(
 		party_blueprint: impl Iterator<Item = PartyReferenceBase>,
 		resources: &resource::Manager,
-	) -> Result<Self> {
+	) -> resource::Result<Self> {
 		let mut party = Vec::new();
 		let mut characters = VecDeque::new();
 
@@ -111,66 +113,6 @@ impl Manager {
 		})
 	}
 
-	pub fn new_floor(
-		&mut self,
-		resources: &resource::Manager,
-		lua: &mlua::Lua,
-		console: &impl console::Handle,
-	) -> Result<()> {
-		self.location.floor += 1;
-		console.print_important(format!("Entering floor {}", self.location.floor));
-		self.current_floor = Floor::default();
-
-		self.characters.retain(|x| {
-			self.party
-				.iter()
-				.any(|y| std::ptr::eq(x.as_ptr(), y.piece.as_ptr()))
-		});
-
-		console.print_unimportant("You take some time to rest...");
-		for i in &self.characters {
-			// This happens before anything else,
-			// but that's only because the latter half of this function would prefer a `borrow_mut`.
-			// Please change this order if it makes more sense elsewhere!
-			let original_components = i
-				.borrow()
-				.components
-				.keys()
-				.filter_map(|component_id| {
-					resources
-						.component
-						.get(component_id)
-						.map(|x| x.on_rest.clone())
-						.transpose()
-				})
-				.collect::<Result<Vec<mlua::Function>>>()?;
-			for on_rest in original_components {
-				on_rest.call::<()>(i.clone())?;
-			}
-
-			let mut i = i.borrow_mut();
-			// Reset positions
-			i.x = 0;
-			i.y = 0;
-			// Rest
-			let stats = i.stats(lua)?;
-			i.hp = i32::min(i.hp + (stats.heart as u32 / 2) as i32, stats.heart as i32);
-			i.sp = i32::min(i.sp + (stats.soul as u32) as i32, stats.soul as i32);
-			// Award experience
-			i.sheet.experience += 40;
-			while i.sheet.experience >= 100 {
-				i.sheet.experience -= 100;
-				i.sheet.level = i.sheet.level.saturating_add(1);
-				console.print_special(
-					format!("{{Address}}'s level increased to {}!", i.sheet.level)
-						.replace_nouns(&i.sheet.nouns),
-				);
-			}
-		}
-		// TODO: Generate floor
-		Ok(())
-	}
-
 	pub fn next_character(&self) -> &character::Ref {
 		&self.characters[0]
 	}
@@ -187,7 +129,7 @@ impl Manager {
 		seed: &str,
 		set: &vault::Set,
 		resources: &resource::Manager,
-	) -> Result<()> {
+	) -> resource::Result<()> {
 		use rand::seq::{IndexedRandom, SliceRandom};
 		use rand::SeedableRng;
 
@@ -246,13 +188,13 @@ impl Manager {
 		Ok(())
 	}
 
-	pub fn try_apply_vault(
+	fn try_apply_vault(
 		&mut self,
 		x: i32,
 		y: i32,
 		vault: &Vault,
 		resources: &resource::Manager,
-	) -> Result<bool> {
+	) -> resource::Result<bool> {
 		for (row, y) in vault
 			.tiles
 			.chunks(vault.width)
@@ -298,11 +240,14 @@ impl Manager {
 		resources: &resource::Manager,
 		lua: &mlua::Lua,
 		console: impl console::Handle,
-	) -> Result<bool> {
+	) -> anyhow::Result<bool> {
 		let character = self.next_character();
 		if !character.borrow().components.contains_key(":conscious") {
-			let action = self.consider_action(lua, character.clone())?;
-			self.perform_action(&console, resources, lua, action)?;
+			let action = self
+				.consider_action(lua, character.clone())
+				.context("failed to consider action")?;
+			self.perform_action(&console, resources, lua, action)
+				.context("failed to perform action")?;
 			Ok(true)
 		} else {
 			Ok(false)
@@ -313,7 +258,7 @@ impl Manager {
 		&self,
 		lua: &mlua::Lua,
 		character: character::Ref,
-	) -> Result<character::Action> {
+	) -> mlua::Result<character::Action> {
 		let on_consider = {
 			let character = character.borrow();
 			let on_consider = character.sheet.on_consider.as_ref();
@@ -337,7 +282,7 @@ impl Manager {
 		resources: &resource::Manager,
 		lua: &mlua::Lua,
 		action: character::Action,
-	) -> Result<()> {
+	) -> anyhow::Result<()> {
 		let next_character = self.next_character().clone();
 
 		let delay = next_character.borrow().action_delay;
@@ -357,13 +302,16 @@ impl Manager {
 			.filter_map(|component_id| {
 				resources
 					.component
-					.get(component_id)
-					.map(|x| x.on_turn.clone())
+					.get_key_value(component_id)
+					.map(|(id, component)| component.on_turn.clone().map(|x| (id, x)))
 					.transpose()
 			})
-			.collect::<Result<Vec<mlua::Function>>>()?;
-		for on_turn in original_components {
-			on_turn.call::<()>((next_character.clone(), delay))?;
+			.collect::<resource::Result<Vec<(&str, mlua::Function)>>>()
+			.context("failed to retrieve components")?;
+		for (component_id, on_turn) in original_components {
+			on_turn
+				.call::<()>((next_character.clone(), delay))
+				.with_context(|| format!("failed to call on_turn for component {component_id}"))?;
 		}
 
 		let delay = match action {
@@ -375,7 +323,7 @@ impl Manager {
 				};
 				// For distances of 1 tile, don't bother using a dijkstra map.
 				if let Some(direction) = OrdDir::from_offset(target_x - x, target_y - y) {
-					self.move_piece(&next_character, direction, console)?
+					self.move_piece(&next_character, direction, console)
 				} else {
 					let mut dijkstra = astar::Floor::target(&[(target_x, target_y)]);
 					dijkstra.explore(x, y, |x, y, base| {
@@ -390,7 +338,7 @@ impl Manager {
 						}
 					});
 					if let Some(direction) = dijkstra.step(x, y) {
-						self.move_piece(&next_character, direction, console)?
+						self.move_piece(&next_character, direction, console)
 					} else {
 						None
 					}
@@ -398,12 +346,20 @@ impl Manager {
 			}
 			character::Action::Attack(attack, arguments) => self.attack(
 				lua,
-				resources.attack.get(&attack)?.clone(),
+				resources
+					.attack
+					.get(&attack)
+					.context("failed to retrieve attack")?
+					.clone(),
 				next_character,
 				arguments,
 			)?,
 			character::Action::Cast(spell, arguments) => self.cast(
-				resources.spell.get(&spell)?.clone(),
+				resources
+					.spell
+					.get(&spell)
+					.context("failed to retrieve spell")?
+					.clone(),
 				next_character,
 				lua,
 				arguments,
@@ -445,7 +401,7 @@ impl Manager {
 		lua: &mlua::Lua,
 		argument: Value,
 		console: impl console::Handle,
-	) -> Result<Option<u32>, Error> {
+	) -> mlua::Result<Option<u32>> {
 		let castable = spell.castable_by(&user.borrow());
 		Ok(match castable {
 			spell::Castable::Yes => self.poll::<Option<Aut>>(
@@ -474,9 +430,9 @@ impl Manager {
 		attack: Rc<Attack>,
 		user: character::Ref,
 		argument: Value,
-	) -> Result<Option<Aut>> {
+	) -> mlua::Result<Option<Aut>> {
 		let thread = lua.create_thread(attack.on_use.clone())?;
-		Ok(self.poll::<Option<Aut>>(lua, thread, (user, attack, argument))?)
+		self.poll::<Option<Aut>>(lua, thread, (user, attack, argument))
 	}
 
 	pub fn move_piece(
@@ -484,7 +440,7 @@ impl Manager {
 		character: &character::Ref,
 		dir: OrdDir,
 		console: impl console::Handle,
-	) -> Result<Option<Aut>> {
+	) -> Option<Aut> {
 		use crate::floor::Tile;
 
 		let (x, y, delay) = {
@@ -508,17 +464,17 @@ impl Manager {
 				let mut character = character.borrow_mut();
 				character.x = x;
 				character.y = y;
-				Ok(Some(delay))
+				Some(delay)
 			}
 			Some(Tile::Wall) => {
 				console.say(character.borrow().sheet.nouns.name.clone(), "Ouch!");
-				Ok(None)
+				None
 			}
 			None => {
 				console.print_system(
 					"You stare out into the void: an infinite expanse of nothingness enclosed within a single tile."
 				);
-				Ok(None)
+				None
 			}
 		}
 	}

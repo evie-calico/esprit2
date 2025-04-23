@@ -54,9 +54,9 @@ use std::rc::Rc;
 pub enum Error {
 	#[error("resource {0} not found")]
 	NotFound(Box<str>),
-	#[error("keys (file names) must be representable in UTF8")]
-	InvalidKey,
 }
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug)]
 pub struct Resource<T>(HashMap<Box<str>, T>);
@@ -66,10 +66,15 @@ impl<T> Resource<T> {
 		Self(HashMap::new())
 	}
 
-	pub fn get(&self, key: &str) -> Result<&T> {
+	pub fn get(&self, key: &str) -> Result<&T, Error> {
+		self.0.get(key).ok_or_else(|| Error::NotFound(key.into()))
+	}
+
+	pub fn get_key_value<'a>(&'a self, key: &str) -> Result<(&'a str, &'a T), Error> {
 		self.0
-			.get(key)
-			.ok_or_else(|| crate::Error::Resource(Error::NotFound(key.into())))
+			.get_key_value(key)
+			.map(|(key, value)| (&**key, value))
+			.ok_or_else(|| Error::NotFound(key.into()))
 	}
 }
 
@@ -257,13 +262,13 @@ fn lib_searcher(
 }
 
 /// Organizes initialization scripts' resources.
-fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Result<()>>(
+fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> mlua::Result<()>) -> mlua::Result<()>>(
 	lua: &mlua::Lua,
 	name: &str,
 	directory: impl AsRef<Path>,
 	mut load: Load,
-) -> Result<mlua::Table> {
-	fn recurse(directory: &Path, lua: &mlua::Lua) -> Result<()> {
+) -> mlua::Result<mlua::Table> {
+	fn recurse(directory: &Path, lua: &mlua::Lua) -> mlua::Result<()> {
 		for entry in fs::read_dir(directory)? {
 			let entry = entry?;
 			let path = entry.path();
@@ -318,16 +323,16 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Result<()>>(
 struct PreliminaryModule<'a> {
 	name: &'a str,
 	path: &'a Path,
-	prototypes: Result<(mlua::Table, Manager), Vec<crate::Error>>,
+	prototypes: Result<(mlua::Table, Manager), Vec<mlua::Error>>,
 }
 
-fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<crate::Error>> {
+fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<mlua::Error>> {
 	let mut products = Ok(Manager::default());
-	let append_err = |errors: Result<Manager, Vec<crate::Error>>, e| {
+	let append_err = |errors: Result<Manager, Vec<mlua::Error>>, e| {
 		Err(match errors {
-			Ok(_) => vec![crate::Error::Lua(e)],
+			Ok(_) => vec![e],
 			Err(mut errors) => {
-				errors.push(crate::Error::Lua(e));
+				errors.push(e);
 				errors
 			}
 		})
@@ -363,10 +368,13 @@ fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<crate::E
 
 pub struct FailedModule<'a> {
 	pub name: &'a str,
-	pub errors: Box<[crate::Error]>,
+	pub errors: Box<[mlua::Error]>,
 }
 
-pub fn open<'a, Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Result<()>>(
+pub fn open<
+	'a,
+	Load: FnMut(&str, &Path, &mut dyn FnMut() -> mlua::Result<()>) -> mlua::Result<()>,
+>(
 	lua: &mlua::Lua,
 	modules: impl IntoIterator<Item = &'a Path>,
 	mut load: Load,

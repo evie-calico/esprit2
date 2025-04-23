@@ -2,8 +2,8 @@
 #![expect(clippy::unwrap_used)]
 
 use clap::Parser;
+use esprit2::anyhow::Context;
 use esprit2::prelude::*;
-use esprit2_server::Error;
 use esprit2_server::*;
 use rkyv::util::AlignedVec;
 use std::net::Ipv4Addr;
@@ -26,12 +26,12 @@ struct Cli {
 }
 
 struct Instance {
-	handle: thread::JoinHandle<esprit2::Result<()>>,
+	handle: thread::JoinHandle<anyhow::Result<()>>,
 	router: mpsc::Sender<(Client, ReceiverStream<AlignedVec>)>,
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
 	let cli = Cli::parse();
 	// Logging initialization.
 	tracing_subscriber::fmt()
@@ -88,7 +88,7 @@ async fn main() {
 				}
 				let _span = span.entered();
 
-				let packet = rkyv::access(&packet).map_err(Error::Access).unwrap();
+				let packet = rkyv::access::<_, rkyv::rancor::Error>(&packet).context("failed to read packet")?;
 				match packet {
 					protocol::ArchivedClientPacket::Ping => client.ping().await.unwrap(),
 					protocol::ArchivedClientPacket::Authenticate(auth) => client.authenticate(auth).await.unwrap(),

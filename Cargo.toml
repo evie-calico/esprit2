@@ -44,3 +44,4 @@ rand = "0.9.1"
 rkyv.workspace = true
 thiserror = "2.0.3"
 tracing = "0.1.40"
+anyhow = "1.0.98"

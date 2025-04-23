@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use esprit2::anyhow::Context;
 use esprit2::prelude::*;
 use mlua::FromLua;
 use sdl3::event::Event;
@@ -186,7 +187,7 @@ pub(crate) enum PartialAction {
 }
 
 impl PartialAction {
-	fn resolve(self, lua: &mlua::Lua, arg: impl mlua::IntoLuaMulti) -> esprit2::Result<Response> {
+	fn resolve(self, lua: &mlua::Lua, arg: impl mlua::IntoLuaMulti) -> mlua::Result<Response> {
 		match self {
 			PartialAction::Attack(attack, next_character, thread) => {
 				let value = thread.resume(arg)?;
@@ -265,7 +266,7 @@ pub(crate) fn controllable_character(
 	lua: &mlua::Lua,
 	mode: Mode,
 	options: &Options,
-) -> Result<(Mode, Option<Response>)> {
+) -> anyhow::Result<(Mode, Option<Response>)> {
 	match mode {
 		Mode::Normal => {
 			let directions = [
@@ -502,11 +503,17 @@ fn gather_attack_inputs(
 	lua: &mlua::Lua,
 	attack_id: Box<str>,
 	next_character: character::Ref,
-) -> Result<Response, Error> {
-	let attack = resources.attack.get(&attack_id)?;
-	let thread = lua.create_thread(attack.on_input.clone())?;
-	PartialAction::Attack(attack_id, next_character.clone(), thread)
-		.resolve(lua, (next_character, attack.clone()))
+) -> anyhow::Result<Response> {
+	let attack = resources
+		.attack
+		.get(&attack_id)
+		.context("failed to retrieve attack")?;
+	lua.create_thread(attack.on_input.clone())
+		.and_then(|thread| {
+			PartialAction::Attack(attack_id, next_character.clone(), thread)
+				.resolve(lua, (next_character, attack.clone()))
+		})
+		.context("failed to run attack input thread")
 }
 
 fn gather_spell_inputs(
@@ -514,9 +521,15 @@ fn gather_spell_inputs(
 	lua: &mlua::Lua,
 	spell_id: Box<str>,
 	next_character: character::Ref,
-) -> Result<Response, Error> {
-	let spell = resources.spell.get(&spell_id)?;
-	let thread = lua.create_thread(spell.on_input.clone())?;
-	PartialAction::Spell(spell_id, next_character.clone(), thread)
-		.resolve(lua, (next_character, spell.clone()))
+) -> anyhow::Result<Response> {
+	let spell = resources
+		.spell
+		.get(&spell_id)
+		.context("failed to retrieve spell")?;
+	lua.create_thread(spell.on_input.clone())
+		.and_then(|thread| {
+			PartialAction::Spell(spell_id, next_character.clone(), thread)
+				.resolve(lua, (next_character, spell.clone()))
+		})
+		.context("failed to run spell input thread")
 }

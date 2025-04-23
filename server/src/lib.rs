@@ -12,6 +12,7 @@
 
 #![feature(anonymous_lifetime_in_impl_trait, once_cell_try, iter_array_chunks)]
 
+use esprit2::anyhow::Context;
 use esprit2::prelude::*;
 use protocol::{
 	ArchivedClientAuthentication, ClientAuthentication, ClientIdentifier, PacketReceiver,
@@ -20,7 +21,6 @@ use protocol::{
 use rkyv::rancor;
 use rkyv::util::AlignedVec;
 use std::collections::HashMap;
-use std::io;
 use std::path::Path;
 use std::process::exit;
 use std::time::{Duration, Instant};
@@ -32,20 +32,7 @@ use tokio_stream::{StreamExt, StreamMap};
 
 pub mod protocol;
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error(transparent)]
-	Engine(#[from] esprit2::Error),
-	#[error(transparent)]
-	Io(#[from] io::Error),
-
-	#[error("failed to serialize packet: {0}")]
-	Ser(rkyv::rancor::BoxedError),
-	#[error("failed to read packet: {0}")]
-	Access(rkyv::rancor::BoxedError),
-	#[error("failed to deserialize packet: {0}")]
-	De(rkyv::rancor::BoxedError),
-}
+pub use esprit2::anyhow;
 
 #[derive(Debug)]
 pub struct Client {
@@ -80,17 +67,21 @@ impl Client {
 		)
 	}
 
-	pub async fn ping(&mut self) -> Result<(), Error> {
+	pub async fn ping(&mut self) -> anyhow::Result<()> {
 		self.sender
 			.send(&protocol::ServerPacket::Ping)
 			.await
-			.map_err(Error::Ser)?;
+			.context("failed to send packet")?;
 		self.ping = Instant::now();
 		Ok(())
 	}
 
-	pub async fn authenticate(&mut self, auth: &ArchivedClientAuthentication) -> Result<(), Error> {
-		let auth = rkyv::deserialize(auth).map_err(Error::De)?;
+	pub async fn authenticate(
+		&mut self,
+		auth: &ArchivedClientAuthentication,
+	) -> anyhow::Result<()> {
+		let auth =
+			rkyv::deserialize::<_, rancor::Error>(auth).context("failed to recieve packet")?;
 		info!(username = auth.username, "authenticated");
 		self.authentication = Some(auth);
 		Ok(())
@@ -106,10 +97,11 @@ impl Server {
 	pub(crate) fn new(
 		resource_directory: impl AsRef<Path>,
 		lua: &mlua::Lua,
-	) -> esprit2::Result<Self> {
+	) -> anyhow::Result<Self> {
 		let modules = resource_directory
 			.as_ref()
-			.read_dir()?
+			.read_dir()
+			.context("failed to read contents of resource directory")?
 			.filter_map(|x| {
 				let x = x.ok()?;
 				if x.metadata().ok()?.is_dir() {
@@ -232,7 +224,7 @@ impl std::ops::DerefMut for ClientParty {
 pub fn instance(
 	mut router: mpsc::Receiver<(Client, ReceiverStream<AlignedVec>)>,
 	res: impl AsRef<Path>,
-) -> esprit2::Result<()> {
+) -> anyhow::Result<()> {
 	let lua = esprit2::lua::init()?;
 
 	let (sender, mut console_reciever) = mpsc::unbounded_channel();
@@ -338,7 +330,7 @@ async fn client_tick(
 	console_handle: &Console,
 	lua: &mlua::Lua,
 	server: &mut Server,
-) -> Result<(), Error> {
+) -> anyhow::Result<()> {
 	let span = tracing::error_span!(
 		"client",
 		addr = client.address,
@@ -349,11 +341,12 @@ async fn client_tick(
 	}
 	let _span = span.entered();
 
-	let packet = rkyv::access(&packet).map_err(Error::Access)?;
+	let packet = rkyv::access::<_, rancor::Error>(&packet).context("failed to read packet")?;
 	match packet {
 		protocol::ArchivedClientPacket::Ping => client.ping().await?,
 		protocol::ArchivedClientPacket::Action { action } => {
-			let action: character::Action = rkyv::deserialize(action).map_err(Error::De)?;
+			let action: character::Action = rkyv::deserialize::<_, rancor::Error>(action)
+				.context("failed to deserialize action packet")?;
 			let console = console_handle;
 			let next_character = server.world.next_character();
 			// TODO: Uuid-based piece ownership.
@@ -368,17 +361,11 @@ async fn client_tick(
 					.perform_action(console, &server.resources, lua, action)?;
 			} else {
 				warn!("client attempted to move piece it did not own");
-				client
-					.sender
-					.send(&protocol::ServerPacket::World {
-						world: &server.world,
-					})
-					.await
-					.map_err(Error::Ser)?;
 			}
 		}
 		protocol::ArchivedClientPacket::Authenticate(auth) => {
-			let client_authentication = rkyv::deserialize(auth).map_err(Error::De)?;
+			let client_authentication = rkyv::deserialize::<_, rancor::Error>(auth)
+				.context("failed to deserialize client authentication packet")?;
 			info!(username = client_authentication.username, "authenticated");
 			client.authentication = Some(client_authentication);
 		}

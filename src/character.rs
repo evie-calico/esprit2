@@ -335,11 +335,11 @@ pub struct StatOutcomes {
 }
 
 impl Piece {
-	pub fn stats(&self, lua: &mlua::Lua) -> Result<Stats> {
+	pub fn stats(&self, lua: &mlua::Lua) -> mlua::Result<Stats> {
 		self.stat_outcomes(lua).map(|x| x.stats)
 	}
 
-	pub fn stat_outcomes(&self, lua: &mlua::Lua) -> Result<StatOutcomes> {
+	pub fn stat_outcomes(&self, lua: &mlua::Lua) -> mlua::Result<StatOutcomes> {
 		let buffs = Stats::default();
 		let mut debuffs = Stats::default();
 		let resources: resource::Handle =
