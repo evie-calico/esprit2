@@ -387,6 +387,11 @@ impl mlua::UserData for Action {}
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Sheet {
+	/// The identifier of the resource this sheet originated from.
+	/// The sheet this refers to is not guaranteed to be the same as the sheet is is a member of,
+	/// since a piece's sheet may mutate over the course of a game.
+	pub id: Box<str>,
+
 	/// Note that this includes the character's name.
 	pub nouns: Nouns,
 

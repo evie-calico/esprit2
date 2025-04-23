@@ -172,7 +172,7 @@ pub(crate) fn characters(
 					textures
 						.sheets
 						// TODO: Don't hard-code this.
-						.get("esprit:luvui")
+						.get(&character.sheet.id)
 						.map_or("missingno", |x| &x.icon),
 				),
 				FRect::new(0.0, 0.0, PIECE_SIZE as f32, PIECE_SIZE as f32),

@@ -131,7 +131,7 @@ impl mlua::UserData for Handle {
 	}
 }
 
-fn attack(table: mlua::Table) -> mlua::Result<attack::Attack> {
+fn attack(_id: &str, table: mlua::Table) -> mlua::Result<attack::Attack> {
 	Ok(attack::Attack {
 		name: table.get("name")?,
 		description: table.get("description")?,
@@ -143,7 +143,7 @@ fn attack(table: mlua::Table) -> mlua::Result<attack::Attack> {
 	})
 }
 
-fn sheet(table: mlua::Table) -> mlua::Result<character::Sheet> {
+fn sheet(id: &str, table: mlua::Table) -> mlua::Result<character::Sheet> {
 	let stats = |table: mlua::Table| -> mlua::Result<_> {
 		Ok(character::Stats {
 			heart: table.get("heart")?,
@@ -156,6 +156,7 @@ fn sheet(table: mlua::Table) -> mlua::Result<character::Sheet> {
 	};
 
 	Ok(character::Sheet {
+		id: id.into(),
 		nouns: table.get("nouns")?,
 		level: table.get("level")?,
 		experience: table.get::<Option<_>>("experience")?.unwrap_or_default(),
@@ -172,7 +173,7 @@ fn sheet(table: mlua::Table) -> mlua::Result<character::Sheet> {
 	})
 }
 
-fn spell(table: mlua::Table) -> mlua::Result<spell::Spell> {
+fn spell(_id: &str, table: mlua::Table) -> mlua::Result<spell::Spell> {
 	Ok(spell::Spell {
 		name: table.get("name")?,
 		icon: table.get("icon")?,
@@ -187,7 +188,7 @@ fn spell(table: mlua::Table) -> mlua::Result<spell::Spell> {
 	})
 }
 
-fn component(table: mlua::Table) -> mlua::Result<component::Component> {
+fn component(_id: &str, table: mlua::Table) -> mlua::Result<component::Component> {
 	Ok(component::Component {
 		name: table.get("name")?,
 		icon: table.get("icon")?,
@@ -200,7 +201,7 @@ fn component(table: mlua::Table) -> mlua::Result<component::Component> {
 	})
 }
 
-fn vault(table: mlua::Table) -> mlua::Result<vault::Vault> {
+fn vault(_id: &str, table: mlua::Table) -> mlua::Result<vault::Vault> {
 	let source = table.get::<mlua::String>(1)?;
 	let source = source.to_str()?;
 	let source = source.as_ref();
@@ -320,7 +321,7 @@ struct PreliminaryModule<'a> {
 	prototypes: Result<(mlua::Table, Manager), Vec<crate::Error>>,
 }
 
-fn produce(prototypes: &mlua::Table) -> Result<Manager, Vec<crate::Error>> {
+fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<crate::Error>> {
 	let mut products = Ok(Manager::default());
 	let append_err = |errors: Result<Manager, Vec<crate::Error>>, e| {
 		Err(match errors {
@@ -335,7 +336,11 @@ fn produce(prototypes: &mlua::Table) -> Result<Manager, Vec<crate::Error>> {
 			($type:ident) => {
 				match prototypes.get::<mlua::Table>(stringify!($type)) {
 					Ok(table) => for i in table.pairs::<mlua::String, mlua::Table>() {
-						match i.and_then(|(id, table)| Ok((Box::from(id.to_str()?.as_ref()), $type(table).context(concat!("while producing ", stringify!($type)))?))) {
+						match i.and_then(|(id, table)| {
+							let id = format!("{name}:{}", id.to_str()?.as_ref()).into_boxed_str();
+							let resource = $type(&id, table).context(concat!("while producing ", stringify!($type)))?;
+							Ok((id, resource))
+						}) {
 							Ok((id, product)) => {
 								if let Ok(products) = &mut products {
 									products.$type.0.insert(id, product.into());
@@ -414,7 +419,7 @@ pub fn open<'a, Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Resu
 	// Fill out dummy prototype fields.
 	for module in &mut preliminary_modules {
 		module.prototypes = init(lua, module.name, module.path, &mut load)
-			.map(|table| produce(&table).map(|x| (table, x)))
+			.map(|table| produce(module.name, &table).map(|x| (table, x)))
 			.unwrap_or_else(|e| Err(vec![e]));
 	}
 
@@ -424,14 +429,14 @@ pub fn open<'a, Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Resu
 		.into_iter()
 		.filter_map(|preliminary_module| match preliminary_module {
 			PreliminaryModule {
-				name,
+				name: _,
 				path: _,
 				prototypes: Ok((_, prototypes)),
 			} => {
 				macro_rules! combine{
 						($type:ident) => {
 							for (id, value) in prototypes.$type.0.into_iter() {
-								manager.$type.0.insert(format!("{name}:{id}").into_boxed_str(), value);
+								manager.$type.0.insert(id, value);
 							}
 						};
 						($($type:ident),+) => {
