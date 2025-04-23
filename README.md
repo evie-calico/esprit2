@@ -1,14 +1,5 @@
 # Esprit 2
 
-This is a sequel to Esprit for the Game Boy.
-
-## Project Goals
-- A more in-depth character system.
-- Even more dynamic cutscenes.
-- Persistent worldgen. (dungeons are always the same for each seed)
-- Magic system
-- Freeplay roguelike mode where you can make a character and play with no story.
-
 ## Dependencies
 
 The `mlua` and `sdl3` libraries provide bindings to their respective C libraries.
