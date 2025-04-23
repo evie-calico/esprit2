@@ -4,6 +4,10 @@ local resources = require "std:resources"
 local attacks = { "esprit:scratch", "esprit:bite" }
 
 resources.sheet "luvui" {
+	textures = {
+		icon = resources.texture "sheets/luvui.png",
+	},
+
 	level = 1,
 	attacks = attacks,
 	spells = {
@@ -16,7 +20,6 @@ resources.sheet "luvui" {
 		"esprit:debug/frenzy"
 	},
 	speed = 12,
-	icon = resources.texture "luvui.png",
 
 	on_consider = "std:basic",
 	nouns = {
@@ -44,10 +47,13 @@ resources.sheet "luvui" {
 }
 
 resources.sheet "aris" {
+	textures = {
+		icon = resources.texture "sheets/aris.png",
+	},
+
 	level = 1,
 	attacks = attacks,
 	speed = 12,
-	icon = resources.texture "aris.png",
 
 	on_consider = "std:basic",
 	nouns = {

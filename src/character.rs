@@ -387,7 +387,6 @@ impl mlua::UserData for Action {}
 
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct Sheet {
-	pub icon: Box<str>,
 	/// Note that this includes the character's name.
 	pub nouns: Nouns,
 

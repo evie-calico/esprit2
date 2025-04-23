@@ -168,7 +168,13 @@ pub(crate) fn characters(
 	for character in world_manager.characters.iter().map(|x| x.borrow()) {
 		canvas
 			.copy(
-				textures.get(&character.sheet.icon),
+				textures.get(
+					textures
+						.sheets
+						// TODO: Don't hard-code this.
+						.get("esprit:luvui")
+						.map_or("missingno", |x| &x.icon),
+				),
 				FRect::new(0.0, 0.0, PIECE_SIZE as f32, PIECE_SIZE as f32),
 				Some(FRect::new(
 					(character.x * ITILE_SIZE - camera.x - (IPIECE_SIZE - ITILE_SIZE) / 2) as f32,

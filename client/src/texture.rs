@@ -10,26 +10,28 @@ use std::path::PathBuf;
 
 /// Handles lazy loading of textures into memory and video memory.
 #[derive(Default)]
-pub struct TextureInfo<'texture> {
-	path: PathBuf,
+pub(crate) struct TextureInfo<'texture> {
+	pub(crate) path: PathBuf,
 
 	/// This is populated upon calling `get_texture`.
-	texture: OnceCell<Texture<'texture>>,
+	pub(crate) texture: OnceCell<Texture<'texture>>,
 	/// Unlike `texture`, this keeps a copy of the texture in memory,
 	/// so that further owned instances can be constructed as needed.
 	/// This isn't always necessary since usually owned textures are only
 	/// for modulation, but it can persist across scene changes unlike owned textures,
 	/// which avoids an uneccessary disk read.
-	image: OnceCell<Vec<u8>>,
+	pub(crate) image: OnceCell<Vec<u8>>,
 
 	/// Silence further error messages if any errors occur.
-	had_error: Cell<bool>,
+	pub(crate) had_error: Cell<bool>,
 }
 
 pub(crate) struct Manager<'texture> {
 	pub(crate) texture_creator: &'texture TextureCreator<WindowContext>,
 	pub(crate) textures: HashMap<Box<str>, TextureInfo<'texture>>,
 	pub(crate) missing_texture: Texture<'texture>,
+
+	pub(crate) sheets: HashMap<Box<str>, Sheet>,
 }
 
 impl<'texture> Manager<'texture> {
@@ -40,6 +42,8 @@ impl<'texture> Manager<'texture> {
 			missing_texture: texture_creator
 				.load_texture_bytes(include_bytes!("res/missing_texture.png"))
 				.expect("missing texture should never fail to load"),
+
+			sheets: HashMap::new(),
 		}
 	}
 
@@ -90,4 +94,10 @@ impl<'texture> Manager<'texture> {
 			.into_error()?;
 		self.texture_creator.load_texture_bytes(image).into_error()
 	}
+}
+
+// Texture fields for character sheets
+#[derive(Debug)]
+pub(crate) struct Sheet {
+	pub(crate) icon: Box<str>,
 }

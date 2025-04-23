@@ -156,7 +156,6 @@ fn sheet(table: mlua::Table) -> mlua::Result<character::Sheet> {
 	};
 
 	Ok(character::Sheet {
-		icon: table.get("icon")?,
 		nouns: table.get("nouns")?,
 		level: table.get("level")?,
 		experience: table.get::<Option<_>>("experience")?.unwrap_or_default(),
@@ -257,11 +256,11 @@ fn lib_searcher(
 }
 
 /// Organizes initialization scripts' resources.
-fn init<Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
+fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Result<()>>(
 	lua: &mlua::Lua,
 	name: &str,
 	directory: impl AsRef<Path>,
-	load: Load,
+	mut load: Load,
 ) -> Result<mlua::Table> {
 	fn recurse(directory: &Path, lua: &mlua::Lua) -> Result<()> {
 		for entry in fs::read_dir(directory)? {
@@ -281,21 +280,34 @@ fn init<Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 
 	let directory = directory.as_ref();
 
+	let lua_name = mlua::Value::String(lua.create_string(name)?);
+	let lua_directory = directory
+		.to_str()
+		.map(|x| lua.create_string(x))
+		.transpose()?
+		.map_or(mlua::Value::Nil, mlua::Value::String);
 	let resources = lua.load_from_function::<mlua::Table>(
 		"init.resources",
-		lua.create_function(|lua, ()| {
+		lua.create_function(move |lua, ()| {
 			lua.create_table_from([
 				("attack", lua.create_table()?),
 				("component", lua.create_table()?),
 				("sheet", lua.create_table()?),
 				("spell", lua.create_table()?),
 				("vault", lua.create_table()?),
+				(
+					"module",
+					lua.create_table_from([
+						(lua.create_string("name")?, lua_name.clone()),
+						(lua.create_string("path")?, lua_directory.clone()),
+					])?,
+				),
 			])
 		})?,
 	)?;
 	let init = directory.join("init/");
-	let init = || recurse(&init, lua);
-	let result = load(name, directory, &init);
+	let mut init = || recurse(&init, lua);
+	let result = load(name, directory, &mut init);
 	lua.unload("init.resources")?;
 	result?; // defer errors to hopefully unload init.resources?
 
@@ -323,7 +335,7 @@ fn produce(prototypes: &mlua::Table) -> Result<Manager, Vec<crate::Error>> {
 			($type:ident) => {
 				match prototypes.get::<mlua::Table>(stringify!($type)) {
 					Ok(table) => for i in table.pairs::<mlua::String, mlua::Table>() {
-						match i.and_then(|(id, table)| Ok((Box::from(id.to_str()?.as_ref()), $type(table)?))) {
+						match i.and_then(|(id, table)| Ok((Box::from(id.to_str()?.as_ref()), $type(table).context(concat!("while producing ", stringify!($type)))?))) {
 							Ok((id, product)) => {
 								if let Ok(products) = &mut products {
 									products.$type.0.insert(id, product.into());
@@ -349,10 +361,10 @@ pub struct FailedModule<'a> {
 	pub errors: Box<[crate::Error]>,
 }
 
-pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
+pub fn open<'a, Load: FnMut(&str, &Path, &mut dyn FnMut() -> Result<()>) -> Result<()>>(
 	lua: &mlua::Lua,
 	modules: impl IntoIterator<Item = &'a Path>,
-	load: Load,
+	mut load: Load,
 ) -> (Manager, Vec<FailedModule<'a>>) {
 	let mut manager = Manager::default();
 	// Inject hard-coded engine resources here.
@@ -401,7 +413,7 @@ pub fn open<'a, Load: Fn(&str, &Path, &dyn Fn() -> Result<()>) -> Result<()>>(
 
 	// Fill out dummy prototype fields.
 	for module in &mut preliminary_modules {
-		module.prototypes = init(lua, module.name, module.path, &load)
+		module.prototypes = init(lua, module.name, module.path, &mut load)
 			.map(|table| produce(&table).map(|x| (table, x)))
 			.unwrap_or_else(|e| Err(vec![e]));
 	}
