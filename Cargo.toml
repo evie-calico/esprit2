@@ -11,7 +11,7 @@ rkyv = "0.8.8"
 version = "0.10.1"
 features = [
   "luajit52", # jit for performance, 5.2 for __ipairs
-  "vendored", # necessary to ensure luajit is cocmpiled with the 5.2 flag.
+  "vendored", # necessary to ensure luajit is compiled with the 5.2 flag.
   "macros",
   "error-send",
   "userdata-wrappers", # for Rc, etc.
@@ -40,7 +40,7 @@ pest_derive = "2.7.10"
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
 mlua.workspace = true
 paste = "1.0.14" # Useful for proc macros
-rand = "0.8.5"
+rand = "0.9.1"
 rkyv.workspace = true
 thiserror = "2.0.3"
 tracing = "0.1.40"

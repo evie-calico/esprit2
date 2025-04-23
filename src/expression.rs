@@ -1,6 +1,5 @@
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
-use rand::Rng;
 // TODO: Return errors instead of printing them.
 use tracing::error;
 
@@ -21,7 +20,6 @@ pub enum Operation {
 	SubC(usize, Integer),
 	MulC(usize, Integer),
 	DivC(usize, Integer),
-	Roll(Integer, Integer),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -47,9 +45,6 @@ impl Operation {
 		match self {
 			Operation::Integer(i) => Ok(*i),
 			Operation::Variable(from, to) => variables.get(&equation.source[*from..*to]),
-			Operation::Roll(amount, die) => {
-				Ok((0..*amount).fold(0, |a, _| a + rand::thread_rng().gen_range(1..=*die)))
-			}
 			Operation::Add(a, b) => Ok(get_leaf(*a)? + get_leaf(*b)?),
 			Operation::Sub(a, b) => Ok(get_leaf(*a)? - get_leaf(*b)?),
 			Operation::Mul(a, b) => Ok(get_leaf(*a)? * get_leaf(*b)?),
@@ -156,19 +151,6 @@ impl TryFrom<String> for Expression {
 					Rule::identifier => {
 						let span = primary.as_span();
 						Operation::Variable(span.start(), span.end())
-					}
-					Rule::roll => {
-						let (amount, die) = primary
-							.as_str()
-							.split_once('d')
-							.expect("parser must return a string containing a 'd'");
-						Operation::Roll(
-							amount
-								.parse()
-								.expect("parser must return valid integer characters"),
-							die.parse()
-								.expect("parser must return valid integer characters"),
-						)
 					}
 					rule => unreachable!(
 						"Expr::parse expected terminal value, found {rule:?} ({})",

@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
+use super::soul::Soul;
 use crate::prelude::*;
 use esprit2::prelude::*;
 use rand::Rng;
@@ -21,9 +22,9 @@ pub(crate) struct SoulJar<'texture> {
 
 impl<'texture> SoulJar<'texture> {
 	pub(crate) fn new<T>(texture_creator: &'texture TextureCreator<T>) -> Self {
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 		let souls = (0..=9)
-			.map(|_| Soul::new((rng.gen(), rng.gen(), rng.gen(), 255)))
+			.map(|_| Soul::new((rng.random(), rng.random(), rng.random(), 255)))
 			.collect();
 		Self {
 			souls,
@@ -386,7 +387,8 @@ pub(crate) fn on_cloud(
 			f(&mut gui);
 			gui.advance(0, 4);
 			height_used = gui.y as u32;
-		});
+		})
+		.unwrap();
 	let target = Rect::new(
 		gui.x + radius as i32,
 		gui.y + radius as i32,

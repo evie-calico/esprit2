@@ -22,7 +22,6 @@ pub mod item;
 pub mod lua;
 pub mod nouns;
 pub mod resource;
-pub mod soul;
 pub mod spell;
 pub mod value;
 pub mod vault;
@@ -168,7 +167,6 @@ pub mod prelude {
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
-	pub use soul::Soul;
 	pub use spell::Spell;
 	pub use vault::Vault;
 
@@ -176,7 +174,6 @@ pub mod prelude {
 	pub use console::Handle;
 	pub use expression::Evaluate;
 	pub use nouns::StrExt;
-	pub use rand::Rng;
 
 	pub use tracing::{debug, error, info, warn};
 }

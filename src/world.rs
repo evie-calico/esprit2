@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use rand::{seq::SliceRandom, SeedableRng};
 use std::{collections::VecDeque, rc::Rc};
 
 /// This struct contains all information that is relevant during gameplay.
@@ -189,6 +188,9 @@ impl Manager {
 		set: &vault::Set,
 		resources: &resource::Manager,
 	) -> Result<()> {
+		use rand::seq::{IndexedRandom, SliceRandom};
+		use rand::SeedableRng;
+
 		const SEED_LENGTH: usize = 32;
 
 		let _enter = tracing::error_span!("level gen", seed).entered();

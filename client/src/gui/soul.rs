@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use rand::Rng;
 
 pub struct Soul {
 	pub color: Color,
@@ -20,11 +21,11 @@ pub struct Soul {
 
 impl Soul {
 	pub fn new(color: Color) -> Self {
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 		let mut new = Self {
 			color,
-			x: rng.gen(),
-			y: rng.gen(),
+			x: rng.random(),
+			y: rng.random(),
 
 			// None of these fields are final; the following function will fill them in.
 			x_offset: 0.0,
@@ -39,15 +40,15 @@ impl Soul {
 	}
 
 	pub fn speed_timer_timeout(&mut self) {
-		let mut rng = rand::thread_rng();
-		self.speed = rng.gen_range(0.5..1.0);
-		self.x_offset = rng.gen();
-		self.y_offset = rng.gen();
-		if rng.gen_range(0..100) < 20 {
-			self.path_position = rng.gen_range(0.0..100.0);
+		let mut rng = rand::rng();
+		self.speed = rng.random_range(0.5..1.0);
+		self.x_offset = rng.random();
+		self.y_offset = rng.random();
+		if rng.random_range(0..100) < 20 {
+			self.path_position = rng.random_range(0.0..100.0);
 		}
-		self.path_speed = rng.gen_range(0.5..1.0);
-		self.speed_timer = rng.gen_range(3.0..8.0);
+		self.path_speed = rng.random_range(0.5..1.0);
+		self.speed_timer = rng.random_range(3.0..8.0);
 	}
 
 	pub fn tick(&mut self, delta: f32) {

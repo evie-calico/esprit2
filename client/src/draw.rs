@@ -196,11 +196,11 @@ pub(crate) struct CloudState {
 
 impl Default for CloudState {
 	fn default() -> Self {
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 		Self {
 			timer: 0.0,
-			current_seed: rng.gen(),
-			next_seed: rng.gen(),
+			current_seed: rng.random(),
+			next_seed: rng.random(),
 		}
 	}
 }
@@ -216,7 +216,7 @@ impl CloudState {
 		self.timer += delta;
 		if self.timer > 1.0 {
 			self.current_seed = self.next_seed;
-			self.next_seed = rand::thread_rng().gen();
+			self.next_seed = rand::rng().random();
 			self.timer %= 1.0;
 		}
 	}

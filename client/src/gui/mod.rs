@@ -10,6 +10,7 @@ use sdl3::render::{Canvas, FRect, Texture};
 use sdl3::video::Window;
 use std::sync::OnceLock;
 
+mod soul;
 pub(crate) mod widget;
 
 const MINIMUM_NAMEPLATE_WIDTH: u32 = 100;
@@ -179,7 +180,7 @@ impl<'canvas> Context<'canvas> {
 		let mut font_system = font_system().write();
 		let mut buffer = Buffer::new(&mut font_system, Metrics::new(18.0, 20.0));
 		let mut buffer = buffer.borrow_with(&mut font_system);
-		buffer.set_text(s, Attrs::new(), cosmic_text::Shaping::Advanced);
+		buffer.set_text(s, &Attrs::new(), cosmic_text::Shaping::Advanced);
 		buffer.shape_until_scroll(true);
 		let mut swash_cache = swash_cache().write();
 		let mut advancement = (0, 0);

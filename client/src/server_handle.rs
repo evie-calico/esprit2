@@ -360,7 +360,8 @@ impl<'texture> ServerHandle<'texture> {
 					draw::tilemap(canvas, world, &camera);
 					draw::characters(canvas, world, &self.textures, &camera);
 					draw::cursor(canvas, input_mode, &self.textures, &camera);
-				});
+				})
+				.unwrap();
 
 			ctx.canvas
 				.copy(
