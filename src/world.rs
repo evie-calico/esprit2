@@ -122,8 +122,11 @@ impl Manager {
 		console.print_important(format!("Entering floor {}", self.location.floor));
 		self.current_floor = Floor::default();
 
-		self.characters
-			.retain(|x| self.party.iter().any(|y| x.as_ptr() == y.piece.as_ptr()));
+		self.characters.retain(|x| {
+			self.party
+				.iter()
+				.any(|y| std::ptr::eq(x.as_ptr(), y.piece.as_ptr()))
+		});
 
 		console.print_unimportant("You take some time to rest...");
 		for i in &self.characters {
@@ -375,7 +378,7 @@ impl Manager {
 					let mut dijkstra = astar::Floor::target(&[(target_x, target_y)]);
 					dijkstra.explore(x, y, |x, y, base| {
 						if let Some(character) = self.get_character_at(x, y)
-							&& character.as_ptr() != next_character.as_ptr()
+							&& !std::ptr::eq(character.as_ptr(), next_character.as_ptr())
 						{
 							return astar::IMPASSABLE;
 						}

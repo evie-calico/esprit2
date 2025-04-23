@@ -116,7 +116,7 @@ impl Ref {
 
 impl PartialEq for Ref {
 	fn eq(&self, other: &Self) -> bool {
-		self.as_ptr() == other.as_ptr()
+		std::ptr::eq(self.as_ptr(), other.as_ptr())
 	}
 }
 

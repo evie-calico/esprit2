@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "SDL")]
 
 use crate::prelude::*;
-use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, SwashCache};
+use cosmic_text::{Attrs, Buffer, FontSystem, Metrics, SwashCache};
 use esprit2::prelude::*;
 use parking_lot::RwLock;
 use sdl3::rect::Rect;

@@ -6,7 +6,6 @@ use esprit2::prelude::*;
 use esprit2_server::Error;
 use esprit2_server::*;
 use rkyv::util::AlignedVec;
-use std::mem::MaybeUninit;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::process::exit;
@@ -61,7 +60,7 @@ async fn main() {
 	.entered();
 
 	let mut instances = Box::new_uninit_slice(cli.instances as usize);
-	let instances: &mut [Option<Instance>] = MaybeUninit::fill_with(&mut instances, || None);
+	let instances: &mut [Option<Instance>] = instances.write_with(|_| None);
 	let mut clients = ClientParty::default();
 
 	info!("listening");
