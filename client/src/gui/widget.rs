@@ -149,12 +149,7 @@ pub(crate) fn spell_menu(
 			continue;
 		};
 
-		let (message, color) = match spell
-			.castable
-			.as_ref()
-			.and_then(|x| x.call::<Option<Box<str>>>(character.clone()).transpose())
-			.transpose()
-		{
+		let (message, color) = match spell.castable(character.clone()) {
 			Ok(None) => (
 				format!("({letter}) {} - {} SP", spell.name, spell.level),
 				(255, 255, 255, 255),

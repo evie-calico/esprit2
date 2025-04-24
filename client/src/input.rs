@@ -419,15 +419,24 @@ pub(crate) fn controllable_character(
 			if (0..=26).contains(&selected_index)
 				&& let Some(spell_id) = spell_id
 			{
-				Ok((
-					Mode::Normal,
-					Some(gather_spell_inputs(
-						resources,
-						lua,
-						spell_id,
-						world.next_character().clone(),
-					)?),
-				))
+				let spell = resources
+					.spell
+					.get(&spell_id)
+					.context("failed to retrieve spell")?;
+				let character = world.next_character().clone();
+				if spell.castable(character.clone())?.is_none() {
+					Ok((
+						Mode::Normal,
+						Some(gather_spell_inputs(
+							lua,
+							spell,
+							spell_id,
+							world.next_character().clone(),
+						)?),
+					))
+				} else {
+					Ok((Mode::Normal, None))
+				}
 			} else {
 				Ok((Mode::Normal, None))
 			}
@@ -517,15 +526,11 @@ fn gather_attack_inputs(
 }
 
 fn gather_spell_inputs(
-	resources: &resource::Manager,
 	lua: &mlua::Lua,
+	spell: &Spell,
 	spell_id: Box<str>,
 	next_character: character::Ref,
 ) -> anyhow::Result<Response> {
-	let spell = resources
-		.spell
-		.get(&spell_id)
-		.context("failed to retrieve spell")?;
 	lua.create_thread(spell.on_input.clone())
 		.and_then(|thread| {
 			PartialAction::Spell(spell_id, next_character.clone(), thread)

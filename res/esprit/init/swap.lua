@@ -22,6 +22,7 @@ resources.spell "swap" {
 
 	level = 4,
 
+	castable = spell.make_castable(4, affinity),
 	on_cast = function(user, spell, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)

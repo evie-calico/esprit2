@@ -402,12 +402,7 @@ impl Manager {
 		argument: Value,
 		console: impl console::Handle,
 	) -> mlua::Result<Option<u32>> {
-		if let Some(rejection_message) = spell
-			.castable
-			.as_ref()
-			.and_then(|x| x.call::<Option<Box<str>>>(user.clone()).transpose())
-			.transpose()?
-		{
+		if let Some(rejection_message) = spell.castable(user.clone())? {
 			console.print_system(rejection_message);
 			Ok(None)
 		} else {

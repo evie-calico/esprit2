@@ -7,6 +7,16 @@ spell.affinity = {
 	chaos = "chaos",
 }
 
+function spell.make_castable(cost, affinity)
+	return function(user)
+		if user.sp < cost then
+			return "not enough SP"
+		elseif not affinity:castable(user) then
+			return "improper skills to cast"
+		end
+	end
+end
+
 function spell.affinity.new(first, second)
 	if (first == spell.affinity.positive or first == spell.affinity.negative)
 		and (second == spell.affinity.positive or second == spell.affinity.negative)
@@ -27,19 +37,12 @@ function spell.affinity.new(first, second)
 	function affinity:castable(user)
 		local major = user:component("esprit:major")
 		local minor = user:component("esprit:minor")
-		if major ~= self.energy
-			and major ~= self.harmony
-			and minor ~= self.energy
-			and minor ~= self.harmony
-		then
-			return "improper skills to cast"
-		end
-	end
-
-	function affinity:make_castable()
-		return function(user)
-			self:castable(user)
-		end
+		return (
+			major == self.energy
+			or major == self.harmony
+			or minor == self.energy
+			or minor == self.harmony
+		)
 	end
 
 	function affinity:score(user)

@@ -15,7 +15,7 @@ resources.spell "magic_missile" {
 
 	level = 1,
 
-	castable = affinity:make_castable(),
+	castable = spell.make_castable(1, affinity),
 	on_cast = function(user, spell, args)
 		local combat = require "engine.combat"
 		local console = require "runtime.console"

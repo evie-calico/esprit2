@@ -1,3 +1,5 @@
+use crate::character;
+
 #[derive(Clone, Debug)]
 pub struct Spell {
 	pub name: Box<str>,
@@ -20,6 +22,15 @@ pub struct Spell {
 	/// When an on_consider script is about to be called, it's fed a list of characters that are potential targets for the spell.
 	pub on_consider: Option<mlua::Function>,
 	pub on_input: mlua::Function,
+}
+
+impl Spell {
+	pub fn castable(&self, user: character::Ref) -> mlua::Result<Option<Box<str>>> {
+		self.castable
+			.as_ref()
+			.and_then(|x| x.call::<Option<Box<str>>>(user).transpose())
+			.transpose()
+	}
 }
 
 impl mlua::UserData for Spell {

@@ -21,6 +21,7 @@ resources.spell "crush" {
 
 	level = 2,
 
+	castable = spell.make_castable(2, affinity),
 	on_cast = function(user, spell, args)
 		local console = require "runtime.console"
 		-- It would be nice to all some filters for *requesting* a list of characters,
