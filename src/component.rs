@@ -4,6 +4,7 @@ pub struct Component {
 	pub icon: Option<String>,
 	/// If `true`, the component should be displayed to the user on stat screens.
 	pub visible: bool,
+
 	/// Called any time the component is attached to a piece.
 	///
 	/// This function is called after the new component and value have been added,
@@ -20,14 +21,11 @@ pub struct Component {
 	/// detach may provide an "annotation", similar to attach.
 	/// This does nothing, but gets passed down to on_detach.
 	pub on_detach: Option<mlua::Function>,
+
 	/// Called any time a turn is taken.
 	///
 	/// Recieves the piece and the time the turn took as arguments.
 	pub on_turn: Option<mlua::Function>,
-	/// Called any time a piece "rests".
-	///
-	/// What this means is a little unclear but i previously used it whenever an exit was taken.
-	pub on_rest: Option<mlua::Function>,
 	/// Used to determine any deductions that need to be applied to the piece's stats.
 	///
 	/// Recieves only the component value as an argument, not the piece.

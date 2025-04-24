@@ -199,7 +199,6 @@ fn component(_id: &str, table: mlua::Table) -> anyhow::Result<component::Compone
 		on_attach: get!(table.on_attach)?,
 		on_detach: get!(table.on_detach)?,
 		on_turn: get!(table.on_turn)?,
-		on_rest: get!(table.on_rest)?,
 		on_debuff: get!(table.on_debuff)?,
 	})
 }
@@ -389,7 +388,6 @@ pub fn open<
 			on_attach: None,
 			on_detach: None,
 			on_turn: None,
-			on_rest: None,
 			on_debuff: None,
 		}
 		.into(),
