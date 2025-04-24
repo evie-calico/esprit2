@@ -291,16 +291,6 @@ pub struct Piece {
 	pub action_delay: Aut,
 }
 
-impl expression::Variables for Piece {
-	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
-		match s {
-			"hp" => Ok(self.hp as expression::Integer),
-			"sp" => Ok(self.sp as expression::Integer),
-			_ => self.sheet.get(s),
-		}
-	}
-}
-
 // Don't add stupid methods to this!
 // Anything useful should be operating on a Ref!!!
 impl Piece {
@@ -418,15 +408,6 @@ pub struct Sheet {
 	pub on_consider: Box<str>,
 }
 
-impl expression::Variables for Sheet {
-	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
-		match s {
-			"speed" => Ok(self.speed as expression::Integer),
-			_ => self.stats.get(s),
-		}
-	}
-}
-
 #[derive(
 	Clone, Copy, Debug, Default, mlua::FromLua, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize,
 )]
@@ -529,19 +510,5 @@ impl mlua::UserData for Stats {
 		fields.add_field_method_get("defense", |_, this| Ok(this.defense));
 		fields.add_field_method_get("magic", |_, this| Ok(this.magic));
 		fields.add_field_method_get("resistance", |_, this| Ok(this.resistance));
-	}
-}
-
-impl expression::Variables for Stats {
-	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
-		match s {
-			"heart" => Ok(self.heart as expression::Integer),
-			"soul" => Ok(self.soul as expression::Integer),
-			"power" => Ok(self.power as expression::Integer),
-			"defense" => Ok(self.defense as expression::Integer),
-			"magic" => Ok(self.magic as expression::Integer),
-			"resistance" => Ok(self.resistance as expression::Integer),
-			_ => Err(expression::Error::MissingVariable(s.into())),
-		}
 	}
 }

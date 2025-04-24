@@ -1,11 +1,11 @@
-local expression = require "engine.types.expression"
 local resources = require "std:resources"
 local team = require "std:team"
+
+local function magnitude(user) return user.power + 8 end
 
 resources.attack "bite" {
 	name = "Bite",
 	description = "Lowers your defense until your next turn.",
-	magnitude = expression "power + 8",
 	use_time = 12,
 
 	on_use = function(user, attack, args)
@@ -21,7 +21,7 @@ resources.attack "bite" {
 		-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 		-- Bite has high damage, but also a relatively high pierce threshold for a melee attack.
-		local damage, pierce_failed = combat.apply_pierce(4, attack.magnitude(user.stats) - target.stats.defense)
+		local damage, pierce_failed = combat.apply_pierce(4, magnitude(user) - target.stats.defense)
 
 		-- Biting requires you to get closer to the enemy, lowering your physical defense.
 		user:attach("esprit:close_combat")

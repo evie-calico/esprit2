@@ -154,7 +154,7 @@ impl serde::de::Visitor<'_> for KeyVisitor {
 	type Value = String;
 
 	fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-		formatter.write_str("a string containing an expression")
+		formatter.write_str("SDL3 keycode name")
 	}
 
 	fn visit_string<E>(self, value: String) -> Result<Self::Value, E>

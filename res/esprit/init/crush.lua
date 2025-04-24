@@ -1,6 +1,5 @@
 local combat = require "engine.combat"
 local world = require "engine.world"
-local expression = require "engine.types.expression"
 local log = require "engine.types.log"
 local resources = require "std:resources"
 

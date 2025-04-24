@@ -32,11 +32,6 @@ edition = "2021"
 workspace = true
 
 [dependencies]
-# Parser generator for expression.rs
-# this is keeping thiserror on v1, but master has updated it so pest should have a new release to fix this soon
-pest = "2.7.10"
-pest_derive = "2.7.10"
-
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
 mlua.workspace = true
 paste = "1.0.14" # Useful for proc macros

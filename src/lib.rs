@@ -16,7 +16,6 @@ pub mod combat;
 pub mod component;
 pub mod consider;
 pub mod console;
-pub mod expression;
 pub mod floor;
 pub mod item;
 pub mod lua;
@@ -150,7 +149,6 @@ pub mod prelude {
 	pub use attack::Attack;
 	pub use component::Component;
 	pub use consider::Consider;
-	pub use expression::Expression;
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
@@ -159,7 +157,6 @@ pub mod prelude {
 
 	// Export common traits
 	pub use console::Handle;
-	pub use expression::Evaluate;
 	pub use nouns::StrExt;
 
 	pub use tracing::{debug, error, info, warn};

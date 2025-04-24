@@ -140,7 +140,6 @@ fn attack(_id: &str, table: mlua::Table) -> mlua::Result<attack::Attack> {
 	Ok(attack::Attack {
 		name: table.get("name")?,
 		description: table.get("description")?,
-		magnitude: table.get("magnitude")?,
 		on_input: table.get("on_input")?,
 		on_use: table.get("on_use")?,
 		on_consider: table.get("on_consider")?,

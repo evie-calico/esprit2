@@ -86,12 +86,6 @@ pub fn init() -> Result<Lua> {
 		})?,
 	)?;
 	lua.load_from_function::<mlua::Value>(
-		"engine.types.expression",
-		lua.create_function(|lua, ()| {
-			lua.create_function(|_, s: String| Expression::try_from(s).map_err(Error::external))
-		})?,
-	)?;
-	lua.load_from_function::<mlua::Value>(
 		"engine.types.heuristic",
 		lua.create_function(heuristic)?,
 	)?;

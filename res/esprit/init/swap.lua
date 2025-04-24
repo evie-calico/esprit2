@@ -1,13 +1,12 @@
 local combat = require "engine.combat"
 local world = require "engine.world"
-local expression = require "engine.types.expression"
 local log = require "engine.types.log"
 local team = require "std:team"
 local resources = require "std:resources"
 
 -- Feel free to change this value as needed, it's set to an arbitrary value to test the resistance code.
 local function magnitude(user) return user.magic end
--- TODO: pick a good range value. expression ranges would allow this to vary based on magic, eg: magic / 2 (within 4 to 8)
+-- TODO: pick a good range value. maybe this should vary based on magic, eg: magic / 2 (within 4 to 8)
 local range = 8
 -- Long cast time to punish risky swaps
 local cast_time = 48

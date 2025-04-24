@@ -3,17 +3,18 @@ local world = require "engine.world"
 
 local action = require "engine.types.action"
 local consider = require "engine.types.consider"
-local expression = require "engine.types.expression"
 local heuristic = require "engine.types.heuristic"
 local log = require "engine.types.log"
 
 local resources = require "std:resources"
 local team = require "std:team"
 
+local function magnitude(user) return user.power + 4 end
+
 resources.attack "scratch" {
 	name = "Scratch",
 	description = "Causes a small amount of bleeding damage, which reduces defense.",
-	magnitude = expression "power + 4",
+
 	use_time = 12,
 
 	on_use = function(user, attack, args)
@@ -25,7 +26,7 @@ resources.attack "scratch" {
 		-- TODO: Since you can't request input in the middle of a script anymore, this needs to communicate a failure reason and prompt resubmission
 		-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
-		local damage, pierce_failed = combat.apply_pierce(1, attack.magnitude(user.stats) - target.stats.defense)
+		local damage, pierce_failed = combat.apply_pierce(1, magnitude(user) - target.stats.defense)
 
 		target.hp = target.hp - damage
 		if damage > 0 or pierce_failed then
@@ -69,10 +70,6 @@ resources.attack "scratch" {
 		return attack.use_time
 	end,
 	on_consider = function(user, attack_id, considerations)
-		local resources = require "runtime.resources"
-
-		local attack = resources:attack(attack_id)
-
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
 			if team.friendly(user, character) then
 				table.insert(
@@ -85,7 +82,7 @@ resources.attack "scratch" {
 						{
 							heuristic.damage(
 								character,
-								attack.magnitude(user.stats) - character.stats.defense
+								magnitude(user) - character.stats.defense
 							),
 							heuristic.debuff(character, 1)
 						}

@@ -20,10 +20,7 @@
 ---@field force_affinity fun(self, id: integer) Debugging utility, not for normal use.
 ---@field force_level fun(self) Debugging utility, not for normal use.
 
----@alias Expression fun(args: userdata|table<string, integer>): integer
-
 ---@class (exact) Attack: userdata
----@field magnitude Expression
 ---@field on_consider fun(user: Piece, id: string, considerations: [Consider])?
 ---@field use_time integer
 

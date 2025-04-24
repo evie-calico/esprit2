@@ -1,4 +1,3 @@
-local expression = require "engine.types.expression"
 local team = require "std:team"
 local resources = require "std:resources"
 
