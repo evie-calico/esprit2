@@ -163,13 +163,7 @@ fn sheet(id: &str, table: mlua::Table) -> mlua::Result<character::Sheet> {
 	Ok(character::Sheet {
 		id: id.into(),
 		nouns: table.get("nouns")?,
-		level: table.get("level")?,
-		experience: table.get::<Option<_>>("experience")?.unwrap_or_default(),
-		bases: stats(table.get("bases")?)?,
-		growths: stats(table.get("growths")?)?,
-		growth_bonuses: table
-			.get::<Option<_>>("growth_bonuses")?
-			.unwrap_or_default(),
+		stats: stats(table.get("stats")?)?,
 		skillset: table.get("skillset")?,
 		speed: table.get::<Option<_>>("speed")?.unwrap_or(TURN),
 		attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),

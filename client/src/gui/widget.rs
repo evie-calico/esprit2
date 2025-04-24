@@ -408,7 +408,7 @@ pub(crate) fn on_cloud(
 
 fn character_info(player_window: &mut gui::Context<'_>, piece: &character::Piece, lua: &mlua::Lua) {
 	let character::Piece {
-		sheet: character::Sheet { nouns, level, .. },
+		sheet: character::Sheet { nouns, .. },
 		hp,
 		sp,
 		..

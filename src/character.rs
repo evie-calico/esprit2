@@ -151,7 +151,6 @@ impl mlua::UserData for Ref {
 				$( set! { $field } )+
 			}
 		}
-		fields.add_field_method_get("level", |_, this| Ok(this.borrow().sheet.level));
 		fields.add_field_method_get("stats", |lua, this| {
 			this.borrow().stats(lua).map_err(mlua::Error::runtime)
 		});
@@ -202,11 +201,6 @@ impl mlua::UserData for Ref {
 				Ok(string.replace_prefixed_nouns(&this.borrow().sheet.nouns, &prefix))
 			},
 		);
-		methods.add_method("force_level", |_, this, ()| {
-			let level = &mut this.borrow_mut().sheet.level;
-			*level = level.saturating_add(1);
-			Ok(())
-		});
 		methods.add_method("force_affinity", force_affinity);
 		methods.add_method(
 			"attach",
@@ -311,9 +305,8 @@ impl expression::Variables for Piece {
 // Anything useful should be operating on a Ref!!!
 impl Piece {
 	pub fn new(sheet: Sheet) -> Self {
-		let stats = sheet.stats();
-		let hp = stats.heart as i32;
-		let sp = stats.soul as i32;
+		let hp = sheet.stats.heart as i32;
+		let sp = sheet.stats.soul as i32;
 
 		Self {
 			sheet,
@@ -354,13 +347,31 @@ impl Piece {
 			}
 		}
 
-		let mut stats = self.sheet.stats();
-		stats.heart = stats.heart.saturating_sub(debuffs.heart) + buffs.heart;
-		stats.soul = stats.soul.saturating_sub(debuffs.soul) + buffs.soul;
-		stats.power = stats.power.saturating_sub(debuffs.power) + buffs.power;
-		stats.defense = stats.defense.saturating_sub(debuffs.defense) + buffs.defense;
-		stats.magic = stats.magic.saturating_sub(debuffs.magic) + buffs.magic;
-		stats.resistance = stats.resistance.saturating_sub(debuffs.resistance) + buffs.resistance;
+		let mut stats = self.sheet.stats;
+		stats.heart = stats
+			.heart
+			.saturating_sub(debuffs.heart)
+			.saturating_add(buffs.heart);
+		stats.soul = stats
+			.soul
+			.saturating_sub(debuffs.soul)
+			.saturating_add(buffs.soul);
+		stats.power = stats
+			.power
+			.saturating_sub(debuffs.power)
+			.saturating_add(buffs.power);
+		stats.defense = stats
+			.defense
+			.saturating_sub(debuffs.defense)
+			.saturating_add(buffs.defense);
+		stats.magic = stats
+			.magic
+			.saturating_sub(debuffs.magic)
+			.saturating_add(buffs.magic);
+		stats.resistance = stats
+			.resistance
+			.saturating_sub(debuffs.resistance)
+			.saturating_add(buffs.resistance);
 
 		Ok(StatOutcomes {
 			stats,
@@ -395,12 +406,7 @@ pub struct Sheet {
 	/// Note that this includes the character's name.
 	pub nouns: Nouns,
 
-	pub level: u16,
-	pub experience: u32,
-
-	pub bases: Stats,
-	pub growths: Stats,
-	pub growth_bonuses: Stats,
+	pub stats: Stats,
 
 	pub skillset: spell::Skillset,
 	pub speed: Aut,
@@ -412,27 +418,11 @@ pub struct Sheet {
 	pub on_consider: Box<str>,
 }
 
-impl Sheet {
-	pub fn stats(&self) -> Stats {
-		const BONUS_WEIGHTS: Stats = Stats {
-			heart: 20,
-			soul: 20,
-			power: 10,
-			defense: 10,
-			magic: 10,
-			resistance: 10,
-		};
-
-		self.bases + (self.growths + self.growth_bonuses * BONUS_WEIGHTS) * self.level / 100
-	}
-}
-
 impl expression::Variables for Sheet {
 	fn get(&self, s: &str) -> Result<expression::Integer, expression::Error> {
 		match s {
-			"level" => Ok(self.level as expression::Integer),
 			"speed" => Ok(self.speed as expression::Integer),
-			_ => self.stats().get(s),
+			_ => self.stats.get(s),
 		}
 	}
 }
