@@ -18,9 +18,12 @@ resources.spell "debug/level_up" {
 		target:force_level();
 		console:print(target:replace_nouns("{Address}'s level increased to " .. target.level))
 	end,
-	on_input = require "esprit:input/single_target",
-
-	parameters = { range = 5 },
+	on_input = function(user)
+		local input = require "runtime.input"
+		return {
+			target = input.cursor(user.x, user.y, 5)
+		}
+	end,
 }
 
 resources.spell "debug/possess" {
@@ -45,9 +48,12 @@ resources.spell "debug/possess" {
 			target:detach(":conscious")
 		end
 	end,
-	on_input = require "esprit:input/single_target",
-
-	parameters = { range = 5 },
+	on_input = function(user)
+		local input = require "runtime.input"
+		return {
+			target = input.cursor(user.x, user.y, 5)
+		}
+	end,
 }
 
 resources.spell "debug/change_affinity" {
@@ -68,7 +74,7 @@ resources.spell "debug/change_affinity" {
 		target:force_affinity(args.id);
 		console:print(target:replace_nouns("{Address}'s affinity is now " .. args.name))
 	end,
-	on_input = function(user, this)
+	on_input = function(user)
 		local input = require "runtime.input"
 		local names = {
 			"Positive",
@@ -85,7 +91,7 @@ resources.spell "debug/change_affinity" {
 			"Order Negative",
 		}
 
-		local target = input.cursor(user.x, user.y, this.parameters.range)
+		local target = input.cursor(user.x, user.y, 5)
 		local is_energy = input.prompt("Major (Y: Energy, N: Harmony)")
 		local first_major = input.prompt(is_energy and "Energy (Y: Positive, N: Negative)" or
 			"Harmony (Y: Chaos, N: Order)")
@@ -102,6 +108,4 @@ resources.spell "debug/change_affinity" {
 			name = names[id + 1],
 		}
 	end,
-
-	parameters = { range = 5 },
 }

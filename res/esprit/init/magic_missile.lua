@@ -2,6 +2,11 @@ local expression = require "engine.types.expression"
 local team = require "std:team"
 local resources = require "std:resources"
 
+local function magnitude(user) return user.magic + 4 end
+local pierce_threshold = 2
+local range = 5
+local cast_time = 12
+
 resources.spell "magic_missile" {
 	name = "Magic Missile",
 	icon = resources.texture "magic_missile.png",
@@ -11,13 +16,6 @@ resources.spell "magic_missile" {
 	harmony = "order",
 
 	level = 1,
-
-	parameters = {
-		magnitude = expression "magic + 4",
-		pierce_threshold = 2,
-		range = 5,
-		cast_time = 12,
-	},
 
 	on_cast = function(user, spell, args)
 		local combat = require "engine.combat"
@@ -32,8 +30,8 @@ resources.spell "magic_missile" {
 		-- if combat.alliance_check(User, target) and not combat.alliance_prompt() then return end
 
 		local damage, pierce_failed = combat.apply_pierce(
-			spell.parameters.pierce_threshold --[[@as integer]],
-			spell:affinity(user):magnitude(spell.parameters.magnitude(user.stats)) - target.stats.resistance
+			pierce_threshold,
+			spell:affinity(user):magnitude(magnitude(user)) - target.stats.resistance
 		)
 
 		target.hp = target.hp - damage
@@ -83,7 +81,7 @@ resources.spell "magic_missile" {
 			console:combat_log(pick(damage_messages), log.Hit(damage))
 		end
 
-		return spell.parameters.cast_time
+		return cast_time
 	end,
 	on_consider = function(user, spell_id, considerations)
 		local resources = require "runtime.resources"
@@ -94,7 +92,7 @@ resources.spell "magic_missile" {
 
 		local spell = resources:spell(spell_id)
 
-		for _, character in ipairs(world.characters_within(user.x, user.y, spell.parameters.range --[[@as integer]])) do
+		for _, character in ipairs(world.characters_within(user.x, user.y, range)) do
 			if not team.friendly(user, character) then
 				table.insert(
 					considerations,
@@ -107,7 +105,7 @@ resources.spell "magic_missile" {
 							heuristic.damage(
 								character,
 								spell:affinity(user):magnitude(
-									spell.parameters.magnitude(user.stats)
+									magnitude(user)
 								) -
 								character.stats.resistance
 							),
@@ -117,5 +115,10 @@ resources.spell "magic_missile" {
 			end
 		end
 	end,
-	on_input = require "esprit:input/single_target",
+	on_input = function(user)
+		local input = require "runtime.input"
+		return {
+			target = input.cursor(user.x, user.y, range)
+		}
+	end,
 }

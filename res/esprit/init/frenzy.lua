@@ -18,9 +18,12 @@ resources.spell "debug/frenzy" {
 		console:print(target:replace_nouns("{Address} has been frenzied!"))
 		target:attach("esprit:frenzy", 2 * 12)
 	end,
-	on_input = require "esprit:input/single_target",
-
-	parameters = { range = 5 },
+	on_input = function(user)
+		local input = require "runtime.input"
+		return {
+			target = input.cursor(user.x, user.y, 5)
+		}
+	end,
 }
 
 ---@class Frenzy

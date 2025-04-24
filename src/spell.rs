@@ -74,11 +74,6 @@ pub struct Spell {
 	pub name: Box<str>,
 	pub description: Box<str>,
 	pub icon: Box<str>,
-	/// Configurable spell parameters.
-	///
-	/// These may be displayed to the user as information about the spell.
-	/// (in addition to its description)
-	pub parameters: mlua::Table,
 
 	/// Whether the spell concentrates or disperses energy.
 	pub energy: Energy,
@@ -97,8 +92,6 @@ pub struct Spell {
 	/// For a self-buff, this should roughly estimate the potential benefit of casting the spell.
 	///
 	/// When an on_consider script is about to be called, it's fed a list of characters that are potential targets for the spell.
-	/// If a spell parameter named "range" exists, the script will only be provided with characters within this range.
-	/// Otherwise, consideration scripts are expected to filter targets themselves.
 	pub on_consider: Option<mlua::Function>,
 	pub on_input: mlua::Function,
 }
@@ -107,7 +100,6 @@ impl mlua::UserData for Spell {
 	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
 		fields.add_field_method_get("level", |_, this| Ok(this.level));
 		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
-		fields.add_field_method_get("parameters", |_, this| Ok(this.parameters.clone()));
 	}
 
 	fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {

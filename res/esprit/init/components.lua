@@ -1,6 +1,10 @@
 local resources = require "std:resources"
 local stats = require "engine.types.stats"
 
+resources.component "level" {
+	name = "Level",
+}
+
 resources.component "bleed" {
 	name = "Bleeding",
 	visible = true,

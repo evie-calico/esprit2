@@ -180,7 +180,6 @@ fn spell(_id: &str, table: mlua::Table) -> mlua::Result<spell::Spell> {
 		on_input: table.get("on_input")?,
 		on_cast: table.get("on_cast")?,
 		on_consider: table.get("on_consider")?,
-		parameters: table.get("parameters")?,
 		energy: table.get("energy")?,
 		harmony: table.get("harmony")?,
 		level: table.get("level")?,

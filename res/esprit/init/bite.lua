@@ -89,5 +89,10 @@ resources.attack "bite" {
 			end
 		end
 	end,
-	on_input = require "esprit:input/melee",
+	on_input = function(user)
+		local input = require "runtime.input"
+		return {
+			target = input.cursor(user.x, user.y, 1, 0)
+		}
+	end,
 }

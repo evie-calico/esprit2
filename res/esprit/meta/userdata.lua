@@ -34,7 +34,6 @@
 ---@field on_input string
 ---@field use_time integer
 ---@field affinity fun(self, character: Piece): Affinity
----@field [string] integer|Expression Represents the contents of the spell's parameters field.
 
 ---@class (exact) Affinity: userdata
 ---@field magnitude fun(self, magnitude: integer): integer

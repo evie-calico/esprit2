@@ -4,6 +4,14 @@ local expression = require "engine.types.expression"
 local log = require "engine.types.log"
 local resources = require "std:resources"
 
+-- Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
+local function magnitude(user) return user.magic + 2 end
+local pierce_threshold = 2
+local range = 6        -- How far away the crush can be centered
+local radius = 4       -- How large the area is
+local displacement = 5 -- How far targets are moved
+local cast_time = 1
+
 resources.spell "crush" {
 	name = "Crush",
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
@@ -14,16 +22,6 @@ resources.spell "crush" {
 	harmony = "chaos",
 
 	level = 2,
-
-	parameters = {
-		-- Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
-		magnitude = expression "magic + 2",
-		pierce_threshold = 2,
-		range = 6,  -- How far away the crush can be centered
-		radius = 4, -- How large the area is
-		displacement = 5, -- How far targets are moved
-		cast_time = 12,
-	},
 
 	on_cast = function(user, spell, args)
 		local console = require "runtime.console"
@@ -53,9 +51,9 @@ resources.spell "crush" {
 		console:combat_log(user:replace_nouns(cast_messages[math.random(#cast_messages)]), log.Success);
 
 		for _, character in ipairs(characters) do
-			if math.abs(character.x - args.target.x) <= spell.parameters.radius and math.abs(character.y - args.target.y) <= spell.parameters.radius then
+			if math.abs(character.x - args.target.x) <= radius and math.abs(character.y - args.target.y) <= radius then
 				-- we'll start with a basic rightward movement.
-				for distance_traveled = 0, spell:affinity(user):magnitude(spell.parameters.displacement --[[@as integer]]) do
+				for distance_traveled = 0, spell:affinity(user):magnitude(displacement) do
 					local projected_x = character.x
 					local projected_y = character.y
 					if args.direction == "Left" then
@@ -78,8 +76,8 @@ resources.spell "crush" {
 						character.y = projected_y
 					else
 						local damage, pierce_failed = combat.apply_pierce(
-							spell.parameters.pierce_threshold --[[@as integer]],
-							spell:affinity(user):magnitude(spell.parameters.magnitude(user.stats)) +
+							pierce_threshold,
+							spell:affinity(user):magnitude(magnitude(user)) +
 							distance_traveled * 2 -
 							character.stats.resistance
 						)
@@ -112,13 +110,13 @@ resources.spell "crush" {
 
 		user.sp = user.sp - spell.level
 
-		return spell.parameters.cast_time
+		return cast_time
 	end,
 	-- TODO: on_consider
-	on_input = function(user, spell)
+	on_input = function(user)
 		local input = require "runtime.input"
 		return {
-			target = input.cursor(user.x, user.y, spell.parameters.range, spell.parameters.radius),
+			target = input.cursor(user.x, user.y, range, radius),
 			direction = input.direction("Crush in which direction?"),
 		}
 	end,
