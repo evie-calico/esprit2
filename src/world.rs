@@ -402,26 +402,21 @@ impl Manager {
 		argument: Value,
 		console: impl console::Handle,
 	) -> mlua::Result<Option<u32>> {
-		let castable = spell.castable_by(&user.borrow());
-		Ok(match castable {
-			spell::Castable::Yes => self.poll::<Option<Aut>>(
+		if let Some(rejection_message) = spell
+			.castable
+			.as_ref()
+			.and_then(|x| x.call::<Option<Box<str>>>(user.clone()).transpose())
+			.transpose()?
+		{
+			console.print_system(rejection_message);
+			Ok(None)
+		} else {
+			self.poll::<Option<Aut>>(
 				lua,
 				lua.create_thread(spell.on_cast.clone())?,
 				(user, spell, argument),
-			)?,
-			spell::Castable::NotEnoughSP => {
-				let message = format!("{{Address}} doesn't have enough SP to cast {}.", spell.name)
-					.replace_nouns(&user.borrow().sheet.nouns);
-				console.print_system(message);
-				None
-			}
-			spell::Castable::UncastableAffinity => {
-				let message = format!("{{Address}} has the wrong affinity to cast {}.", spell.name)
-					.replace_nouns(&user.borrow().sheet.nouns);
-				console.print_system(message);
-				None
-			}
-		})
+			)
+		}
 	}
 
 	pub fn attack(

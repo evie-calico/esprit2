@@ -59,13 +59,10 @@ resources.attack "bite" {
 		return 12
 	end,
 	on_consider = function(user, attack_id, considerations)
-		local resources = require "runtime.resources"
 		local world = require "engine.world"
 		local action = require "engine.types.action"
 		local consider = require "engine.types.consider"
 		local heuristic = require "engine.types.heuristic"
-
-		local attack = resources:attack(attack_id)
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
 			if not team.friendly(user, character) then
@@ -79,7 +76,7 @@ resources.attack "bite" {
 						{
 							heuristic.damage(
 								character,
-								attack.magnitude(user.stats) - character.stats.defense
+								magnitude(user) - character.stats.defense
 							),
 							-- Estimate the drawback of close combat
 							heuristic.debuff(user, 2)

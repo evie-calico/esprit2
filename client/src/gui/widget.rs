@@ -88,7 +88,7 @@ pub(crate) fn menu(
 		}
 		input::Mode::Cast => {
 			menu.label("Cast");
-			spell_menu(menu, &world_manager.next_character().borrow(), resources);
+			spell_menu(menu, world_manager.next_character(), resources);
 		}
 		input::Mode::Cursor(input::Cursor {
 			position: (x, y), ..
@@ -133,10 +133,11 @@ pub(crate) fn menu(
 
 pub(crate) fn spell_menu(
 	gui: &mut gui::Context,
-	character: &character::Piece,
+	character: &character::Ref,
 	resources: &resource::Manager,
 ) {
 	for (spell, letter) in character
+		.borrow()
 		.sheet
 		.spells
 		.iter()
@@ -147,15 +148,30 @@ pub(crate) fn spell_menu(
 			gui.label("<Missing Spell>");
 			continue;
 		};
-		let color = match spell.castable_by(character) {
-			spell::Castable::Yes => (255, 255, 255, 255),
-			spell::Castable::NotEnoughSP => (255, 0, 0, 255),
-			spell::Castable::UncastableAffinity => (128, 128, 128, 255),
+
+		let (message, color) = match spell
+			.castable
+			.as_ref()
+			.and_then(|x| x.call::<Option<Box<str>>>(character.clone()).transpose())
+			.transpose()
+		{
+			Ok(None) => (
+				format!("({letter}) {} - {} SP", spell.name, spell.level),
+				(255, 255, 255, 255),
+			),
+			Ok(Some(message)) => (
+				format!("({letter}) {} - {} SP ({message})", spell.name, spell.level),
+				(128, 128, 128, 255),
+			),
+			Err(_) => (
+				format!(
+					"({letter}) {} - {} SP (castability unknown due to script error)",
+					spell.name, spell.level
+				),
+				(255, 0, 0, 255),
+			),
 		};
-		gui.label_color(
-			&format!("({letter}) {} - {} SP", spell.name, spell.level),
-			color,
-		);
+		gui.label_color(&message, color);
 	}
 }
 

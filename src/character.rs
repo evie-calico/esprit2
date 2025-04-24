@@ -5,64 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// Used for debugging.
-fn force_affinity(_lua: &mlua::Lua, this: &Ref, index: u32) -> mlua::Result<()> {
-	this.borrow_mut().sheet.skillset = match index {
-		0 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Positive,
-			minor: None,
-		},
-		1 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Positive,
-			minor: Some(spell::Harmony::Chaos),
-		},
-		2 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Positive,
-			minor: Some(spell::Harmony::Order),
-		},
-		3 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Negative,
-			minor: None,
-		},
-		4 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Negative,
-			minor: Some(spell::Harmony::Chaos),
-		},
-		5 => spell::Skillset::EnergyMajor {
-			major: spell::Energy::Negative,
-			minor: Some(spell::Harmony::Order),
-		},
-		6 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Chaos,
-			minor: None,
-		},
-		7 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Chaos,
-			minor: Some(spell::Energy::Positive),
-		},
-		8 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Chaos,
-			minor: Some(spell::Energy::Negative),
-		},
-		9 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Order,
-			minor: None,
-		},
-		10 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Order,
-			minor: Some(spell::Energy::Positive),
-		},
-		11 => spell::Skillset::HarmonyMajor {
-			major: spell::Harmony::Order,
-			minor: Some(spell::Energy::Negative),
-		},
-		_ => {
-			return Err(mlua::Error::runtime("invalid affinity index"));
-		}
-	};
-	Ok(())
-}
-
 pub struct InlineRefCell;
 
 impl<F: rkyv::Archive> ArchiveWith<RefCell<F>> for InlineRefCell {
@@ -130,6 +72,7 @@ impl std::ops::Deref for Ref {
 	}
 }
 
+// TODO: Use `try_borrow(_mut)?` methods to catch immutability violations in scripts (such as spell's castable)
 impl mlua::UserData for Ref {
 	fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
 		macro_rules! get {
@@ -201,7 +144,6 @@ impl mlua::UserData for Ref {
 				Ok(string.replace_prefixed_nouns(&this.borrow().sheet.nouns, &prefix))
 			},
 		);
-		methods.add_method("force_affinity", force_affinity);
 		methods.add_method(
 			"attach",
 			|lua, this, (component_id, value): (Box<str>, Value)| {
@@ -222,7 +164,7 @@ impl mlua::UserData for Ref {
 			},
 		);
 		methods.add_method("component", |lua, this, component_id: mlua::String| {
-			this.borrow_mut()
+			this.borrow()
 				.components
 				.get(component_id.to_str()?.as_ref())
 				.map(|x| x.as_lua(lua))
@@ -398,7 +340,6 @@ pub struct Sheet {
 
 	pub stats: Stats,
 
-	pub skillset: spell::Skillset,
 	pub speed: Aut,
 
 	pub attacks: Vec<Box<str>>,

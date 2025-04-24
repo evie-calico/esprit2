@@ -2,6 +2,7 @@ local combat = require "engine.combat"
 local world = require "engine.world"
 local log = require "engine.types.log"
 local resources = require "std:resources"
+local spell = require "esprit:spell"
 
 -- Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
 local function magnitude(user) return user.stats.magic + 2 end
@@ -10,15 +11,13 @@ local range = 6        -- How far away the crush can be centered
 local radius = 4       -- How large the area is
 local displacement = 5 -- How far targets are moved
 local cast_time = 1
+-- This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
+local affinity = spell.affinity.new(spell.affinity.negative, spell.affinity.chaos)
 
 resources.spell "crush" {
 	name = "Crush",
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
 	icon = resources.texture "magic_missile.png",
-
-	-- This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
-	energy = "negative",
-	harmony = "chaos",
 
 	level = 2,
 
@@ -52,7 +51,7 @@ resources.spell "crush" {
 		for _, character in ipairs(characters) do
 			if math.abs(character.x - args.target.x) <= radius and math.abs(character.y - args.target.y) <= radius then
 				-- we'll start with a basic rightward movement.
-				for distance_traveled = 0, spell:affinity(user):magnitude(displacement) do
+				for distance_traveled = 0, affinity:magnitude(user, displacement) do
 					local projected_x = character.x
 					local projected_y = character.y
 					if args.direction == "Left" then
@@ -76,7 +75,7 @@ resources.spell "crush" {
 					else
 						local damage, pierce_failed = combat.apply_pierce(
 							pierce_threshold,
-							spell:affinity(user):magnitude(magnitude(user)) +
+							affinity:magnitude(user, magnitude(user)) +
 							distance_traveled * 2 -
 							character.stats.resistance
 						)

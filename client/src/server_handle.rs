@@ -99,7 +99,7 @@ impl<'texture> ServerHandle<'texture> {
 			.into_iter()
 			.flat_map(|x| <Box<[_]> as IntoIterator>::into_iter(x.errors).map(move |e| (x.name, e)))
 		{
-			error!(module, "{error}");
+			error!(module, "{error:?}");
 		}
 
 		let mut soul_jar = gui::widget::SoulJar::new(texture_manager.texture_creator);

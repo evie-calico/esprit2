@@ -1,21 +1,21 @@
 local team = require "std:team"
 local resources = require "std:resources"
+local spell = require "esprit:spell"
 
 local function magnitude(user) return user.stats.magic + 4 end
 local pierce_threshold = 2
 local range = 5
 local cast_time = 12
+local affinity = spell.affinity.new(spell.affinity.negative, spell.affinity.order)
 
 resources.spell "magic_missile" {
 	name = "Magic Missile",
 	icon = resources.texture "magic_missile.png",
 	description = "Constructs a searing ray of magical energy that can be fired at a target.",
 
-	energy = "negative",
-	harmony = "order",
-
 	level = 1,
 
+	castable = affinity:make_castable(),
 	on_cast = function(user, spell, args)
 		local combat = require "engine.combat"
 		local console = require "runtime.console"
@@ -30,7 +30,7 @@ resources.spell "magic_missile" {
 
 		local damage, pierce_failed = combat.apply_pierce(
 			pierce_threshold,
-			spell:affinity(user):magnitude(magnitude(user)) - target.stats.resistance
+			math.max(0, affinity:magnitude(user, magnitude(user)) - target.stats.resistance)
 		)
 
 		target.hp = target.hp - damage
@@ -71,7 +71,7 @@ resources.spell "magic_missile" {
 		if pierce_failed then
 			console:combat_log(pick(glancing_messages), log.Glance)
 		elseif damage == 0 then
-			if spell.affinity:weak() and math.random(0, 1) == 1 then
+			if affinity:weak(user) and math.random(0, 1) == 1 then
 				console:combat_log(pick(unskilled_messages), log.Miss)
 			else
 				console:combat_log(pick(failure_messages), log.Miss)
@@ -83,13 +83,10 @@ resources.spell "magic_missile" {
 		return cast_time
 	end,
 	on_consider = function(user, spell_id, considerations)
-		local resources = require "runtime.resources"
 		local world = require "engine.world"
 		local action = require "engine.types.action"
 		local consider = require "engine.types.consider"
 		local heuristic = require "engine.types.heuristic"
-
-		local spell = resources:spell(spell_id)
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, range)) do
 			if not team.friendly(user, character) then
@@ -103,10 +100,7 @@ resources.spell "magic_missile" {
 						{
 							heuristic.damage(
 								character,
-								spell:affinity(user):magnitude(
-									magnitude(user)
-								) -
-								character.stats.resistance
+								affinity:magnitude(user, magnitude(user)) - character.stats.resistance
 							),
 						}
 					)

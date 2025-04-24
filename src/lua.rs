@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use consider::Heuristic;
 use mlua::Function as F;
-use mlua::{chunk, AsChunk, Either, Error, Lua, Result};
+use mlua::{chunk, AsChunk, Error, Lua, Result};
 use paste::paste;
 
 macro_rules! make_lua_enum{
@@ -45,8 +45,6 @@ macro_rules! make_lua_enum{
     };
 }
 
-make_lua_enum! { spell::Energy: positive, | negative }
-make_lua_enum! { spell::Harmony: chaos, | order }
 make_lua_enum! { nouns::Pronouns: female, male, neutral, | object }
 
 impl mlua::FromLua for Nouns {
@@ -90,7 +88,6 @@ pub fn init() -> Result<Lua> {
 		lua.create_function(heuristic)?,
 	)?;
 	lua.load_from_function::<mlua::Value>("engine.types.log", lua.create_function(log)?)?;
-	lua.load_from_function::<mlua::Value>("engine.types.skillset", lua.create_function(skillset)?)?;
 	lua.load_from_function::<mlua::Value>("engine.types.stats", lua.create_function(stats)?)?;
 	Ok(lua)
 }
@@ -204,43 +201,6 @@ fn log(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	log.set("Glance", combat::Log::Glance)?;
 	log.set("Hit", F::wrap(|damage| Ok(combat::Log::Hit { damage })))?;
 	Ok(log)
-}
-
-type SkillsetArguments = (
-	mlua::Table,
-	Either<spell::Energy, spell::Harmony>,
-	Either<Option<spell::Energy>, Option<spell::Harmony>>,
-);
-
-fn skillset(lua: &Lua, _: ()) -> Result<mlua::Table> {
-	let skillset = lua.create_table()?;
-	skillset.set("chaos", spell::Harmony::Chaos)?;
-	skillset.set("order", spell::Harmony::Order)?;
-	skillset.set("positive", spell::Energy::Positive)?;
-	skillset.set("negative", spell::Energy::Negative)?;
-	let skillset_meta = lua.create_table()?;
-	skillset_meta.set(
-		"__call",
-		lua.create_function(|_, (_this, major, minor): SkillsetArguments| {
-			Ok(match (major, minor) {
-				(Either::Left(energy), Either::Right(harmony)) => spell::Skillset::EnergyMajor {
-					major: energy,
-					minor: harmony,
-				},
-				(Either::Right(harmony), Either::Left(energy)) => spell::Skillset::HarmonyMajor {
-					major: harmony,
-					minor: energy,
-				},
-				_ => {
-					return Err(Error::runtime(
-						"skillset arguments must not be of the same axis",
-					))
-				}
-			})
-		})?,
-	)?;
-	skillset.set_metatable(Some(skillset_meta));
-	Ok(skillset)
 }
 
 fn stats(lua: &Lua, _: ()) -> Result<mlua::Table> {

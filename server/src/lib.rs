@@ -118,7 +118,7 @@ impl Server {
 			.into_iter()
 			.flat_map(|x| <Box<[_]> as IntoIterator>::into_iter(x.errors).map(move |e| (x.name, e)))
 		{
-			error!(module, "{error}");
+			error!(module, "{error:?}");
 		}
 
 		// Create a piece for the player, and register it with the world manager.

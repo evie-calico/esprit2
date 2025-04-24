@@ -3,6 +3,7 @@ local world = require "engine.world"
 local log = require "engine.types.log"
 local team = require "std:team"
 local resources = require "std:resources"
+local spell = require "esprit:spell"
 
 -- Feel free to change this value as needed, it's set to an arbitrary value to test the resistance code.
 local function magnitude(user) return user.stats.magic end
@@ -10,16 +11,14 @@ local function magnitude(user) return user.stats.magic end
 local range = 8
 -- Long cast time to punish risky swaps
 local cast_time = 48
+-- This perfectly matches Luvui's affinity, making it a good early game spell for her.
+local affinity = spell.affinity.new(spell.affinity.positive, spell.affinity.chaos)
 
 resources.spell "swap" {
 	name = "Swap",
 	description = "Swaps the caster's position with the target. For non-allied targets, the spell must have a magnitude greater than the target's resistance.",
 	-- TODO: Swap icon
 	icon = resources.texture "magic_missile.png",
-
-	-- This perfectly matches Luvui's affinity, making it a good early game spell for her.
-	energy = "positive",
-	harmony = "chaos",
 
 	level = 4,
 
@@ -31,7 +30,7 @@ resources.spell "swap" {
 		user.sp = user.sp - spell.level
 
 		if not team.friendly(user, target)
-			and spell:affinity(user):magnitude(magnitude(user)) - target.stats.resistance <= 0
+			and affinity:magnitude(user, magnitude(user)) - target.stats.resistance <= 0
 		then
 			console:combat_log(
 				combat.format(user, target, "{target_Address} resisted {self_address}'s swap."),

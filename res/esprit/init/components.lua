@@ -5,6 +5,14 @@ resources.component "level" {
 	name = "Level",
 }
 
+resources.component "major" {
+	name = "Major Skill",
+}
+
+resources.component "minor" {
+	name = "Minor Skill",
+}
+
 resources.component "bleed" {
 	name = "Bleeding",
 	visible = true,

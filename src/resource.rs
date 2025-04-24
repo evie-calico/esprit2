@@ -43,7 +43,8 @@
 //! allowing custom modules to be loaded and unloaded around the "init" call.
 
 use crate::prelude::*;
-use mlua::{ErrorContext, FromLua};
+use anyhow::Context;
+use mlua::FromLua;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
@@ -136,69 +137,75 @@ impl mlua::UserData for Handle {
 	}
 }
 
-fn attack(_id: &str, table: mlua::Table) -> mlua::Result<attack::Attack> {
+macro_rules! get {
+	($table:ident.$field:ident) => {
+		$table
+			.get(stringify!($field))
+			.context(concat!("failed to retrieve ", stringify!($field)))
+	};
+}
+
+fn attack(_id: &str, table: mlua::Table) -> anyhow::Result<attack::Attack> {
 	Ok(attack::Attack {
-		name: table.get("name")?,
-		description: table.get("description")?,
-		on_input: table.get("on_input")?,
-		on_use: table.get("on_use")?,
-		on_consider: table.get("on_consider")?,
-		use_time: table.get("use_time")?,
+		name: get!(table.name)?,
+		description: get!(table.description)?,
+		on_input: get!(table.on_input)?,
+		on_use: get!(table.on_use)?,
+		on_consider: get!(table.on_consider)?,
+		use_time: get!(table.use_time)?,
 	})
 }
 
-fn sheet(id: &str, table: mlua::Table) -> mlua::Result<character::Sheet> {
-	let stats = |table: mlua::Table| -> mlua::Result<_> {
+fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
+	let stats = |table: mlua::Table| -> anyhow::Result<_> {
 		Ok(character::Stats {
-			heart: table.get("heart")?,
-			soul: table.get("soul")?,
-			power: table.get("power")?,
-			defense: table.get("defense")?,
-			magic: table.get("magic")?,
-			resistance: table.get("resistance")?,
+			heart: get!(table.heart)?,
+			soul: get!(table.soul)?,
+			power: get!(table.power)?,
+			defense: get!(table.defense)?,
+			magic: get!(table.magic)?,
+			resistance: get!(table.resistance)?,
 		})
 	};
 
 	Ok(character::Sheet {
 		id: id.into(),
-		nouns: table.get("nouns")?,
-		stats: stats(table.get("stats")?)?,
-		skillset: table.get("skillset")?,
+		nouns: get!(table.nouns)?,
+		stats: stats(get!(table.stats)?)?,
 		speed: table.get::<Option<_>>("speed")?.unwrap_or(TURN),
 		attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),
 		spells: table.get::<Option<_>>("spells")?.unwrap_or_default(),
-		on_consider: table.get("on_consider")?,
+		on_consider: get!(table.on_consider)?,
 	})
 }
 
-fn spell(_id: &str, table: mlua::Table) -> mlua::Result<spell::Spell> {
+fn spell(_id: &str, table: mlua::Table) -> anyhow::Result<spell::Spell> {
 	Ok(spell::Spell {
-		name: table.get("name")?,
-		icon: table.get("icon")?,
-		description: table.get("description")?,
-		on_input: table.get("on_input")?,
-		on_cast: table.get("on_cast")?,
-		on_consider: table.get("on_consider")?,
-		energy: table.get("energy")?,
-		harmony: table.get("harmony")?,
-		level: table.get("level")?,
+		name: get!(table.name)?,
+		icon: get!(table.icon)?,
+		description: get!(table.description)?,
+		castable: get!(table.castable)?,
+		on_input: get!(table.on_input)?,
+		on_cast: get!(table.on_cast)?,
+		on_consider: get!(table.on_consider)?,
+		level: get!(table.level)?,
 	})
 }
 
-fn component(_id: &str, table: mlua::Table) -> mlua::Result<component::Component> {
+fn component(_id: &str, table: mlua::Table) -> anyhow::Result<component::Component> {
 	Ok(component::Component {
-		name: table.get("name")?,
-		icon: table.get("icon")?,
+		name: get!(table.name)?,
+		icon: get!(table.icon)?,
 		visible: table.get::<Option<bool>>("visible")?.unwrap_or_default(),
-		on_attach: table.get("on_attach")?,
-		on_detach: table.get("on_detach")?,
-		on_turn: table.get("on_turn")?,
-		on_rest: table.get("on_rest")?,
-		on_debuff: table.get("on_debuff")?,
+		on_attach: get!(table.on_attach)?,
+		on_detach: get!(table.on_detach)?,
+		on_turn: get!(table.on_turn)?,
+		on_rest: get!(table.on_rest)?,
+		on_debuff: get!(table.on_debuff)?,
 	})
 }
 
-fn vault(_id: &str, table: mlua::Table) -> mlua::Result<vault::Vault> {
+fn vault(_id: &str, table: mlua::Table) -> anyhow::Result<vault::Vault> {
 	let source = table.get::<mlua::String>(1)?;
 	let source = source.to_str()?;
 	let source = source.as_ref();
@@ -221,7 +228,7 @@ fn vault(_id: &str, table: mlua::Table) -> mlua::Result<vault::Vault> {
 			})
 		})
 		.collect::<mlua::Result<Box<[(char, vault::SymbolMeaning)]>>>()?;
-	vault::Vault::parse(source, symbols.iter()).map_err(mlua::Error::external)
+	Ok(vault::Vault::parse(source, symbols.iter())?)
 }
 
 fn lib_searcher(
@@ -237,9 +244,10 @@ fn lib_searcher(
 			let mut directory = directory.join("lib");
 			directory.push(path);
 			directory.set_extension("lua");
-			let chunk = fs::read_to_string(&directory)
-				.map_err(mlua::Error::external)
-				.with_context(|_| format!("while loading {}", directory.display()))?;
+			let chunk = mlua::ErrorContext::with_context(
+				fs::read_to_string(&directory).map_err(mlua::Error::external),
+				|_| format!("while loading {}", directory.display()),
+			)?;
 			Ok(mlua::Value::Function(
 				lua.load(chunk)
 					.set_name(format!("@{}", directory.display()))
@@ -254,13 +262,13 @@ fn lib_searcher(
 }
 
 /// Organizes initialization scripts' resources.
-fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> mlua::Result<()>) -> mlua::Result<()>>(
+fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyhow::Result<()>>(
 	lua: &mlua::Lua,
 	name: &str,
 	directory: impl AsRef<Path>,
 	mut load: Load,
-) -> mlua::Result<mlua::Table> {
-	fn recurse(directory: &Path, lua: &mlua::Lua) -> mlua::Result<()> {
+) -> anyhow::Result<mlua::Table> {
+	fn recurse(directory: &Path, lua: &mlua::Lua) -> anyhow::Result<()> {
 		for entry in fs::read_dir(directory)? {
 			let entry = entry?;
 			let path = entry.path();
@@ -315,12 +323,12 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> mlua::Result<()>) -> mlua::
 struct PreliminaryModule<'a> {
 	name: &'a str,
 	path: &'a Path,
-	prototypes: Result<(mlua::Table, Manager), Vec<mlua::Error>>,
+	prototypes: Result<(mlua::Table, Manager), Vec<anyhow::Error>>,
 }
 
-fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<mlua::Error>> {
+fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<anyhow::Error>> {
 	let mut products = Ok(Manager::default());
-	let append_err = |errors: Result<Manager, Vec<mlua::Error>>, e| {
+	let append_err = |errors: Result<Manager, Vec<anyhow::Error>>, e: anyhow::Error| {
 		Err(match errors {
 			Ok(_) => vec![e],
 			Err(mut errors) => {
@@ -331,11 +339,11 @@ fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<mlua::Er
 	};
 	macro_rules! produce {
 			($type:ident) => {
-				match prototypes.get::<mlua::Table>(stringify!($type)) {
+				match prototypes.get::<mlua::Table>(stringify!($type)).context(concat!("missing ", stringify!($type), " prototypes")) {
 					Ok(table) => for i in table.pairs::<mlua::String, mlua::Table>() {
-						match i.and_then(|(id, table)| {
+						match i.context("failed to read resource prototype").and_then(|(id, table)| {
 							let id = format!("{name}:{}", id.to_str()?.as_ref()).into_boxed_str();
-							let resource = $type(&id, table).context(concat!("while producing ", stringify!($type)))?;
+							let resource = $type(&id, table).with_context(|| format!("failed to produce {} \"{id}\"", stringify!($type)))?;
 							Ok((id, resource))
 						}) {
 							Ok((id, product)) => {
@@ -360,12 +368,12 @@ fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<mlua::Er
 
 pub struct FailedModule<'a> {
 	pub name: &'a str,
-	pub errors: Box<[mlua::Error]>,
+	pub errors: Box<[anyhow::Error]>,
 }
 
 pub fn open<
 	'a,
-	Load: FnMut(&str, &Path, &mut dyn FnMut() -> mlua::Result<()>) -> mlua::Result<()>,
+	Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyhow::Result<()>,
 >(
 	lua: &mlua::Lua,
 	modules: impl IntoIterator<Item = &'a Path>,
@@ -403,7 +411,7 @@ pub fn open<
 		.collect::<Vec<PreliminaryModule>>();
 
 	// Register modules with lua's `require` function.
-	mlua::Result::<()>::expect(
+	anyhow::Result::<()>::expect(
 		try {
 			let package = lua.globals().get::<mlua::Table>("package")?;
 			let loaders = lua.create_sequence_from(
