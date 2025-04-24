@@ -286,7 +286,7 @@ pub fn instance(
 						Ok(true) => (),
 						Ok(false) => break,
 						Err(msg) => {
-							error!("server world tick failed: {msg}");
+							error!("server world tick failed: {msg:?}");
 							break 'server;
 						}
 					}

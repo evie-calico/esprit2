@@ -1,7 +1,7 @@
 local team = require "std:team"
 local resources = require "std:resources"
 
-local function magnitude(user) return user.magic + 4 end
+local function magnitude(user) return user.stats.magic + 4 end
 local pierce_threshold = 2
 local range = 5
 local cast_time = 12

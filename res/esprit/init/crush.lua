@@ -4,7 +4,7 @@ local log = require "engine.types.log"
 local resources = require "std:resources"
 
 -- Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
-local function magnitude(user) return user.magic + 2 end
+local function magnitude(user) return user.stats.magic + 2 end
 local pierce_threshold = 2
 local range = 6        -- How far away the crush can be centered
 local radius = 4       -- How large the area is

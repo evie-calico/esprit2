@@ -1,7 +1,7 @@
 local resources = require "std:resources"
 local team = require "std:team"
 
-local function magnitude(user) return user.power + 8 end
+local function magnitude(user) return user.stats.power + 8 end
 
 resources.attack "bite" {
 	name = "Bite",

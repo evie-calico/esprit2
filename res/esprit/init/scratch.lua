@@ -9,7 +9,7 @@ local log = require "engine.types.log"
 local resources = require "std:resources"
 local team = require "std:team"
 
-local function magnitude(user) return user.power + 4 end
+local function magnitude(user) return user.stats.power + 4 end
 
 resources.attack "scratch" {
 	name = "Scratch",
