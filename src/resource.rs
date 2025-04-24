@@ -172,7 +172,6 @@ fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
 		id: id.into(),
 		nouns: get!(table.nouns)?,
 		stats: stats(get!(table.stats)?)?,
-		speed: table.get::<Option<_>>("speed")?.unwrap_or(TURN),
 		attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),
 		spells: table.get::<Option<_>>("spells")?.unwrap_or_default(),
 		on_consider: get!(table.on_consider)?,

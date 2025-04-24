@@ -30,7 +30,6 @@ resources.sheet "luvui" {
 		"esprit:debug/possess",
 		"esprit:debug/frenzy"
 	},
-	speed = 12,
 
 	on_consider = "std:basic",
 	nouns = {
@@ -67,7 +66,6 @@ resources.sheet "aris" {
 	},
 
 	attacks = attacks,
-	speed = 12,
 
 	on_consider = "std:basic",
 	nouns = {

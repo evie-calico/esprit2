@@ -340,8 +340,6 @@ pub struct Sheet {
 
 	pub stats: Stats,
 
-	pub speed: Aut,
-
 	pub attacks: Vec<Box<str>>,
 	pub spells: Vec<Box<str>>,
 
