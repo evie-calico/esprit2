@@ -86,8 +86,8 @@ pub(crate) fn menu(
 			menu.label("Attack");
 			attack_menu(menu, &world_manager.next_character().borrow(), resources);
 		}
-		input::Mode::Cast => {
-			menu.label("Cast");
+		input::Mode::Act => {
+			menu.label("Act");
 			ability_menu(menu, world_manager.next_character(), resources);
 		}
 		input::Mode::Cursor(input::Cursor {
@@ -149,12 +149,12 @@ pub(crate) fn ability_menu(
 			continue;
 		};
 
-		let castability = ability.usable(character.clone());
-		let (uncastable_reason, color) = match &castability {
+		let usability = ability.usable(character.clone());
+		let (unusable_reason, color) = match &usability {
 			Ok(None) => (None, (255, 255, 255, 255)),
 			Ok(Some(message)) => (Some(&**message), (128, 128, 128, 255)),
 			Err(_) => (
-				Some("castability unknown due to script error"),
+				Some("usability unknown due to script error"),
 				(255, 0, 0, 255),
 			),
 		};
@@ -167,9 +167,9 @@ pub(crate) fn ability_menu(
 			gui.label_color(usage, color);
 		}
 		gui.x = gui.x.max(256);
-		if let Some(uncastable_reason) = uncastable_reason {
+		if let Some(unusable_reason) = unusable_reason {
 			gui.label_color(" (", color);
-			gui.label_color(uncastable_reason, color);
+			gui.label_color(unusable_reason, color);
 			gui.label_color(")", color);
 		}
 		gui.vertical();

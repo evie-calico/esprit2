@@ -185,9 +185,9 @@ fn ability(_id: &str, table: mlua::Table) -> anyhow::Result<ability::Ability> {
 		name: get!(table.name)?,
 		usage: get!(table.usage)?,
 		description: get!(table.description)?,
-		usable: get!(table.castable)?,
+		usable: get!(table.usable)?,
 		on_input: get!(table.on_input)?,
-		on_use: get!(table.on_cast)?,
+		on_use: get!(table.on_use)?,
 		on_consider: get!(table.on_consider)?,
 	})
 }

@@ -231,7 +231,7 @@ pub(crate) struct Controls {
 	pub(crate) autocombat: Triggers,
 	pub(crate) select: Triggers,
 	pub(crate) attack: Triggers,
-	pub(crate) cast: Triggers,
+	pub(crate) act: Triggers,
 	pub(crate) underfoot: Triggers,
 
 	pub(crate) yes: Triggers,
@@ -260,7 +260,7 @@ impl Default for Controls {
 			autocombat: Triggers(vec![Key(K::Tab)]),
 			select: Triggers(vec![Key(K::F)]),
 			attack: Triggers(vec![Key(K::V)]),
-			cast: Triggers(vec![Key(K::C)]),
+			act: Triggers(vec![Key(K::C)]),
 			underfoot: Triggers(vec![Key(K::Period)]),
 
 			yes: Triggers(vec![Key(K::Y)]),

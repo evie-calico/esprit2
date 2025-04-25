@@ -15,8 +15,8 @@ resources.ability "magic_missile" {
 	icon = resources.texture "magic_missile.png",
 	description = "Constructs a searing ray of magical energy that can be fired at a target.",
 
-	castable = ability.spell.make_castable(1, affinity),
-	on_cast = function(user, _, args)
+	usable = ability.spell.make_castable(1, affinity),
+	on_use = function(user, _, args)
 		local combat = require "engine.combat"
 		local console = require "runtime.console"
 		local world = require "engine.world"
@@ -93,7 +93,7 @@ resources.ability "magic_missile" {
 				table.insert(
 					considerations,
 					consider(
-						action.cast(
+						action.act(
 							spell_id,
 							{ target = { x = character.x, y = character.y } }
 						),

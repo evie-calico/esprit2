@@ -22,8 +22,8 @@ resources.ability "swap" {
 	-- TODO: Swap icon
 	icon = resources.texture "magic_missile.png",
 
-	castable = ability.spell.make_castable(4, affinity),
-	on_cast = function(user, _, args)
+	usable = ability.spell.make_castable(4, affinity),
+	on_use = function(user, _, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end

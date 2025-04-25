@@ -245,7 +245,7 @@ pub(crate) enum Mode {
 	// Select modes
 	Select,
 	Attack,
-	Cast,
+	Act,
 	// Prompt modes
 	Cursor(Cursor),
 	Prompt(Prompt),
@@ -314,8 +314,8 @@ pub(crate) fn controllable_character(
 				}
 			}
 
-			if options.controls.cast.contains(keycode) {
-				return Ok((Mode::Cast, None));
+			if options.controls.act.contains(keycode) {
+				return Ok((Mode::Act, None));
 			}
 
 			if options.controls.attack.contains(keycode) {
@@ -402,7 +402,7 @@ pub(crate) fn controllable_character(
 				Ok((Mode::Normal, None))
 			}
 		}
-		Mode::Cast => {
+		Mode::Act => {
 			if options.controls.escape.contains(keycode) {
 				return Ok((Mode::Normal, None));
 			}

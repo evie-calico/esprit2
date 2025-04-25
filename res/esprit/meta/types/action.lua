@@ -23,6 +23,6 @@ function action.attack(attack, args) end
 ---@param move string
 ---@param args Value
 ---@return Action
-function action.cast(move, args) end
+function action.act(move, args) end
 
 return action

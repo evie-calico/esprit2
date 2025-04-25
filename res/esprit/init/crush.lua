@@ -21,8 +21,8 @@ resources.ability "crush" {
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
 	icon = resources.texture "magic_missile.png",
 
-	castable = ability.spell.make_castable(2, affinity),
-	on_cast = function(user, _, args)
+	usable = ability.spell.make_castable(2, affinity),
+	on_use = function(user, _, args)
 		local console = require "runtime.console"
 		-- It would be nice to all some filters for *requesting* a list of characters,
 		-- (sort of like yielding a Cursor ActionRequest) with some sort of query language

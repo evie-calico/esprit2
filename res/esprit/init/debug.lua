@@ -10,7 +10,7 @@ resources.ability "debug/level_up" {
 
 	level = 0,
 
-	on_cast = function(_, _, args)
+	on_use = function(_, _, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
@@ -34,7 +34,7 @@ resources.ability "debug/possess" {
 
 	level = 0,
 
-	on_cast = function(_, _, args)
+	on_use = function(_, _, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
@@ -62,7 +62,7 @@ resources.ability "debug/change_affinity" {
 
 	level = 0,
 
-	on_cast = function(_, _, args)
+	on_use = function(_, _, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end

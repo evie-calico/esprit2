@@ -354,7 +354,7 @@ impl Manager {
 				next_character,
 				arguments,
 			)?,
-			character::Action::Ability(ability, arguments) => self.cast(
+			character::Action::Ability(ability, arguments) => self.act(
 				resources
 					.ability
 					.get(&ability)
@@ -394,7 +394,7 @@ impl Manager {
 		Ok(())
 	}
 
-	fn cast(
+	fn act(
 		&mut self,
 		ability: Rc<Ability>,
 		user: character::Ref,
