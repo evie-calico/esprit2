@@ -7,13 +7,13 @@ local pierce_threshold = 2
 local range = 5
 local cast_time = 12
 local affinity = spell.affinity.new(spell.affinity.negative, spell.affinity.order)
+local level = 1
 
 resources.spell "magic_missile" {
 	name = "Magic Missile",
+	usage = spell.sp_usage(level),
 	icon = resources.texture "magic_missile.png",
 	description = "Constructs a searing ray of magical energy that can be fired at a target.",
-
-	level = 1,
 
 	castable = spell.make_castable(1, affinity),
 	on_cast = function(user, spell, args)

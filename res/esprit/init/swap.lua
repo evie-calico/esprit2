@@ -13,14 +13,14 @@ local range = 8
 local cast_time = 48
 -- This perfectly matches Luvui's affinity, making it a good early game spell for her.
 local affinity = spell.affinity.new(spell.affinity.positive, spell.affinity.chaos)
+local level = 4
 
 resources.spell "swap" {
 	name = "Swap",
+	usage = spell.sp_usage(level),
 	description = "Swaps the caster's position with the target. For non-allied targets, the spell must have a magnitude greater than the target's resistance.",
 	-- TODO: Swap icon
 	icon = resources.texture "magic_missile.png",
-
-	level = 4,
 
 	castable = spell.make_castable(4, affinity),
 	on_cast = function(user, spell, args)

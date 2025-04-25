@@ -7,6 +7,10 @@ spell.affinity = {
 	chaos = "chaos",
 }
 
+function spell.sp_usage(cost)
+	return "-" .. cost .. " SP"
+end
+
 function spell.make_castable(cost, affinity)
 	return function(user)
 		if user.sp < cost then

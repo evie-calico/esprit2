@@ -3,11 +3,8 @@ use crate::character;
 #[derive(Clone, Debug)]
 pub struct Spell {
 	pub name: Box<str>,
-	pub description: Box<str>,
-	pub icon: Box<str>,
-
-	/// This is also the cost of the spell.
-	pub level: u8,
+	pub usage: Option<Box<str>>,
+	pub description: Option<Box<str>>,
 
 	/// Whether or not the function can be casted by a given piece.
 	pub castable: Option<mlua::Function>,
@@ -35,7 +32,6 @@ impl Spell {
 
 impl mlua::UserData for Spell {
 	fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
-		fields.add_field_method_get("level", |_, this| Ok(this.level));
 		fields.add_field_method_get("on_consider", |_, this| Ok(this.on_consider.clone()));
 	}
 }

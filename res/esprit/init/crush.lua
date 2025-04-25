@@ -13,13 +13,13 @@ local displacement = 5 -- How far targets are moved
 local cast_time = 1
 -- This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
 local affinity = spell.affinity.new(spell.affinity.negative, spell.affinity.chaos)
+local level = 2
 
 resources.spell "crush" {
 	name = "Crush",
+	usage = spell.sp_usage(level),
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
 	icon = resources.texture "magic_missile.png",
-
-	level = 2,
 
 	castable = spell.make_castable(2, affinity),
 	on_cast = function(user, spell, args)

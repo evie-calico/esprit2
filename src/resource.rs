@@ -181,13 +181,12 @@ fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
 fn spell(_id: &str, table: mlua::Table) -> anyhow::Result<spell::Spell> {
 	Ok(spell::Spell {
 		name: get!(table.name)?,
-		icon: get!(table.icon)?,
+		usage: get!(table.usage)?,
 		description: get!(table.description)?,
 		castable: get!(table.castable)?,
 		on_input: get!(table.on_input)?,
 		on_cast: get!(table.on_cast)?,
 		on_consider: get!(table.on_consider)?,
-		level: get!(table.level)?,
 	})
 }
 

@@ -3,7 +3,8 @@ local resources = require "std:resources"
 local spell = require "esprit:spell"
 
 resources.spell "debug/level_up" {
-	name = "(DEBUG) Level Up",
+	name = "Level Up",
+	usage = "debug",
 	description = "Causes the targeted character to gain a level.",
 	icon = resources.texture "dummy.png",
 
@@ -26,7 +27,8 @@ resources.spell "debug/level_up" {
 }
 
 resources.spell "debug/possess" {
-	name = "(DEBUG) Possess",
+	name = "Possess",
+	usage = "debug",
 	description = "Makes the targetted piece controllable by the user of this spell. Removes consciousness if it's already present.",
 	icon = resources.texture "dummy.png",
 
@@ -53,7 +55,8 @@ resources.spell "debug/possess" {
 }
 
 resources.spell "debug/change_affinity" {
-	name = "(DEBUG) Change Affinity",
+	name = "Change Affinity",
+	usage = "debug",
 	description = "Changes the target's magical affinity",
 	icon = resources.texture "dummy.png",
 

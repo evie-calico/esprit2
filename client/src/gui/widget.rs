@@ -149,24 +149,30 @@ pub(crate) fn spell_menu(
 			continue;
 		};
 
-		let (message, color) = match spell.castable(character.clone()) {
-			Ok(None) => (
-				format!("({letter}) {} - {} SP", spell.name, spell.level),
-				(255, 255, 255, 255),
-			),
-			Ok(Some(message)) => (
-				format!("({letter}) {} - {} SP ({message})", spell.name, spell.level),
-				(128, 128, 128, 255),
-			),
+		let castability = spell.castable(character.clone());
+		let (uncastable_reason, color) = match &castability {
+			Ok(None) => (None, (255, 255, 255, 255)),
+			Ok(Some(message)) => (Some(&**message), (128, 128, 128, 255)),
 			Err(_) => (
-				format!(
-					"({letter}) {} - {} SP (castability unknown due to script error)",
-					spell.name, spell.level
-				),
+				Some("castability unknown due to script error"),
 				(255, 0, 0, 255),
 			),
 		};
-		gui.label_color(&message, color);
+		gui.horizontal();
+		gui.label_color(&format!("( {letter} ) "), color);
+		gui.x = gui.x.max(64);
+		gui.label_color(&spell.name, color);
+		if let Some(usage) = &spell.usage {
+			gui.label_color(" - ", color);
+			gui.label_color(usage, color);
+		}
+		gui.x = gui.x.max(256);
+		if let Some(uncastable_reason) = uncastable_reason {
+			gui.label_color(" (", color);
+			gui.label_color(uncastable_reason, color);
+			gui.label_color(")", color);
+		}
+		gui.vertical();
 	}
 }
 

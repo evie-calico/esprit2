@@ -2,7 +2,8 @@ local world = require "engine.world"
 local resources = require "std:resources"
 
 resources.spell "debug/frenzy" {
-	name = "(DEBUG) Frenzy",
+	name = "Frenzy",
+	usage = "debug",
 	description = "Applies frenzy",
 	icon = resources.texture "dummy.png",
 
