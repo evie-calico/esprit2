@@ -160,7 +160,7 @@ fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	)?;
 	action.set(
 		"cast",
-		F::wrap(|spell, args| Ok(character::Action::Cast(spell, args))),
+		F::wrap(|ability, args| Ok(character::Action::Ability(ability, args))),
 	)?;
 	Ok(action)
 }

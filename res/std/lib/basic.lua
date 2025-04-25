@@ -17,10 +17,10 @@ return function(user)
 		end
 	end
 
-	for _, spell_id in user:spells() do
-		local spell = resources:spell(spell_id)
-		if spell.on_consider ~= nil then
-			spell.on_consider(user, spell_id, considerations)
+	for _, ability_id in user:abilities() do
+		local ability = resources:ability(ability_id)
+		if ability.on_consider ~= nil then
+			ability.on_consider(user, ability_id, considerations)
 		end
 	end
 

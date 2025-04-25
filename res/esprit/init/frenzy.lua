@@ -1,16 +1,10 @@
 local world = require "engine.world"
 local resources = require "std:resources"
 
-resources.spell "debug/frenzy" {
+resources.ability "debug/frenzy" {
 	name = "Frenzy",
 	usage = "debug",
 	description = "Applies frenzy",
-	icon = resources.texture "dummy.png",
-
-	energy = "positive",
-	harmony = "order",
-
-	level = 0,
 
 	on_cast = function(_, _, args)
 		local console = require "runtime.console"

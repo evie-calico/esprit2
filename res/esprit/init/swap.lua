@@ -3,7 +3,7 @@ local world = require "engine.world"
 local log = require "engine.types.log"
 local team = require "std:team"
 local resources = require "std:resources"
-local spell = require "esprit:spell"
+local ability = require "esprit:ability"
 
 -- Feel free to change this value as needed, it's set to an arbitrary value to test the resistance code.
 local function magnitude(user) return user.stats.magic end
@@ -12,23 +12,23 @@ local range = 8
 -- Long cast time to punish risky swaps
 local cast_time = 48
 -- This perfectly matches Luvui's affinity, making it a good early game spell for her.
-local affinity = spell.affinity.new(spell.affinity.positive, spell.affinity.chaos)
+local affinity = ability.spell.affinity.new(ability.spell.affinity.positive, ability.spell.affinity.chaos)
 local level = 4
 
-resources.spell "swap" {
+resources.ability "swap" {
 	name = "Swap",
-	usage = spell.sp_usage(level),
+	usage = ability.spell.sp_usage(level),
 	description = "Swaps the caster's position with the target. For non-allied targets, the spell must have a magnitude greater than the target's resistance.",
 	-- TODO: Swap icon
 	icon = resources.texture "magic_missile.png",
 
-	castable = spell.make_castable(4, affinity),
-	on_cast = function(user, spell, args)
+	castable = ability.spell.make_castable(4, affinity),
+	on_cast = function(user, _, args)
 		local console = require "runtime.console"
 		local target = world.character_at(args.target.x, args.target.y)
 		if target == nil then return end
 
-		user.sp = user.sp - spell.level
+		user.sp = user.sp - level
 
 		if not team.friendly(user, target)
 			and affinity:magnitude(user, magnitude(user)) - target.stats.resistance <= 0

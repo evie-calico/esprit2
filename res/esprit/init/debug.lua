@@ -1,8 +1,8 @@
 local world = require "engine.world"
 local resources = require "std:resources"
-local spell = require "esprit:spell"
+local ability = require "esprit:ability"
 
-resources.spell "debug/level_up" {
+resources.ability "debug/level_up" {
 	name = "Level Up",
 	usage = "debug",
 	description = "Causes the targeted character to gain a level.",
@@ -26,7 +26,7 @@ resources.spell "debug/level_up" {
 	end,
 }
 
-resources.spell "debug/possess" {
+resources.ability "debug/possess" {
 	name = "Possess",
 	usage = "debug",
 	description = "Makes the targetted piece controllable by the user of this spell. Removes consciousness if it's already present.",
@@ -54,7 +54,7 @@ resources.spell "debug/possess" {
 	end,
 }
 
-resources.spell "debug/change_affinity" {
+resources.ability "debug/change_affinity" {
 	name = "Change Affinity",
 	usage = "debug",
 	description = "Changes the target's magical affinity",
@@ -98,10 +98,10 @@ resources.spell "debug/change_affinity" {
 		local input = require "runtime.input"
 
 		local direction_to_affinity = {
-			["Up"] = spell.affinity.positive,
-			["Down"] = spell.affinity.negative,
-			["Left"] = spell.affinity.order,
-			["Right"] = spell.affinity.chaos,
+			["Up"] = ability.spell.affinity.positive,
+			["Down"] = ability.spell.affinity.negative,
+			["Left"] = ability.spell.affinity.order,
+			["Right"] = ability.spell.affinity.chaos,
 		}
 
 		local target = input.cursor(user.x, user.y, 5)

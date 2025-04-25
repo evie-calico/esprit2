@@ -88,7 +88,7 @@ pub(crate) fn menu(
 		}
 		input::Mode::Cast => {
 			menu.label("Cast");
-			spell_menu(menu, world_manager.next_character(), resources);
+			ability_menu(menu, world_manager.next_character(), resources);
 		}
 		input::Mode::Cursor(input::Cursor {
 			position: (x, y), ..
@@ -131,25 +131,25 @@ pub(crate) fn menu(
 	}
 }
 
-pub(crate) fn spell_menu(
+pub(crate) fn ability_menu(
 	gui: &mut gui::Context,
 	character: &character::Ref,
 	resources: &resource::Manager,
 ) {
-	for (spell, letter) in character
+	for (ability, letter) in character
 		.borrow()
 		.sheet
-		.spells
+		.abilities
 		.iter()
-		.map(|k| resources.spell.get(k))
+		.map(|k| resources.ability.get(k))
 		.zip('a'..='z')
 	{
-		let Ok(spell) = spell else {
-			gui.label("<Missing Spell>");
+		let Ok(ability) = ability else {
+			gui.label("<Missing Ability>");
 			continue;
 		};
 
-		let castability = spell.castable(character.clone());
+		let castability = ability.usable(character.clone());
 		let (uncastable_reason, color) = match &castability {
 			Ok(None) => (None, (255, 255, 255, 255)),
 			Ok(Some(message)) => (Some(&**message), (128, 128, 128, 255)),
@@ -161,8 +161,8 @@ pub(crate) fn spell_menu(
 		gui.horizontal();
 		gui.label_color(&format!("( {letter} ) "), color);
 		gui.x = gui.x.max(64);
-		gui.label_color(&spell.name, color);
-		if let Some(usage) = &spell.usage {
+		gui.label_color(&ability.name, color);
+		if let Some(usage) = &ability.usage {
 			gui.label_color(" - ", color);
 			gui.label_color(usage, color);
 		}

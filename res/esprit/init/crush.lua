@@ -2,7 +2,7 @@ local combat = require "engine.combat"
 local world = require "engine.world"
 local log = require "engine.types.log"
 local resources = require "std:resources"
-local spell = require "esprit:spell"
+local ability = require "esprit:ability"
 
 -- Distance adds to this, so it's effectively magic + 2 + 2d(displacement)
 local function magnitude(user) return user.stats.magic + 2 end
@@ -12,17 +12,17 @@ local radius = 4       -- How large the area is
 local displacement = 5 -- How far targets are moved
 local cast_time = 1
 -- This spell is 75% effective for luvui, making it a cheap, early utility spell with some offensive capability.
-local affinity = spell.affinity.new(spell.affinity.negative, spell.affinity.chaos)
+local affinity = ability.spell.affinity.new(ability.spell.affinity.negative, ability.spell.affinity.chaos)
 local level = 2
 
-resources.spell "crush" {
+resources.ability "crush" {
 	name = "Crush",
-	usage = spell.sp_usage(level),
+	usage = ability.spell.sp_usage(level),
 	description = "Manipulates gravity to pull targets in any direction. Targets that hit walls will recieve damage according to the spell's magnitude, plus a bonus for each tile traveled.",
 	icon = resources.texture "magic_missile.png",
 
-	castable = spell.make_castable(2, affinity),
-	on_cast = function(user, spell, args)
+	castable = ability.spell.make_castable(2, affinity),
+	on_cast = function(user, _, args)
 		local console = require "runtime.console"
 		-- It would be nice to all some filters for *requesting* a list of characters,
 		-- (sort of like yielding a Cursor ActionRequest) with some sort of query language
@@ -107,7 +107,7 @@ resources.spell "crush" {
 			end
 		end
 
-		user.sp = user.sp - spell.level
+		user.sp = user.sp - level
 
 		return cast_time
 	end,

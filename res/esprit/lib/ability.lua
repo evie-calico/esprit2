@@ -1,17 +1,19 @@
-local spell = {}
+local ability = {}
 
-spell.affinity = {
+ability.spell = {}
+
+ability.spell.affinity = {
 	positive = "positive",
 	negative = "negative",
 	order = "order",
 	chaos = "chaos",
 }
 
-function spell.sp_usage(cost)
+function ability.spell.sp_usage(cost)
 	return "-" .. cost .. " SP"
 end
 
-function spell.make_castable(cost, affinity)
+function ability.spell.make_castable(cost, affinity)
 	return function(user)
 		if user.sp < cost then
 			return "not enough SP"
@@ -21,16 +23,16 @@ function spell.make_castable(cost, affinity)
 	end
 end
 
-function spell.affinity.new(first, second)
-	if (first == spell.affinity.positive or first == spell.affinity.negative)
-		and (second == spell.affinity.positive or second == spell.affinity.negative)
-		or (first == spell.affinity.order or first == spell.affinity.chaos)
-		and (second == spell.affinity.order or second == spell.affinity.chaos)
+function ability.spell.affinity.new(first, second)
+	if (first == ability.spell.affinity.positive or first == ability.spell.affinity.negative)
+		and (second == ability.spell.affinity.positive or second == ability.spell.affinity.negative)
+		or (first == ability.spell.affinity.order or first == ability.spell.affinity.chaos)
+		and (second == ability.spell.affinity.order or second == ability.spell.affinity.chaos)
 	then
 		error("mixed affinities")
 	end
 
-	local affinity = (first == spell.affinity.positive or first == spell.affinity.negative) and {
+	local affinity = (first == ability.spell.affinity.positive or first == ability.spell.affinity.negative) and {
 		energy = first,
 		harmony = second,
 	} or {
@@ -69,4 +71,4 @@ function spell.affinity.new(first, second)
 	return affinity
 end
 
-return spell
+return ability

@@ -11,7 +11,7 @@ function resources:component(key) end
 function resources:attack(key) end
 
 ---@param key string
----@return Spell
-function resources:spell(key) end
+---@return Ability
+function resources:ability(key) end
 
 return resources

@@ -4,9 +4,10 @@
 pub struct Attack {
 	pub name: String,
 	pub description: String,
-	pub on_input: mlua::Function,
+
 	pub on_use: mlua::Function,
 	pub on_consider: Option<mlua::Function>,
+	pub on_input: mlua::Function,
 }
 
 impl mlua::UserData for Attack {

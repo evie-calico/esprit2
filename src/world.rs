@@ -354,11 +354,11 @@ impl Manager {
 				next_character,
 				arguments,
 			)?,
-			character::Action::Cast(spell, arguments) => self.cast(
+			character::Action::Ability(ability, arguments) => self.cast(
 				resources
-					.spell
-					.get(&spell)
-					.context("failed to retrieve spell")?
+					.ability
+					.get(&ability)
+					.context("failed to retrieve ability")?
 					.clone(),
 				next_character,
 				lua,
@@ -396,20 +396,20 @@ impl Manager {
 
 	fn cast(
 		&mut self,
-		spell: Rc<Spell>,
+		ability: Rc<Ability>,
 		user: character::Ref,
 		lua: &mlua::Lua,
 		argument: Value,
 		console: impl console::Handle,
 	) -> mlua::Result<Option<u32>> {
-		if let Some(rejection_message) = spell.castable(user.clone())? {
+		if let Some(rejection_message) = ability.usable(user.clone())? {
 			console.print_system(rejection_message);
 			Ok(None)
 		} else {
 			self.poll::<Option<Aut>>(
 				lua,
-				lua.create_thread(spell.on_cast.clone())?,
-				(user, spell, argument),
+				lua.create_thread(ability.on_use.clone())?,
+				(user, ability, argument),
 			)
 		}
 	}

@@ -20,9 +20,9 @@ function action.move(x, y) end
 ---@return Action
 function action.attack(attack, args) end
 
----@param spell string
+---@param move string
 ---@param args Value
 ---@return Action
-function action.cast(spell, args) end
+function action.cast(move, args) end
 
 return action

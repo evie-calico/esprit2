@@ -183,7 +183,7 @@ impl mlua::UserData for Request {}
 
 pub(crate) enum PartialAction {
 	Attack(Box<str>, character::Ref, mlua::Thread),
-	Spell(Box<str>, character::Ref, mlua::Thread),
+	Ability(Box<str>, character::Ref, mlua::Thread),
 }
 
 impl PartialAction {
@@ -203,16 +203,16 @@ impl PartialAction {
 					)))
 				}
 			}
-			PartialAction::Spell(spell, next_character, thread) => {
+			PartialAction::Ability(ability, next_character, thread) => {
 				let value = thread.resume(arg)?;
 				if let mlua::ThreadStatus::Resumable = thread.status() {
 					Ok(Response::Partial(
-						PartialAction::Spell(spell, next_character, thread),
+						PartialAction::Ability(ability, next_character, thread),
 						Request::from_lua(value, lua)?,
 					))
 				} else {
-					Ok(Response::Act(character::Action::Cast(
-						spell,
+					Ok(Response::Act(character::Action::Ability(
+						ability,
 						Value::from_lua(value, lua)?,
 					)))
 				}
@@ -409,28 +409,28 @@ pub(crate) fn controllable_character(
 
 			// TODO: just make an array of keys in the options file or something.
 			let selected_index = (u32::from(keycode)) - (u32::from(Keycode::A));
-			let spell_id = world
+			let ability_id = world
 				.next_character()
 				.borrow()
 				.sheet
-				.spells
+				.abilities
 				.get(selected_index as usize)
 				.cloned();
 			if (0..=26).contains(&selected_index)
-				&& let Some(spell_id) = spell_id
+				&& let Some(ability_id) = ability_id
 			{
-				let spell = resources
-					.spell
-					.get(&spell_id)
-					.context("failed to retrieve spell")?;
+				let ability = resources
+					.ability
+					.get(&ability_id)
+					.context("failed to retrieve ability")?;
 				let character = world.next_character().clone();
-				if spell.castable(character.clone())?.is_none() {
+				if ability.usable(character.clone())?.is_none() {
 					Ok((
 						Mode::Normal,
-						Some(gather_spell_inputs(
+						Some(gather_ability_inputs(
 							lua,
-							spell,
-							spell_id,
+							ability,
+							ability_id,
 							world.next_character().clone(),
 						)?),
 					))
@@ -525,16 +525,16 @@ fn gather_attack_inputs(
 		.context("failed to run attack input thread")
 }
 
-fn gather_spell_inputs(
+fn gather_ability_inputs(
 	lua: &mlua::Lua,
-	spell: &Spell,
-	spell_id: Box<str>,
+	ability: &Ability,
+	ability_id: Box<str>,
 	next_character: character::Ref,
 ) -> anyhow::Result<Response> {
-	lua.create_thread(spell.on_input.clone())
+	lua.create_thread(ability.on_input.clone())
 		.and_then(|thread| {
-			PartialAction::Spell(spell_id, next_character.clone(), thread)
-				.resolve(lua, (next_character, spell.clone()))
+			PartialAction::Ability(ability_id, next_character.clone(), thread)
+				.resolve(lua, (next_character, ability.clone()))
 		})
-		.context("failed to run spell input thread")
+		.context("failed to run ability input thread")
 }

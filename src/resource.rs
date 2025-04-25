@@ -93,10 +93,10 @@ impl<T> Default for Resource<T> {
 /// meaning outside code doesn't need to store permanent references to resources.
 #[derive(Debug, Default)]
 pub struct Manager {
+	pub ability: Resource<Rc<ability::Ability>>,
 	pub attack: Resource<Rc<attack::Attack>>,
 	pub component: Resource<Rc<component::Component>>,
 	pub sheet: Resource<Rc<character::Sheet>>,
-	pub spell: Resource<Rc<spell::Spell>>,
 	pub vault: Resource<Rc<vault::Vault>>,
 }
 
@@ -125,8 +125,11 @@ impl mlua::UserData for Handle {
 				.cloned()
 				.map_err(mlua::Error::external)
 		});
-		methods.add_method("spell", |_lua, this, key: Box<str>| {
-			this.spell.get(&key).cloned().map_err(mlua::Error::external)
+		methods.add_method("ability", |_lua, this, key: Box<str>| {
+			this.ability
+				.get(&key)
+				.cloned()
+				.map_err(mlua::Error::external)
 		});
 		methods.add_method("component", |_lua, this, key: Box<str>| {
 			this.component
@@ -172,19 +175,19 @@ fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
 		nouns: get!(table.nouns)?,
 		stats: stats(get!(table.stats)?)?,
 		attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),
-		spells: table.get::<Option<_>>("spells")?.unwrap_or_default(),
+		abilities: table.get::<Option<_>>("abilities")?.unwrap_or_default(),
 		on_consider: get!(table.on_consider)?,
 	})
 }
 
-fn spell(_id: &str, table: mlua::Table) -> anyhow::Result<spell::Spell> {
-	Ok(spell::Spell {
+fn ability(_id: &str, table: mlua::Table) -> anyhow::Result<ability::Ability> {
+	Ok(ability::Ability {
 		name: get!(table.name)?,
 		usage: get!(table.usage)?,
 		description: get!(table.description)?,
-		castable: get!(table.castable)?,
+		usable: get!(table.castable)?,
 		on_input: get!(table.on_input)?,
-		on_cast: get!(table.on_cast)?,
+		on_use: get!(table.on_cast)?,
 		on_consider: get!(table.on_consider)?,
 	})
 }
@@ -292,10 +295,10 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyh
 		"init.resources",
 		lua.create_function(move |lua, ()| {
 			lua.create_table_from([
+				("ability", lua.create_table()?),
 				("attack", lua.create_table()?),
 				("component", lua.create_table()?),
 				("sheet", lua.create_table()?),
-				("spell", lua.create_table()?),
 				("vault", lua.create_table()?),
 				(
 					"module",
@@ -357,7 +360,7 @@ fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<anyhow::
 				$( produce!($type); )+
 			}
 		}
-	produce!(attack, sheet, spell, component, vault);
+	produce!(ability, attack, sheet, component, vault);
 
 	products
 }
@@ -446,7 +449,7 @@ pub fn open<
 							$( combine!($type); )+
 						}
 					}
-				combine!(attack, sheet, spell, component, vault);
+				combine!(ability, attack, sheet, component, vault);
 				None
 			}
 			PreliminaryModule {

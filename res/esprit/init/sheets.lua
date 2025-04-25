@@ -21,7 +21,7 @@ resources.sheet "luvui" {
 	},
 
 	attacks = attacks,
-	spells = {
+	abilities = {
 		"esprit:magic_missile",
 		"esprit:swap",
 		"esprit:crush",

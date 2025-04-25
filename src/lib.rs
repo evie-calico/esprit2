@@ -9,6 +9,7 @@
 	try_blocks
 )]
 
+pub mod ability;
 pub mod astar;
 pub mod attack;
 pub mod character;
@@ -21,7 +22,6 @@ pub mod item;
 pub mod lua;
 pub mod nouns;
 pub mod resource;
-pub mod spell;
 pub mod value;
 pub mod vault;
 pub mod world;
@@ -146,13 +146,13 @@ pub mod prelude {
 	pub use super::*;
 
 	// Import redundant module::Struct names.
+	pub use ability::Ability;
 	pub use attack::Attack;
 	pub use component::Component;
 	pub use consider::Consider;
 	pub use floor::Floor;
 	pub use item::Item;
 	pub use nouns::Nouns;
-	pub use spell::Spell;
 	pub use vault::Vault;
 
 	// Export common traits

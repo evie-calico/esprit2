@@ -40,7 +40,7 @@ local function impl_modules_for_types(types)
 	return resources
 end
 
-local resources = impl_modules_for_types { "attack", "component", "sheet", "spell", "vault" }
+local resources = impl_modules_for_types { "ability", "attack", "component", "sheet", "vault" }
 
 --- Removes a dot (.) and any subsequent non-dot characters from the end of the string.
 ---

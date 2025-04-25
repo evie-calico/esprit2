@@ -72,7 +72,7 @@ impl std::ops::Deref for Ref {
 	}
 }
 
-// TODO: Use `try_borrow(_mut)?` methods to catch immutability violations in scripts (such as spell's castable)
+// TODO: Use `try_borrow(_mut)?` methods to catch immutability violations in scripts (such as `Ability`'s usable)
 impl mlua::UserData for Ref {
 	fn add_fields<F: mlua::prelude::LuaUserDataFields<Self>>(fields: &mut F) {
 		macro_rules! get {
@@ -119,17 +119,17 @@ impl mlua::UserData for Ref {
 			}
 		});
 
-		methods.add_function("spells", |_, this: mlua::AnyUserData| {
+		methods.add_function("abilities", |_, this: mlua::AnyUserData| {
 			Ok((
-				this.metatable()?.get::<mlua::Function>("__next_spell")?,
+				this.metatable()?.get::<mlua::Function>("__next_ability")?,
 				this,
 				mlua::Nil,
 			))
 		});
-		methods.add_meta_method("__next_spell", |lua, this, index: mlua::Value| {
+		methods.add_meta_method("__next_ability", |lua, this, index: mlua::Value| {
 			let index = index.as_usize().unwrap_or(0);
-			if let Some(spell) = this.borrow().sheet.spells.get(index) {
-				lua.pack_multi((index + 1, spell.clone()))
+			if let Some(ability) = this.borrow().sheet.abilities.get(index) {
+				lua.pack_multi((index + 1, ability.clone()))
 			} else {
 				mlua::Nil.into_lua_multi(lua)
 			}
@@ -323,7 +323,7 @@ pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
 	Attack(Box<str>, Value),
-	Cast(Box<str>, Value),
+	Ability(Box<str>, Value),
 }
 
 impl mlua::UserData for Action {}
@@ -341,7 +341,7 @@ pub struct Sheet {
 	pub stats: Stats,
 
 	pub attacks: Vec<Box<str>>,
-	pub spells: Vec<Box<str>>,
+	pub abilities: Vec<Box<str>>,
 
 	/// Script to decide on an action from a list of considerations
 	pub on_consider: Box<str>,

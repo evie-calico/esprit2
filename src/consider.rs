@@ -1,7 +1,7 @@
 //! Enumerate and assign scores to potential actions.
 //!
 //! This is mainly for enemy logic, but may have some use for player UI,
-//! such as showing a sorted list of potential spell targets rather than a cursor.
+//! such as showing a sorted list of potential ability targets rather than a cursor.
 
 use crate::prelude::*;
 use mlua::IntoLuaMulti;
@@ -11,7 +11,7 @@ use mlua::IntoLuaMulti;
 ///
 /// It's worth noting that this is intentionally a VERY rough estimation.
 /// Many effects and outcomes will be ignored or oversimplified by this system.
-/// If this becomes an issue more heuristics can be added to better express the outcomes of spells,
+/// If this becomes an issue more heuristics can be added to better express the outcomes of abilities,
 /// but low performance costs should be a priority over accuracy.
 #[derive(Clone, Debug, mlua::FromLua)]
 pub enum Heuristic {
@@ -95,8 +95,8 @@ impl mlua::UserData for Consider {
 		methods.add_method("attack", |_, this, ()| {
 			Ok(matches!(this.action, character::Action::Attack(..)))
 		});
-		methods.add_method("spell", |_, this, ()| {
-			Ok(matches!(this.action, character::Action::Cast(..)))
+		methods.add_method("ability", |_, this, ()| {
+			Ok(matches!(this.action, character::Action::Ability(..)))
 		});
 	}
 }
