@@ -10,12 +10,11 @@ local resources = require "std:resources"
 local team = require "std:team"
 
 local function magnitude(user) return user.stats.power + 4 end
+local use_time = 12
 
 resources.attack "scratch" {
 	name = "Scratch",
 	description = "Causes a small amount of bleeding damage, which reduces defense.",
-
-	use_time = 12,
 
 	on_use = function(user, attack, args)
 		local console = require "runtime.console"
@@ -67,7 +66,7 @@ resources.attack "scratch" {
 			console:combat_log(pick(damage_messages), log.Hit(damage))
 		end
 
-		return attack.use_time
+		return use_time
 	end,
 	on_consider = function(user, attack_id, considerations)
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do

@@ -2,11 +2,11 @@ local resources = require "std:resources"
 local team = require "std:team"
 
 local function magnitude(user) return user.stats.power + 8 end
+local use_time = 12
 
 resources.attack "bite" {
 	name = "Bite",
 	description = "Lowers your defense until your next turn.",
-	use_time = 12,
 
 	on_use = function(user, attack, args)
 		local combat = require "engine.combat"
@@ -55,8 +55,7 @@ resources.attack "bite" {
 			console:combat_log(pick(damage_messages), log.Hit(damage))
 		end
 
-		-- TODO use a constant
-		return 12
+		return use_time
 	end,
 	on_consider = function(user, attack_id, considerations)
 		local world = require "engine.world"

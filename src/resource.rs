@@ -152,7 +152,6 @@ fn attack(_id: &str, table: mlua::Table) -> anyhow::Result<attack::Attack> {
 		on_input: get!(table.on_input)?,
 		on_use: get!(table.on_use)?,
 		on_consider: get!(table.on_consider)?,
-		use_time: get!(table.use_time)?,
 	})
 }
 
