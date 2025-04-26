@@ -171,7 +171,6 @@ pub(crate) fn characters(
 				textures.get(
 					textures
 						.sheets
-						// TODO: Don't hard-code this.
 						.get(&character.sheet.id)
 						.map_or("missingno", |x| &x.icon),
 				),
