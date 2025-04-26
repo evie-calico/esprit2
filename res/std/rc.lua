@@ -1,0 +1,1 @@
+require "std:teams".init()

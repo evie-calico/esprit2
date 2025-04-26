@@ -1,4 +1,4 @@
-local team = require "std:team"
+local teams = require "std:teams"
 local resources = require "std:resources"
 local ability = require "esprit:ability"
 
@@ -89,7 +89,7 @@ resources.ability "magic_missile" {
 		local heuristic = require "engine.types.heuristic"
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, range)) do
-			if not team.friendly(user, character) then
+			if not teams.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(

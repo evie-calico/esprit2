@@ -15,7 +15,7 @@ end
 
 resources.sheet "luvui" {
 	textures = {
-		icon = resources.texture "sheets/luvui.png",
+		icon = resources.texture "luvui.png",
 	},
 
 	abilities = {
@@ -62,7 +62,7 @@ end
 
 resources.sheet "aris" {
 	textures = {
-		icon = resources.texture "sheets/aris.png",
+		icon = resources.texture "aris.png",
 	},
 
 	abilities = {

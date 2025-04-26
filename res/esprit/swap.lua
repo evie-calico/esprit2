@@ -1,7 +1,7 @@
 local combat = require "engine.combat"
 local world = require "engine.world"
 local log = require "engine.types.log"
-local team = require "std:team"
+local teams = require "std:teams"
 local resources = require "std:resources"
 local ability = require "esprit:ability"
 
@@ -30,7 +30,7 @@ resources.ability "swap" {
 
 		user.sp = user.sp - level
 
-		if not team.friendly(user, target)
+		if not teams.friendly(user, target)
 			and affinity:magnitude(user, magnitude(user)) - target.stats.resistance <= 0
 		then
 			console:combat_log(

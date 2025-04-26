@@ -5,31 +5,9 @@
 //! Resources are tied to a lua runtime, so any lua objects created at this
 //! stage will be available for the rest of the game.
 //!
-//! A module is laid out as follows:
-//!
-//! ```
-//! <module name>/
-//! ├── init/
-//! │   └── **.lua
-//! ├── lib/
-//! │   └── **.lua
-//! └── textures/
-//!     ├── **.png
-//!     └── **.png
-//! ```
-//!
-//! All lua files underneath the `init/` directory (as represented by `**.lua`)
-//! are executed at the initialization phase, and can access the `init.*` lua modules
-//! for constructing resources.
-//!
-//! The `lib` directory is registered with `require` during the initialization phase,
-//! with `<module name>/lib/` replaced by `<module name>:`.
-//!
-//! For example, `foo/lib/bar/baz.lua` becomes `require "foo:bar/baz"`.
-//!
-//! There is no way to access other modules' `lib/` directories during initialization.
-//! After the intialization phase, all modules' `lib/` directories will permanently be accessible via `require`.
-//! This means that—like the `runtime.*` modules—they may only be `require`d from callback functions.
+//! A module is a directory containing an rc.lua script.
+//! The rest of the directory's structure is determined by this script's behavior;
+//! lua's standard library can be used to open surrounding files.
 //!
 //! ## Auxilary init modules
 //!
@@ -222,7 +200,7 @@ fn lib_searcher(
 		if let Some((path_module, path)) = path.as_ref().split_once(':')
 			&& module == path_module
 		{
-			let mut directory = directory.join("lib");
+			let mut directory = directory.clone();
 			directory.push(path);
 			directory.set_extension("lua");
 			let chunk = mlua::ErrorContext::with_context(
@@ -249,22 +227,6 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyh
 	directory: impl AsRef<Path>,
 	mut load: Load,
 ) -> anyhow::Result<mlua::Table> {
-	fn recurse(directory: &Path, lua: &mlua::Lua) -> anyhow::Result<()> {
-		for entry in fs::read_dir(directory)? {
-			let entry = entry?;
-			let path = entry.path();
-			if entry.metadata()?.is_dir() {
-				recurse(&path, lua)?;
-			} else {
-				lua.load(&fs::read_to_string(&path)?)
-					.set_name(format!("@{}", path.display()))
-					.exec()?;
-			}
-		}
-
-		Ok(())
-	}
-
 	let directory = directory.as_ref();
 
 	let lua_name = mlua::Value::String(lua.create_string(name)?);
@@ -291,8 +253,16 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyh
 			])
 		})?,
 	)?;
-	let init = directory.join("init/");
-	let mut init = || recurse(&init, lua);
+	let path = directory.join("rc.lua");
+	let mut init = || {
+		Ok(lua
+			.load(
+				&fs::read_to_string(&path)
+					.with_context(|| format!("failed to open {}", path.display()))?,
+			)
+			.set_name(format!("@{}", path.display()))
+			.exec()?)
+	};
 	let result = load(name, directory, &mut init);
 	lua.unload("init.resources")?;
 	result?; // defer errors to hopefully unload init.resources?

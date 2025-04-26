@@ -7,7 +7,7 @@ local heuristic = require "engine.types.heuristic"
 local log = require "engine.types.log"
 
 local resources = require "std:resources"
-local team = require "std:team"
+local teams = require "std:teams"
 
 local function magnitude(user) return user.stats.power + 4 end
 local use_time = 12
@@ -70,7 +70,7 @@ resources.ability "scratch" {
 	end,
 	on_consider = function(user, attack_id, considerations)
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
-			if team.friendly(user, character) then
+			if teams.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(

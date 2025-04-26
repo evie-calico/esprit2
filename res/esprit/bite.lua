@@ -1,5 +1,5 @@
 local resources = require "std:resources"
-local team = require "std:team"
+local teams = require "std:teams"
 
 local function magnitude(user) return user.stats.power + 8 end
 local use_time = 12
@@ -64,7 +64,7 @@ resources.ability "bite" {
 		local heuristic = require "engine.types.heuristic"
 
 		for _, character in ipairs(world.characters_within(user.x, user.y, 1)) do
-			if not team.friendly(user, character) then
+			if not teams.friendly(user, character) then
 				table.insert(
 					considerations,
 					consider(
