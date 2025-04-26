@@ -493,7 +493,6 @@ fn character_buffs(
 	resources: &resource::Manager,
 	textures: &texture::Manager,
 ) {
-	// TODO: Hide certain components by default
 	let components = piece
 		.components
 		.keys()
