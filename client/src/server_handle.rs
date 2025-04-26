@@ -240,7 +240,7 @@ impl<'texture> ServerHandle<'texture> {
 					self.chase_point = Some(point);
 					mode
 				}
-				Some(input::Response::Act(action)) => {
+				Some(input::Response::Action(action)) => {
 					self.perform_action(lua, action).await?;
 					mode
 				}

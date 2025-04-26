@@ -103,21 +103,6 @@ impl mlua::UserData for Ref {
 
 	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
 		methods.add_meta_method("__eq", |_, this, other: Ref| Ok(*this == other));
-		methods.add_function("attacks", |_, this: mlua::AnyUserData| {
-			Ok((
-				this.metatable()?.get::<mlua::Function>("__next_attack")?,
-				this,
-				mlua::Nil,
-			))
-		});
-		methods.add_meta_method("__next_attack", |lua, this, index: mlua::Value| {
-			let index = index.as_usize().unwrap_or(0);
-			if let Some(attack) = this.borrow().sheet.attacks.get(index) {
-				lua.pack_multi((index + 1, attack.clone()))
-			} else {
-				mlua::Nil.into_lua_multi(lua)
-			}
-		});
 
 		methods.add_function("abilities", |_, this: mlua::AnyUserData| {
 			Ok((
@@ -322,7 +307,6 @@ impl Piece {
 pub enum Action {
 	Wait(Aut),
 	Move(i32, i32),
-	Attack(Box<str>, Value),
 	Ability(Box<str>, Value),
 }
 
@@ -340,7 +324,6 @@ pub struct Sheet {
 
 	pub stats: Stats,
 
-	pub attacks: Vec<Box<str>>,
 	pub abilities: Vec<Box<str>>,
 
 	/// Script to decide on an action from a list of considerations

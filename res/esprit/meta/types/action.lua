@@ -15,11 +15,6 @@ function action.wait(time) end
 ---@return Action
 function action.move(x, y) end
 
----@param attack string
----@param args Value
----@return Action
-function action.attack(attack, args) end
-
 ---@param move string
 ---@param args Value
 ---@return Action

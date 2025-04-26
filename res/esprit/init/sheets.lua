@@ -1,7 +1,5 @@
 local resources = require "std:resources"
 
-local attacks = { "esprit:scratch", "esprit:bite" }
-
 -- TODO: "things sheets used to contain"
 local function luvui_prototype()
 	local luvui = piece.new("luvui")
@@ -20,8 +18,10 @@ resources.sheet "luvui" {
 		icon = resources.texture "sheets/luvui.png",
 	},
 
-	attacks = attacks,
 	abilities = {
+		"esprit:scratch",
+		"esprit:bite",
+
 		"esprit:magic_missile",
 		"esprit:swap",
 		"esprit:crush",
@@ -65,7 +65,10 @@ resources.sheet "aris" {
 		icon = resources.texture "sheets/aris.png",
 	},
 
-	attacks = attacks,
+	abilities = {
+		"esprit:scratch",
+		"esprit:bite",
+	},
 
 	on_consider = "std:basic",
 	nouns = {

@@ -344,16 +344,6 @@ impl Manager {
 					}
 				}
 			}
-			character::Action::Attack(attack, arguments) => self.attack(
-				lua,
-				resources
-					.attack
-					.get(&attack)
-					.context("failed to retrieve attack")?
-					.clone(),
-				next_character,
-				arguments,
-			)?,
 			character::Action::Ability(ability, arguments) => self.act(
 				resources
 					.ability
@@ -412,17 +402,6 @@ impl Manager {
 				(user, ability, argument),
 			)
 		}
-	}
-
-	pub fn attack(
-		&self,
-		lua: &mlua::Lua,
-		attack: Rc<Attack>,
-		user: character::Ref,
-		argument: Value,
-	) -> mlua::Result<Option<Aut>> {
-		let thread = lua.create_thread(attack.on_use.clone())?;
-		self.poll::<Option<Aut>>(lua, thread, (user, attack, argument))
 	}
 
 	pub fn move_piece(

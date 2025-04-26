@@ -94,7 +94,6 @@ impl<T> Default for Resource<T> {
 #[derive(Debug, Default)]
 pub struct Manager {
 	pub ability: Resource<Rc<ability::Ability>>,
-	pub attack: Resource<Rc<attack::Attack>>,
 	pub component: Resource<Rc<component::Component>>,
 	pub sheet: Resource<Rc<character::Sheet>>,
 	pub vault: Resource<Rc<vault::Vault>>,
@@ -119,12 +118,6 @@ impl std::ops::Deref for Handle {
 
 impl mlua::UserData for Handle {
 	fn add_methods<M: mlua::prelude::LuaUserDataMethods<Self>>(methods: &mut M) {
-		methods.add_method("attack", |_lua, this, key: Box<str>| {
-			this.attack
-				.get(&key)
-				.cloned()
-				.map_err(mlua::Error::external)
-		});
 		methods.add_method("ability", |_lua, this, key: Box<str>| {
 			this.ability
 				.get(&key)
@@ -148,16 +141,6 @@ macro_rules! get {
 	};
 }
 
-fn attack(_id: &str, table: mlua::Table) -> anyhow::Result<attack::Attack> {
-	Ok(attack::Attack {
-		name: get!(table.name)?,
-		description: get!(table.description)?,
-		on_input: get!(table.on_input)?,
-		on_use: get!(table.on_use)?,
-		on_consider: get!(table.on_consider)?,
-	})
-}
-
 fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
 	let stats = |table: mlua::Table| -> anyhow::Result<_> {
 		Ok(character::Stats {
@@ -174,7 +157,6 @@ fn sheet(id: &str, table: mlua::Table) -> anyhow::Result<character::Sheet> {
 		id: id.into(),
 		nouns: get!(table.nouns)?,
 		stats: stats(get!(table.stats)?)?,
-		attacks: table.get::<Option<_>>("attacks")?.unwrap_or_default(),
 		abilities: table.get::<Option<_>>("abilities")?.unwrap_or_default(),
 		on_consider: get!(table.on_consider)?,
 	})
@@ -296,7 +278,6 @@ fn init<Load: FnMut(&str, &Path, &mut dyn FnMut() -> anyhow::Result<()>) -> anyh
 		lua.create_function(move |lua, ()| {
 			lua.create_table_from([
 				("ability", lua.create_table()?),
-				("attack", lua.create_table()?),
 				("component", lua.create_table()?),
 				("sheet", lua.create_table()?),
 				("vault", lua.create_table()?),
@@ -360,7 +341,7 @@ fn produce(name: &str, prototypes: &mlua::Table) -> Result<Manager, Vec<anyhow::
 				$( produce!($type); )+
 			}
 		}
-	produce!(ability, attack, sheet, component, vault);
+	produce!(ability, sheet, component, vault);
 
 	products
 }
@@ -449,7 +430,7 @@ pub fn open<
 							$( combine!($type); )+
 						}
 					}
-				combine!(ability, attack, sheet, component, vault);
+				combine!(ability, sheet, component, vault);
 				None
 			}
 			PreliminaryModule {

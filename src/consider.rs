@@ -92,9 +92,6 @@ impl mlua::UserData for Consider {
 				mlua::Nil.into_lua_multi(lua)
 			}
 		});
-		methods.add_method("attack", |_, this, ()| {
-			Ok(matches!(this.action, character::Action::Attack(..)))
-		});
 		methods.add_method("ability", |_, this, ()| {
 			Ok(matches!(this.action, character::Action::Ability(..)))
 		});

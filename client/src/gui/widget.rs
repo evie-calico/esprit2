@@ -82,10 +82,6 @@ pub(crate) fn menu(
 			menu.console(console, &options.ui.colors.console);
 		}
 		input::Mode::Select => menu.label("Select"),
-		input::Mode::Attack => {
-			menu.label("Attack");
-			attack_menu(menu, &world_manager.next_character().borrow(), resources);
-		}
 		input::Mode::Act => {
 			menu.label("Act");
 			ability_menu(menu, world_manager.next_character(), resources);
@@ -173,26 +169,6 @@ pub(crate) fn ability_menu(
 			gui.label_color(")", color);
 		}
 		gui.vertical();
-	}
-}
-
-pub(crate) fn attack_menu(
-	gui: &mut gui::Context,
-	character: &character::Piece,
-	resources: &resource::Manager,
-) {
-	for (attack, letter) in character
-		.sheet
-		.attacks
-		.iter()
-		.map(|k| resources.attack.get(k))
-		.zip('a'..='z')
-	{
-		let Ok(attack) = attack else {
-			gui.label("<Missing Attack>");
-			continue;
-		};
-		gui.label(&format!("({letter}) {}", attack.name));
 	}
 }
 

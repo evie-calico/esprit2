@@ -7,10 +7,6 @@ local resources = {}
 function resources:component(key) end
 
 ---@param key string
----@return Attack
-function resources:attack(key) end
-
----@param key string
 ---@return Ability
 function resources:ability(key) end
 

@@ -11,7 +11,6 @@
 
 pub mod ability;
 pub mod astar;
-pub mod attack;
 pub mod character;
 pub mod combat;
 pub mod component;
@@ -147,7 +146,6 @@ pub mod prelude {
 
 	// Import redundant module::Struct names.
 	pub use ability::Ability;
-	pub use attack::Attack;
 	pub use component::Component;
 	pub use consider::Consider;
 	pub use floor::Floor;

@@ -155,10 +155,6 @@ fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	action.set("wait", F::wrap(|time| Ok(character::Action::Wait(time))))?;
 	action.set("move", F::wrap(|x, y| Ok(character::Action::Move(x, y))))?;
 	action.set(
-		"attack",
-		F::wrap(|attack, args| Ok(character::Action::Attack(attack, args))),
-	)?;
-	action.set(
 		"act",
 		F::wrap(|ability, args| Ok(character::Action::Ability(ability, args))),
 	)?;

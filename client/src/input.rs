@@ -182,27 +182,12 @@ pub(crate) enum Request {
 impl mlua::UserData for Request {}
 
 pub(crate) enum PartialAction {
-	Attack(Box<str>, character::Ref, mlua::Thread),
 	Ability(Box<str>, character::Ref, mlua::Thread),
 }
 
 impl PartialAction {
 	fn resolve(self, lua: &mlua::Lua, arg: impl mlua::IntoLuaMulti) -> mlua::Result<Response> {
 		match self {
-			PartialAction::Attack(attack, next_character, thread) => {
-				let value = thread.resume(arg)?;
-				if let mlua::ThreadStatus::Resumable = thread.status() {
-					Ok(Response::Partial(
-						PartialAction::Attack(attack, next_character, thread),
-						Request::from_lua(value, lua)?,
-					))
-				} else {
-					Ok(Response::Act(character::Action::Attack(
-						attack,
-						Value::from_lua(value, lua)?,
-					)))
-				}
-			}
 			PartialAction::Ability(ability, next_character, thread) => {
 				let value = thread.resume(arg)?;
 				if let mlua::ThreadStatus::Resumable = thread.status() {
@@ -211,7 +196,7 @@ impl PartialAction {
 						Request::from_lua(value, lua)?,
 					))
 				} else {
-					Ok(Response::Act(character::Action::Ability(
+					Ok(Response::Action(character::Action::Ability(
 						ability,
 						Value::from_lua(value, lua)?,
 					)))
@@ -244,7 +229,6 @@ pub(crate) enum Mode {
 	Normal,
 	// Select modes
 	Select,
-	Attack,
 	Act,
 	// Prompt modes
 	Cursor(Cursor),
@@ -254,7 +238,7 @@ pub(crate) enum Mode {
 
 pub(crate) enum Response {
 	Select(select::Point),
-	Act(character::Action),
+	Action(character::Action),
 	Partial(PartialAction, Request),
 }
 
@@ -285,41 +269,12 @@ pub(crate) fn controllable_character(
 						let next_character = world.next_character().borrow();
 						(next_character.x + xoff, next_character.y + yoff)
 					};
-					if world.get_character_at(x, y).is_some() {
-						if let Some(default_attack) = world
-							.next_character()
-							.borrow()
-							.sheet
-							.attacks
-							.first()
-							.cloned()
-						{
-							return Ok((
-								mode,
-								Some(Response::Act(character::Action::Attack(
-									default_attack,
-									Value::Table(Box::new([(
-										Value::String("target".into()),
-										Value::Table(Box::new([
-											(Value::String("x".into()), Value::Integer(x.into())),
-											(Value::String("y".into()), Value::Integer(y.into())),
-										])),
-									)])),
-								))),
-							));
-						}
-					} else {
-						return Ok((mode, Some(Response::Act(character::Action::Move(x, y)))));
-					}
+					return Ok((mode, Some(Response::Action(character::Action::Move(x, y)))));
 				}
 			}
 
 			if options.controls.act.contains(keycode) {
 				return Ok((Mode::Act, None));
-			}
-
-			if options.controls.attack.contains(keycode) {
-				return Ok((Mode::Attack, None));
 			}
 
 			if options.controls.select.contains(keycode) {
@@ -355,7 +310,7 @@ pub(crate) fn controllable_character(
 
 			if options.controls.autocombat.contains(keycode) {
 				let action = world.consider_action(lua, world.next_character().clone())?;
-				Ok((Mode::Normal, Some(Response::Act(action))))
+				Ok((Mode::Normal, Some(Response::Action(action))))
 			} else {
 				Ok((Mode::Normal, None))
 			}
@@ -368,36 +323,6 @@ pub(crate) fn controllable_character(
 				&& let Some(candidate) = candidates.into_iter().nth(selected_index as usize)
 			{
 				Ok((Mode::Normal, Some(Response::Select(candidate))))
-			} else {
-				Ok((Mode::Normal, None))
-			}
-		}
-		Mode::Attack => {
-			if options.controls.escape.contains(keycode) {
-				return Ok((Mode::Normal, None));
-			}
-
-			// TODO: just make an array of keys in the options file or something.
-			let selected_index = (u32::from(keycode)) - (u32::from(Keycode::A));
-			let attack_id = world
-				.next_character()
-				.borrow()
-				.sheet
-				.attacks
-				.get(selected_index as usize)
-				.cloned();
-			if (0..=26).contains(&selected_index)
-				&& let Some(attack_id) = attack_id
-			{
-				Ok((
-					Mode::Normal,
-					Some(gather_attack_inputs(
-						resources,
-						lua,
-						attack_id,
-						world.next_character().clone(),
-					)?),
-				))
 			} else {
 				Ok((Mode::Normal, None))
 			}
@@ -505,24 +430,6 @@ pub(crate) fn controllable_character(
 			}
 		}
 	}
-}
-
-fn gather_attack_inputs(
-	resources: &resource::Manager,
-	lua: &mlua::Lua,
-	attack_id: Box<str>,
-	next_character: character::Ref,
-) -> anyhow::Result<Response> {
-	let attack = resources
-		.attack
-		.get(&attack_id)
-		.context("failed to retrieve attack")?;
-	lua.create_thread(attack.on_input.clone())
-		.and_then(|thread| {
-			PartialAction::Attack(attack_id, next_character.clone(), thread)
-				.resolve(lua, (next_character, attack.clone()))
-		})
-		.context("failed to run attack input thread")
 }
 
 fn gather_ability_inputs(

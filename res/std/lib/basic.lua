@@ -10,13 +10,6 @@ return function(user)
 
 	movement(user, considerations)
 
-	for _, attack_id in user:attacks() do
-		local attack = resources:attack(attack_id)
-		if attack.on_consider ~= nil then
-			attack.on_consider(user, attack_id, considerations)
-		end
-	end
-
 	for _, ability_id in user:abilities() do
 		local ability = resources:ability(ability_id)
 		if ability.on_consider ~= nil then

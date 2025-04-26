@@ -12,11 +12,11 @@ local team = require "std:team"
 local function magnitude(user) return user.stats.power + 4 end
 local use_time = 12
 
-resources.attack "scratch" {
+resources.ability "scratch" {
 	name = "Scratch",
 	description = "Causes a small amount of bleeding damage, which reduces defense.",
 
-	on_use = function(user, attack, args)
+	on_use = function(user, _, args)
 		local console = require "runtime.console"
 
 		local target = world.character_at(args.target.x, args.target.y)
@@ -74,7 +74,7 @@ resources.attack "scratch" {
 				table.insert(
 					considerations,
 					consider(
-						action.attack(
+						action.act(
 							attack_id,
 							{ target = { x = character.x, y = character.y } }
 						),
