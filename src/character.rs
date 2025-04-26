@@ -207,7 +207,6 @@ pub struct Piece {
 	pub sp: i32,
 
 	/// Additional components of the piece with optional data.
-	// TODO: Should this go on sheet? Maybe Duration should detemrine that.
 	pub components: HashMap<Box<str>, Value>,
 
 	/// How much time has to pass until the piece is allowed to take an action.
