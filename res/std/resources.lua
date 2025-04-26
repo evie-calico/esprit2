@@ -56,8 +56,7 @@ end
 function resources.texture(path)
 	local init_resources = require "init.resources"
 	local passed, init_textures = pcall(require, "init.client.textures")
-	-- TODO: Return nil instead of "" once icons are moved out of the engine and into the client.
-	if not passed then return "missingno" end
+	if not passed then return end
 
 	local key = remove_extension(path)
 	init_textures.texture[key] = init_resources.module.path .. "/" .. path
