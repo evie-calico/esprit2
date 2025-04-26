@@ -245,7 +245,11 @@ impl Manager {
 		if !character.borrow().components.contains_key(":conscious") {
 			let action = self
 				.consider_action(lua, character.clone())
-				.context("failed to consider action")?;
+				.context("failed to consider action")?
+				.unwrap_or(character::Action::Ability(
+					":wait".into(),
+					Value::Integer(TURN as i64),
+				));
 			self.perform_action(&console, resources, lua, action)
 				.context("failed to perform action")?;
 			Ok(true)
@@ -258,7 +262,7 @@ impl Manager {
 		&self,
 		lua: &mlua::Lua,
 		character: character::Ref,
-	) -> mlua::Result<character::Action> {
+	) -> mlua::Result<Option<character::Action>> {
 		let on_consider = {
 			let character = character.borrow();
 			let on_consider = character.sheet.on_consider.as_ref();
@@ -271,8 +275,7 @@ impl Manager {
 		let thread = lua.create_thread(on_consider)?;
 		Ok(self
 			.poll::<Option<Consider>>(lua, thread, character)?
-			.map(|x| x.action)
-			.unwrap_or(character::Action::Wait(TURN)))
+			.map(|x| x.action))
 	}
 
 	/// Causes the next character in the queue to perform a given action.
@@ -315,7 +318,6 @@ impl Manager {
 		}
 
 		let delay = match action {
-			character::Action::Wait(delay) => Some(delay),
 			character::Action::Move(target_x, target_y) => {
 				let (x, y) = {
 					let next_character = next_character.borrow();

@@ -374,6 +374,76 @@ pub fn open<
 		}
 		.into(),
 	);
+	manager.ability.0.insert(
+		":wait".into(),
+		Ability {
+			name: "Wait".into(),
+			usage: None,
+			description: Some("Ends a character's turn without doing anything".into()),
+			usable: None,
+			on_use: lua
+				.create_function(
+					|_, (_user, _id, duration): (mlua::Value, mlua::Value, Option<u32>)| {
+						Ok(duration.unwrap_or(TURN))
+					},
+				)
+				.expect("builtin functions should not fail"),
+			on_consider: None,
+			on_input: lua
+				.create_function(|_, ()| Ok(TURN))
+				.expect("builtin functions should not fail"),
+		}
+		.into(),
+	);
+	manager.ability.0.insert(
+		":move".into(),
+		Ability {
+			name: "Move".into(),
+			usage: None,
+			description: Some("Moves a character towards a target".into()),
+			usable: None,
+			on_use: lua
+				.create_function(
+					|_, (_user, _id, duration): (mlua::Value, mlua::Value, Option<u32>)| {
+						Ok(duration.unwrap_or(TURN))
+					},
+				)
+				.expect("builtin functions should not fail"),
+			on_consider: Some(
+				lua.load(mlua::chunk! {
+					local world = require "engine.world"
+					local user, _, considerations = ...
+					for _, v in ipairs(world.characters()) do
+						if team.friendly(user, v) then
+							table.insert(
+								considerations,
+								consider(
+									action.act(":move", { x = v.x, y = v.y }),
+									{ heuristic.move(v.x, v.y) }
+								)
+							)
+						end
+					end
+				})
+				.into_function()
+				.expect("builtin functions should not fail"),
+			),
+			on_input: lua
+				.load(mlua::chunk! {
+					local input = require "runtime.client.input"
+					local offsets = {
+						Left = { x = -1, y = 0 },
+						Right = { x = 1, y = 0 },
+						Up = { x = 0, y = -1 },
+						Down = { x = 0, y = 1 },
+					}
+					input.direction("Move in which direction?")
+				})
+				.into_function()
+				.expect("builtin functions should not fail"),
+		}
+		.into(),
+	);
 
 	let mut preliminary_modules = modules
 		.into_iter()

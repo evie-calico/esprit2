@@ -2,13 +2,13 @@ local resources = require "std:resources"
 
 -- TODO: "things sheets used to contain"
 local function luvui_prototype()
-	local luvui = piece.new("luvui")
+	local luvui = piece.new("esprit:luvui")
 
-	luvui:attach("level", 1)
-	luvui:attach("experience", 0)
+	luvui:attach("esprit:level", 1)
+	luvui:attach("esprit:experience", 0)
 
-	luvui:attach("major", "chaos")
-	luvui:attach("minor", "positive")
+	luvui:attach("esprit:skill/major", "chaos")
+	luvui:attach("esprit:skill/minor", "positive")
 
 	return luvui
 end
@@ -49,13 +49,13 @@ resources.sheet "luvui" {
 
 -- TODO: "things sheets used to contain"
 local function aris_prototype()
-	local aris = piece.new("aris")
+	local aris = piece.new("esprit:aris")
 
-	aris:attach("level", 1)
-	aris:attach("experience", 0)
+	aris:attach("esprit:level", 1)
+	aris:attach("esprit:experience", 0)
 
-	aris:attach("major", "negative")
-	aris:attach("minor", "chaos")
+	aris:attach("esprit:skill/major", "negative")
+	aris:attach("esprit:skill/minor", "chaos")
 
 	return aris
 end

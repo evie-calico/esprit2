@@ -5,11 +5,15 @@ resources.component "level" {
 	name = "Level",
 }
 
-resources.component "major" {
+resources.component "experience" {
+	name = "Experience",
+}
+
+resources.component "skill/major" {
 	name = "Major Skill",
 }
 
-resources.component "minor" {
+resources.component "skill/minor" {
 	name = "Minor Skill",
 }
 

@@ -305,7 +305,6 @@ impl Piece {
 /// (from an incomplete player input), an `ActionRequest` will be yielded to fill in the missing information.
 #[derive(Clone, Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize, mlua::FromLua)]
 pub enum Action {
-	Wait(Aut),
 	Move(i32, i32),
 	Ability(Box<str>, Value),
 }

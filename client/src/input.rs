@@ -292,8 +292,6 @@ pub(crate) fn controllable_character(
 						console.print_unimportant("There's nothing on the ground here.");
 					}
 					Some(floor::Tile::Exit) => {
-						// TODO: move to server.
-						// world.new_floor(resources, console)?;
 						todo!();
 					}
 					None => {
@@ -309,8 +307,12 @@ pub(crate) fn controllable_character(
 			}
 
 			if options.controls.autocombat.contains(keycode) {
-				let action = world.consider_action(lua, world.next_character().clone())?;
-				Ok((Mode::Normal, Some(Response::Action(action))))
+				if let Some(action) = world.consider_action(lua, world.next_character().clone())? {
+					Ok((Mode::Normal, Some(Response::Action(action))))
+				} else {
+					console.print_system("autocombat failed");
+					Ok((Mode::Normal, None))
+				}
 			} else {
 				Ok((Mode::Normal, None))
 			}

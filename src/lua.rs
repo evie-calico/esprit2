@@ -152,7 +152,6 @@ fn world() -> impl AsChunk<'static> {
 
 fn action(lua: &Lua, _: ()) -> Result<mlua::Table> {
 	let action = lua.create_table()?;
-	action.set("wait", F::wrap(|time| Ok(character::Action::Wait(time))))?;
 	action.set("move", F::wrap(|x, y| Ok(character::Action::Move(x, y))))?;
 	action.set(
 		"act",
