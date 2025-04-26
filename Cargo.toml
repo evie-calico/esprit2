@@ -33,10 +33,10 @@ workspace = true
 
 [dependencies]
 aho-corasick = "1.1.2" # Used by nouns.rs for replacing pronouns
+anyhow = "1.0.98"
 mlua.workspace = true
 paste = "1.0.14" # Useful for proc macros
 rand = "0.9.1"
 rkyv.workspace = true
 thiserror = "2.0.3"
 tracing = "0.1.40"
-anyhow = "1.0.98"
